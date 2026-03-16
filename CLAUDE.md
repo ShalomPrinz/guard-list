@@ -18,9 +18,6 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 - Participant **name** is the unique key for statistics tracking across rounds
 - Schedules are immutable once saved — history is never retroactively modified
 - One-time renames in Step 4 do NOT propagate to the saved group
-- Use `python3` for bash commands
-- Every iteration, follow @TESTING.md rules.
-- All UI text must be in hebrew.
 
 ## Docs
 
@@ -28,3 +25,14 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 @docs/screens.md
 @docs/data-model.md
 @docs/business-logic.md
+
+### Migrations
+
+Migrations live in `docs/migrations/`. Ignore them. Also ignore @docs/implementation-plan.md unless you are told otherwise.
+
+## Requirements
+
+- Every iteration, follow @TESTING.md rules.
+- Run `vitest run --coverage` after every implementation step and every migration. Coverage must stay at or above 90% for `src/logic/` and `src/storage/` before moving on.
+- Use `python3` for bash commands
+- All UI text must be in hebrew.
