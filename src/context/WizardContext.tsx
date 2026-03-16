@@ -1,9 +1,16 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { WizardSession, TimeConfig } from '../types'
 
+export const DEFAULT_TIME_CONFIG: TimeConfig = {
+  startTime: '20:00',
+  roundingAlgorithm: 'round-up-10',
+  unevenMode: 'equal-duration',
+}
+
 interface WizardContextValue {
   session: WizardSession | null
-  startNewSession: (groupId: string, groupName: string, date: string) => void
+  /** Replace the entire session (used in Step 1 to bootstrap or re-initialize). */
+  initSession: (session: WizardSession) => void
   updateStations: (stations: WizardSession['stations']) => void
   updateTimeConfig: (timeConfig: TimeConfig) => void
   updateSession: (patch: Partial<WizardSession>) => void
@@ -12,43 +19,26 @@ interface WizardContextValue {
 
 const WizardContext = createContext<WizardContextValue | null>(null)
 
-const DEFAULT_TIME_CONFIG: TimeConfig = {
-  startTime: '00:00',
-  roundingAlgorithm: 'round-up-10',
-  unevenMode: 'equal-duration',
-}
-
 export function WizardProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<WizardSession | null>(null)
 
-  const startNewSession = (groupId: string, groupName: string, date: string) => {
-    setSession({
-      mode: 'new',
-      groupId,
-      groupName,
-      stations: [],
-      timeConfig: { ...DEFAULT_TIME_CONFIG },
-      scheduleName: '',
-      date,
-    })
-  }
+  const initSession = (s: WizardSession) => setSession(s)
 
-  const updateStations = (stations: WizardSession['stations']) => {
-    setSession(prev => prev ? { ...prev, stations } : prev)
-  }
+  const updateStations = (stations: WizardSession['stations']) =>
+    setSession(prev => (prev ? { ...prev, stations } : prev))
 
-  const updateTimeConfig = (timeConfig: TimeConfig) => {
-    setSession(prev => prev ? { ...prev, timeConfig } : prev)
-  }
+  const updateTimeConfig = (timeConfig: TimeConfig) =>
+    setSession(prev => (prev ? { ...prev, timeConfig } : prev))
 
-  const updateSession = (patch: Partial<WizardSession>) => {
-    setSession(prev => prev ? { ...prev, ...patch } : prev)
-  }
+  const updateSession = (patch: Partial<WizardSession>) =>
+    setSession(prev => (prev ? { ...prev, ...patch } : prev))
 
   const resetSession = () => setSession(null)
 
   return (
-    <WizardContext.Provider value={{ session, startNewSession, updateStations, updateTimeConfig, updateSession, resetSession }}>
+    <WizardContext.Provider
+      value={{ session, initSession, updateStations, updateTimeConfig, updateSession, resetSession }}
+    >
       {children}
     </WizardContext.Provider>
   )
