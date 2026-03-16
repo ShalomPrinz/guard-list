@@ -134,7 +134,7 @@ export default function Step1_Stations() {
 
   if (groups.length === 0) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-6">
+      <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
         <StepIndicator current={1} total={4} />
         <p className="mb-4 text-gray-400">אין קבוצות שמורות. צור קבוצה לפני יצירת לוח שמירה.</p>
         <button

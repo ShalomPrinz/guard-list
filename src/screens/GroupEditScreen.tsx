@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getGroupById, upsertGroup } from '../storage/groups'
 import type { Group, Member } from '../types'
@@ -14,7 +14,10 @@ export default function GroupEditScreen() {
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<Member | null>(null)
+  const [savedFlash, setSavedFlash] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstMount = useRef(true)
 
   useEffect(() => {
     if (!groupId) { setNotFound(true); return }
@@ -23,10 +26,19 @@ export default function GroupEditScreen() {
     setGroup(found)
   }, [groupId])
 
-  // Autosave on every group state change
+  // Autosave on every group state change (skip the initial load)
+  const showSaved = useCallback(() => {
+    setSavedFlash(true)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => setSavedFlash(false), 2000)
+  }, [])
+
   useEffect(() => {
-    if (group) upsertGroup(group)
-  }, [group])
+    if (!group) return
+    if (isFirstMount.current) { isFirstMount.current = false; return }
+    upsertGroup(group)
+    showSaved()
+  }, [group, showSaved])
 
   function updateGroupName(name: string) {
     setGroup(prev => prev ? { ...prev, name } : prev)
@@ -78,7 +90,6 @@ export default function GroupEditScreen() {
   function addMember() {
     const name = newMemberName.trim()
     if (!name) return
-    // Deduplication (case-insensitive)
     const exists = group?.members.some(m => m.name.toLowerCase() === name.toLowerCase())
     if (exists) { setNewMemberName(''); return }
     const member: Member = { id: crypto.randomUUID(), name, availability: 'base' }
@@ -101,13 +112,25 @@ export default function GroupEditScreen() {
   const homeCount = group.members.length - baseCount
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <button onClick={() => navigate('/')} className="text-gray-400 active:text-gray-200">
-          →
-        </button>
-        <h1 className="text-xl font-bold text-gray-100">עריכת קבוצה</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/')}
+            className="min-h-[44px] px-1 text-gray-400 active:text-gray-200"
+            aria-label="חזרה"
+          >
+            ←
+          </button>
+          <h1 className="text-xl font-bold text-gray-100">עריכת קבוצה</h1>
+        </div>
+        {/* Autosave indicator */}
+        <span
+          className={`text-xs text-green-400 transition-opacity duration-300 ${savedFlash ? 'opacity-100' : 'opacity-0'}`}
+        >
+          ✓ נשמר
+        </span>
       </div>
 
       {/* Group name */}
@@ -133,7 +156,7 @@ export default function GroupEditScreen() {
             {/* Availability toggle */}
             <button
               onClick={() => toggleAvailability(member.id)}
-              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+              className={`min-h-[36px] shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${
                 member.availability === 'base'
                   ? 'bg-green-700 text-green-100'
                   : 'bg-gray-600 text-gray-300'
@@ -158,7 +181,7 @@ export default function GroupEditScreen() {
             ) : (
               <button
                 onClick={() => startRename(member)}
-                className="min-w-0 flex-1 truncate text-right text-sm text-gray-100"
+                className="min-h-[36px] min-w-0 flex-1 truncate text-right text-sm text-gray-100"
               >
                 {member.name}
               </button>
@@ -167,7 +190,7 @@ export default function GroupEditScreen() {
             {/* Delete */}
             <button
               onClick={() => setConfirmDeleteMember(member)}
-              className="shrink-0 text-gray-500 active:text-red-400"
+              className="min-h-[44px] min-w-[44px] shrink-0 text-gray-500 active:text-red-400"
               aria-label="הסר חבר"
             >
               ✕

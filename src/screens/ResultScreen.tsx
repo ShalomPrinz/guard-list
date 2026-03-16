@@ -16,7 +16,7 @@ export default function ResultScreen() {
 
   if (!schedule) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-6">
+      <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
         <p className="text-gray-400">לוח שמירה לא נמצא.</p>
         <button
           onClick={() => navigate('/')}
@@ -57,7 +57,7 @@ export default function ResultScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       {/* Header — inline-editable round name */}
       <div className="mb-6">
         {editingName ? (

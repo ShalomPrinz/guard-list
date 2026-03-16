@@ -26,11 +26,11 @@ export default function ParticipantHistoryScreen() {
     : []
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/statistics')}
-          className="text-sm text-gray-400 active:text-gray-200"
+          className="min-h-[44px] px-1 text-sm text-gray-400 active:text-gray-200"
         >
           ←
         </button>

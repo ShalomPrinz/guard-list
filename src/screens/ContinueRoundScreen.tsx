@@ -162,27 +162,22 @@ export default function ContinueRoundScreen() {
       }
     })
 
-    // Use the earliest start time as the "global" timeConfig.startTime (Step2 reference)
-    const globalStartTime = useActual
-      ? contStations
-          .filter(s => s.stationType === 'time-based')
-          .reduce((earliest, cs) => {
-            const mins = dateTimeToMins(cs.actualEndDate, cs.actualEndTime)
-            const eMins = dateTimeToMins(
-              contStations.find(s => s.stationType === 'time-based')?.actualEndDate ?? schedule.date,
-              earliest,
-            )
-            return mins < eMins ? cs.actualEndTime : earliest
-          }, contStations.find(s => s.stationType === 'time-based')?.actualEndTime ?? '00:00')
-      : plannedEndTime || DEFAULT_TIME_CONFIG.startTime
+    // Use the earliest station's actual end as the global start time reference
+    const tbFiltered = contStations.filter(s => s.stationType === 'time-based')
+    let globalStartTime: string
+    let newDate: string
 
-    // New round date = start date of earliest station
-    const newDate = useActual
-      ? (contStations
-          .filter(s => s.stationType === 'time-based')
-          .sort((a, b) => dateTimeToMins(a.actualEndDate, a.actualEndTime) - dateTimeToMins(b.actualEndDate, b.actualEndTime))[0]
-          ?.actualEndDate ?? schedule.date)
-      : (plannedEndDate || schedule.date)
+    if (useActual && tbFiltered.length > 0) {
+      const earliest = tbFiltered.reduce((min, cs) =>
+        dateTimeToMins(cs.actualEndDate, cs.actualEndTime) < dateTimeToMins(min.actualEndDate, min.actualEndTime)
+          ? cs : min
+      )
+      globalStartTime = earliest.actualEndTime
+      newDate = earliest.actualEndDate
+    } else {
+      globalStartTime = plannedEndTime || DEFAULT_TIME_CONFIG.startTime
+      newDate = plannedEndDate || schedule.date
+    }
 
     initSession({
       mode: 'continue',
@@ -207,8 +202,8 @@ export default function ContinueRoundScreen() {
   const tbContStations = contStations.filter(s => s.stationType === 'time-based')
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
-      <button onClick={() => navigate(`/schedule/${schedule.id}/result`)} className="mb-4 text-sm text-gray-400 active:text-gray-200">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
+      <button onClick={() => navigate(`/schedule/${schedule.id}/result`)} className="mb-4 min-h-[44px] text-sm text-gray-400 active:text-gray-200">
         ← חזרה
       </button>
 

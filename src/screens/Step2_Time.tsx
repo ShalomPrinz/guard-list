@@ -109,7 +109,7 @@ export default function Step2_Time() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={2} total={4} />
       <h1 className="mb-6 text-xl font-bold text-gray-100">הגדרת זמנים</h1>
 

@@ -38,7 +38,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <img src="/app-icon.png" alt="" className="h-9 w-9 rounded-xl object-cover" />
@@ -67,7 +67,7 @@ export default function HomeScreen() {
           <h2 className="text-lg font-semibold text-gray-200">קבוצות שמורות</h2>
           <button
             onClick={() => setShowCreateGroup(true)}
-            className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
+            className="min-h-[36px] rounded-xl bg-gray-700 px-3 py-2 text-xs font-medium text-gray-200 active:bg-gray-600"
           >
             + קבוצה חדשה
           </button>
@@ -91,13 +91,13 @@ export default function HomeScreen() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate(`/group/${group.id}/edit`)}
-                    className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
+                    className="min-h-[36px] rounded-xl bg-gray-700 px-3 py-2 text-xs font-medium text-gray-200 active:bg-gray-600"
                   >
                     עריכה
                   </button>
                   <button
                     onClick={() => setConfirmDelete({ type: 'group', id: group.id, name: group.name })}
-                    className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-red-400 active:bg-gray-600"
+                    className="min-h-[36px] rounded-xl bg-gray-700 px-3 py-2 text-xs font-medium text-red-400 active:bg-gray-600"
                   >
                     מחיקה
                   </button>
@@ -129,13 +129,13 @@ export default function HomeScreen() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate(`/schedule/${schedule.id}/result`)}
-                    className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
+                    className="min-h-[36px] rounded-xl bg-gray-700 px-3 py-2 text-xs font-medium text-gray-200 active:bg-gray-600"
                   >
                     צפייה
                   </button>
                   <button
                     onClick={() => setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' })}
-                    className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-red-400 active:bg-gray-600"
+                    className="min-h-[36px] rounded-xl bg-gray-700 px-3 py-2 text-xs font-medium text-red-400 active:bg-gray-600"
                   >
                     מחיקה
                   </button>

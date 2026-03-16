@@ -383,7 +383,7 @@ export default function Step4_Review() {
 
   if (!session) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-6">
+      <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
         <p className="text-gray-400">אין סשן פעיל. <button onClick={() => navigate('/')} className="text-blue-400 underline">חזרה לדף הבית</button></p>
       </div>
     )
@@ -582,7 +582,7 @@ export default function Step4_Review() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={4} total={4} />
       <h1 className="mb-6 text-xl font-bold text-gray-100">סקירה ועריכה</h1>
 

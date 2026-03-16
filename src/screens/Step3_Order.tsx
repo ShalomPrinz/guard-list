@@ -322,7 +322,7 @@ export default function Step3_Order() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={3} total={4} />
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-100">סדר שומרים</h1>
