@@ -31,7 +31,7 @@ export default function HomeScreen() {
   }
 
   function formatScheduleDate(isoDate: string) {
-    return new Date(isoDate).toLocaleString(undefined, {
+    return new Date(isoDate).toLocaleString('he-IL', {
       dateStyle: 'medium',
       timeStyle: 'short',
     })
@@ -40,7 +40,7 @@ export default function HomeScreen() {
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       {/* Header */}
-      <h1 className="mb-6 text-2xl font-bold text-gray-100">Guard Duty Scheduler</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-100">מתזמן שמירות</h1>
 
       {/* Primary actions */}
       <div className="mb-8 flex flex-col gap-3">
@@ -48,31 +48,31 @@ export default function HomeScreen() {
           onClick={() => navigate('/schedule/new/step1')}
           className="w-full rounded-2xl bg-blue-600 py-4 text-base font-semibold text-white shadow-lg active:bg-blue-700"
         >
-          + New Schedule
+          + צור לוח שמירה
         </button>
         <button
           onClick={() => navigate('/statistics')}
           className="w-full rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
         >
-          Statistics
+          סטטיסטיקות
         </button>
       </div>
 
       {/* Saved Groups */}
       <section className="mb-8">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-200">Saved Groups</h2>
+          <h2 className="text-lg font-semibold text-gray-200">קבוצות שמורות</h2>
           <button
             onClick={() => setShowCreateGroup(true)}
             className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
           >
-            + New Group
+            + קבוצה חדשה
           </button>
         </div>
 
         {groups.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
-            No groups yet. Create one to get started.
+            אין קבוצות עדיין. צור קבוצה כדי להתחיל.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -81,8 +81,8 @@ export default function HomeScreen() {
                 <div>
                   <p className="font-medium text-gray-100">{group.name}</p>
                   <p className="text-xs text-gray-400">
-                    {group.members.length} member{group.members.length !== 1 ? 's' : ''} ·{' '}
-                    {group.members.filter(m => m.availability === 'base').length} base
+                    {group.members.length} חברים ·{' '}
+                    {group.members.filter(m => m.availability === 'base').length} בסיס
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -90,13 +90,13 @@ export default function HomeScreen() {
                     onClick={() => navigate(`/group/${group.id}/edit`)}
                     className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
                   >
-                    Edit
+                    עריכה
                   </button>
                   <button
                     onClick={() => setConfirmDelete({ type: 'group', id: group.id, name: group.name })}
                     className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-red-400 active:bg-gray-600"
                   >
-                    Delete
+                    מחיקה
                   </button>
                 </div>
               </li>
@@ -107,20 +107,20 @@ export default function HomeScreen() {
 
       {/* Past Schedules */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-gray-200">Past Schedules</h2>
+        <h2 className="mb-3 text-lg font-semibold text-gray-200">לוחות שמירה קודמים</h2>
 
         {schedules.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
-            No past schedules yet.
+            אין לוחות שמירה עדיין.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
             {[...schedules].reverse().map(schedule => (
               <li key={schedule.id} className="flex items-center justify-between rounded-2xl bg-gray-800 px-4 py-3">
                 <div>
-                  <p className="font-medium text-gray-100">{schedule.name || 'Unnamed'}</p>
+                  <p className="font-medium text-gray-100">{schedule.name || 'ללא שם'}</p>
                   <p className="text-xs text-gray-400">
-                    {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} station{schedule.stations.length !== 1 ? 's' : ''}
+                    {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} תחנות
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -128,13 +128,13 @@ export default function HomeScreen() {
                     onClick={() => navigate(`/schedule/${schedule.id}/result`)}
                     className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
                   >
-                    View
+                    צפייה
                   </button>
                   <button
-                    onClick={() => setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'this schedule' })}
+                    onClick={() => setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' })}
                     className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-red-400 active:bg-gray-600"
                   >
-                    Delete
+                    מחיקה
                   </button>
                 </div>
               </li>
@@ -157,7 +157,7 @@ export default function HomeScreen() {
 
       {confirmDelete && (
         <ConfirmDialog
-          message={`Delete "${confirmDelete.name}"?`}
+          message={`למחוק את "${confirmDelete.name}"?`}
           onConfirm={() =>
             confirmDelete.type === 'group'
               ? handleDeleteGroup(confirmDelete.id)

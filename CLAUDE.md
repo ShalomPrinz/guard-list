@@ -19,7 +19,8 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 - Schedules are immutable once saved — history is never retroactively modified
 - One-time renames in Step 4 do NOT propagate to the saved group
 - Use `python3` for bash commands
-- **Crucial**: Every iteration, follow @TESTING.md rules.
+- Every iteration, follow @TESTING.md rules.
+- All UI text must be in hebrew.
 
 ## Docs
 

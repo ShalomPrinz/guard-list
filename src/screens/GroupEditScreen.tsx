@@ -23,7 +23,7 @@ export default function GroupEditScreen() {
     setGroup(found)
   }, [groupId])
 
-  // Autosave whenever group changes
+  // Autosave on every group state change
   useEffect(() => {
     if (group) upsertGroup(group)
   }, [group])
@@ -78,7 +78,7 @@ export default function GroupEditScreen() {
   function addMember() {
     const name = newMemberName.trim()
     if (!name) return
-    // Deduplication check (case-insensitive)
+    // Deduplication (case-insensitive)
     const exists = group?.members.some(m => m.name.toLowerCase() === name.toLowerCase())
     if (exists) { setNewMemberName(''); return }
     const member: Member = { id: crypto.randomUUID(), name, availability: 'base' }
@@ -89,8 +89,8 @@ export default function GroupEditScreen() {
   if (notFound) {
     return (
       <div className="mx-auto max-w-lg px-4 py-6">
-        <p className="text-gray-400">Group not found.</p>
-        <button onClick={() => navigate('/')} className="mt-4 text-blue-400">← Back</button>
+        <p className="text-gray-400">קבוצה לא נמצאה.</p>
+        <button onClick={() => navigate('/')} className="mt-4 text-blue-400">חזרה</button>
       </div>
     )
   }
@@ -98,19 +98,20 @@ export default function GroupEditScreen() {
   if (!group) return null
 
   const baseCount = group.members.filter(m => m.availability === 'base').length
+  const homeCount = group.members.length - baseCount
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <button onClick={() => navigate('/')} className="text-gray-400 active:text-gray-200">
-          ←
+          →
         </button>
-        <h1 className="text-xl font-bold text-gray-100">Edit Group</h1>
+        <h1 className="text-xl font-bold text-gray-100">עריכת קבוצה</h1>
       </div>
 
       {/* Group name */}
-      <label className="mb-1 block text-sm text-gray-400">Group name</label>
+      <label className="mb-1 block text-sm text-gray-400">שם הקבוצה</label>
       <input
         type="text"
         value={group.name}
@@ -121,7 +122,7 @@ export default function GroupEditScreen() {
       {/* Member count summary */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-300">
-          Members — {baseCount} base / {group.members.length - baseCount} home
+          חברים — {baseCount} בסיס / {homeCount} בית
         </h2>
       </div>
 
@@ -138,7 +139,7 @@ export default function GroupEditScreen() {
                   : 'bg-gray-600 text-gray-300'
               }`}
             >
-              {member.availability === 'base' ? 'Base' : 'Home'}
+              {member.availability === 'base' ? 'בסיס' : 'בית'}
             </button>
 
             {/* Name — inline edit */}
@@ -157,7 +158,7 @@ export default function GroupEditScreen() {
             ) : (
               <button
                 onClick={() => startRename(member)}
-                className="min-w-0 flex-1 truncate text-left text-sm text-gray-100"
+                className="min-w-0 flex-1 truncate text-right text-sm text-gray-100"
               >
                 {member.name}
               </button>
@@ -167,7 +168,7 @@ export default function GroupEditScreen() {
             <button
               onClick={() => setConfirmDeleteMember(member)}
               className="shrink-0 text-gray-500 active:text-red-400"
-              aria-label="Delete member"
+              aria-label="הסר חבר"
             >
               ✕
             </button>
@@ -182,7 +183,7 @@ export default function GroupEditScreen() {
           value={newMemberName}
           onChange={e => setNewMemberName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addMember() }}
-          placeholder="Add member…"
+          placeholder="הוסף חבר…"
           className="min-w-0 flex-1 rounded-xl bg-gray-800 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
         />
         <button
@@ -190,14 +191,14 @@ export default function GroupEditScreen() {
           disabled={!newMemberName.trim()}
           className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40 active:bg-blue-700"
         >
-          Add
+          הוסף
         </button>
       </div>
 
       {/* Confirm delete member */}
       {confirmDeleteMember && (
         <ConfirmDialog
-          message={`Remove "${confirmDeleteMember.name}" from group?`}
+          message={`להסיר את "${confirmDeleteMember.name}" מהקבוצה?`}
           onConfirm={() => deleteMember(confirmDeleteMember.id)}
           onCancel={() => setConfirmDeleteMember(null)}
         />
