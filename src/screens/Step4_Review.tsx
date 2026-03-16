@@ -362,7 +362,7 @@ function ReviewStationCard({
 
 export default function Step4_Review() {
   const navigate = useNavigate()
-  const { session, updateSession, resetSession } = useWizard()
+  const { session, updateSession } = useWizard()
 
   const [stations, setStations] = useState<ReviewStation[]>(() => {
     if (!session) return []
@@ -575,7 +575,6 @@ export default function Step4_Review() {
     }
 
     updateSession({ scheduleName: name })
-    resetSession()
     navigate(`/schedule/${scheduleId}/result`)
   }
 
