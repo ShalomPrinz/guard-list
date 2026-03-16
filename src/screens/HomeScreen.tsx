@@ -39,12 +39,6 @@ export default function HomeScreen() {
 
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <img src="/app-icon.png" alt="" className="h-9 w-9 rounded-xl object-cover" />
-        <h1 className="text-2xl font-bold text-gray-100">רשימת שמירה</h1>
-      </div>
-
       {/* Primary actions */}
       <div className="mb-8 flex flex-col gap-3">
         <button
