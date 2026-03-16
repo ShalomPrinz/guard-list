@@ -57,7 +57,7 @@ export default function HomeScreen() {
           onClick={() => navigate('/statistics')}
           className="w-full rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
         >
-          סטטיסטיקות
+          📊 סטטיסטיקות
         </button>
       </div>
 
