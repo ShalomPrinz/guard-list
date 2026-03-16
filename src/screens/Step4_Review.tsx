@@ -181,19 +181,19 @@ function SortableReviewRow({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-xl bg-gray-700 px-3 py-2">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 dark:bg-gray-700">
       {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab touch-none text-gray-500 active:cursor-grabbing"
+        className="cursor-grab touch-none text-gray-400 active:cursor-grabbing dark:text-gray-500"
         aria-label="גרור לסידור מחדש"
       >
         ⠿
       </button>
 
       {/* Times */}
-      <div className="w-24 shrink-0 text-xs text-gray-400">
+      <div className="w-24 shrink-0 text-xs text-gray-500 dark:text-gray-400">
         {item.startTime}–{item.endTime}
       </div>
 
@@ -206,12 +206,12 @@ function SortableReviewRow({
           onBlur={commitName}
           onKeyDown={e => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') { setNameVal(item.name); setEditingName(false) } }}
           autoFocus
-          className="min-w-0 flex-1 rounded bg-gray-600 px-2 py-0.5 text-sm text-gray-100 outline-none"
+          className="min-w-0 flex-1 rounded bg-gray-200 px-2 py-0.5 text-sm text-gray-900 outline-none dark:bg-gray-600 dark:text-gray-100"
         />
       ) : (
         <button
           onClick={() => { setEditingName(true); setTimeout(() => nameInputRef.current?.select(), 0) }}
-          className="min-w-0 flex-1 truncate text-right text-sm text-gray-100"
+          className="min-w-0 flex-1 truncate text-right text-sm text-gray-900 dark:text-gray-100"
         >
           {item.name}
         </button>
@@ -228,12 +228,12 @@ function SortableReviewRow({
           autoFocus
           type="number"
           min={1}
-          className="w-14 rounded bg-gray-600 px-2 py-0.5 text-center text-xs text-gray-100 outline-none"
+          className="w-14 rounded bg-gray-200 px-2 py-0.5 text-center text-xs text-gray-900 outline-none dark:bg-gray-600 dark:text-gray-100"
         />
       ) : (
         <button
           onClick={() => { setEditingDuration(true); setTimeout(() => durationInputRef.current?.select(), 0) }}
-          className="shrink-0 rounded px-2 py-0.5 text-xs text-gray-400 active:bg-gray-600"
+          className="shrink-0 rounded px-2 py-0.5 text-xs text-gray-500 active:bg-gray-200 dark:text-gray-400 dark:active:bg-gray-600"
           title="ערוך משך"
         >
           {item.durationMinutes}′
@@ -245,7 +245,7 @@ function SortableReviewRow({
         <select
           value=""
           onChange={e => { if (e.target.value) onMove(item.id, stationId, e.target.value) }}
-          className="shrink-0 rounded bg-gray-600 px-1 py-0.5 text-xs text-gray-300 outline-none"
+          className="shrink-0 rounded bg-gray-200 px-1 py-0.5 text-xs text-gray-700 outline-none dark:bg-gray-600 dark:text-gray-300"
           title="העבר לעמדה"
         >
           <option value="">↔</option>
@@ -258,7 +258,7 @@ function SortableReviewRow({
       {/* Remove */}
       <button
         onClick={() => onRemove(item.id, stationId)}
-        className="shrink-0 text-red-400 active:text-red-300"
+        className="shrink-0 text-red-500 active:text-red-400 dark:text-red-400 dark:active:text-red-300"
         aria-label="הסר"
       >
         ✕
@@ -299,19 +299,19 @@ function ReviewStationCard({
 
   if (station.stationType === 'headcount') {
     return (
-      <div className="rounded-2xl bg-gray-800 p-4">
-        <p className="mb-2 text-sm font-semibold text-gray-200">{station.stationName}</p>
-        <p className="mb-1 text-xs text-gray-400">כוח אדם ({station.headcountNames.length})</p>
+      <div className="rounded-2xl bg-white p-4 dark:bg-gray-800">
+        <p className="mb-2 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
+        <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">כוח אדם ({station.headcountNames.length})</p>
         {station.headcountNames.map((n, i) => (
-          <div key={i} className="py-0.5 text-sm text-gray-300">{n}</div>
+          <div key={i} className="py-0.5 text-sm text-gray-700 dark:text-gray-300">{n}</div>
         ))}
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl bg-gray-800 p-4">
-      <p className="mb-3 text-sm font-semibold text-gray-200">{station.stationName}</p>
+    <div className="rounded-2xl bg-white p-4 dark:bg-gray-800">
+      <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
 
       <SortableContext items={station.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
         <DroppableZone id={station.stationConfigId}>
@@ -345,11 +345,11 @@ function ReviewStationCard({
               setAddName('')
             }
           }}
-          className="min-w-0 flex-1 rounded-xl bg-gray-700 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="min-w-0 flex-1 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
         />
         <button
           onClick={() => { if (addName.trim()) { onAdd(station.stationConfigId, addName.trim()); setAddName('') } }}
-          className="rounded-xl bg-gray-700 px-3 py-2 text-sm text-gray-300 active:bg-gray-600"
+          className="rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-700 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
         >
           +
         </button>
@@ -386,7 +386,7 @@ export default function Step4_Review() {
   if (!session) {
     return (
       <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
-        <p className="text-gray-400">אין סשן פעיל. <button onClick={() => navigate('/')} className="text-blue-400 underline">חזרה לדף הבית</button></p>
+        <p className="text-gray-500 dark:text-gray-400">אין סשן פעיל. <button onClick={() => navigate('/')} className="text-blue-600 underline dark:text-blue-400">חזרה לדף הבית</button></p>
       </div>
     )
   }
@@ -636,16 +636,16 @@ export default function Step4_Review() {
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={4} total={4} />
-      <h1 className="mb-6 text-xl font-bold text-gray-100">סקירה ועריכה</h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
 
       {/* Schedule name */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-400">שם לוח השמירה</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שם לוח השמירה</label>
         <input
           value={scheduleName}
           onChange={e => setScheduleName(e.target.value)}
           placeholder={defaultName}
-          className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
       </div>
 
@@ -674,10 +674,10 @@ export default function Step4_Review() {
 
         <DragOverlay>
           {activeItem && (
-            <div className="flex items-center gap-2 rounded-xl bg-gray-600 px-3 py-2 shadow-xl">
-              <span className="w-24 text-xs text-gray-400">{activeItem.startTime}–{activeItem.endTime}</span>
-              <span className="text-sm text-gray-100">{activeItem.name}</span>
-              <span className="text-xs text-gray-400">{activeItem.durationMinutes}′</span>
+            <div className="flex items-center gap-2 rounded-xl bg-gray-200 px-3 py-2 shadow-xl dark:bg-gray-600">
+              <span className="w-24 text-xs text-gray-500 dark:text-gray-400">{activeItem.startTime}–{activeItem.endTime}</span>
+              <span className="text-sm text-gray-900 dark:text-gray-100">{activeItem.name}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{activeItem.durationMinutes}′</span>
             </div>
           )}
         </DragOverlay>
@@ -685,34 +685,34 @@ export default function Step4_Review() {
 
       {/* Quote */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-400">ציטוט (אופציונלי)</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">ציטוט (אופציונלי)</label>
         <textarea
           value={quote}
           onChange={e => setQuote(e.target.value)}
           placeholder="הוסף ציטוט..."
           rows={2}
-          className="w-full resize-none rounded-xl bg-gray-800 px-4 py-2.5 text-sm text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="w-full resize-none rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
       </div>
       {quote.trim() && (
         <div className="mb-6">
-          <label className="mb-1 block text-sm text-gray-400">מחבר הציטוט</label>
+          <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">מחבר הציטוט</label>
           <input
             value={quoteAuthor}
             onChange={e => setQuoteAuthor(e.target.value)}
             placeholder="שם המחבר..."
-            className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-sm text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+            className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
           />
         </div>
       )}
 
-      {error && <p className="mb-4 rounded-xl bg-red-900/40 px-4 py-2.5 text-sm text-red-300">{error}</p>}
+      {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-900/40 dark:text-red-300">{error}</p>}
 
       {/* Navigation */}
       <div className="flex gap-3">
         <button
           onClick={() => navigate('/schedule/new/step3')}
-          className="flex-1 rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
+          className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה
         </button>

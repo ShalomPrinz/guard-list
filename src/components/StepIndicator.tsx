@@ -15,12 +15,12 @@ export default function StepIndicator({ current, total }: Props) {
                 ? 'w-5 bg-blue-500'
                 : i + 1 === current
                   ? 'w-8 bg-blue-400'
-                  : 'w-5 bg-gray-600'
+                  : 'w-5 bg-gray-300 dark:bg-gray-600'
             }`}
           />
         ))}
       </div>
-      <span className="text-xs text-gray-400">שלב {current} מתוך {total}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">שלב {current} מתוך {total}</span>
     </div>
   )
 }

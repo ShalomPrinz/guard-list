@@ -53,12 +53,14 @@ afterEach(() => {
 // ─── HomeScreen — empty state ─────────────────────────────────────────────────
 
 describe('HomeScreen — empty state', () => {
-  it('shows empty groups message when no groups exist', () => {
+  it('shows welcome state when no groups exist', () => {
     renderApp()
-    expect(screen.getByText('אין קבוצות עדיין. צור קבוצה כדי להתחיל.')).toBeTruthy()
+    expect(screen.getByText('ברוך הבא! כדי להתחיל, צור קבוצת לוחמים שמורה')).toBeTruthy()
+    expect(screen.getByText('צור קבוצה')).toBeTruthy()
   })
 
-  it('shows empty schedules message when no schedules exist', () => {
+  it('shows empty schedules message when no schedules exist (requires a group)', () => {
+    upsertGroup(makeGroup())
     renderApp()
     expect(screen.getByText('אין לוחות שמירה עדיין.')).toBeTruthy()
   })
@@ -77,7 +79,8 @@ describe('Group creation via modal', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByText('+ קבוצה חדשה'))
+    // Welcome state — click the CTA to open creation modal
+    await user.click(screen.getByText('צור קבוצה'))
 
     // Fill group name
     await user.type(screen.getByPlaceholderText("למשל: מחלקה א'"), 'פלוגה א')
@@ -99,7 +102,7 @@ describe('Group creation via modal', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByText('+ קבוצה חדשה'))
+    await user.click(screen.getByText('צור קבוצה'))
 
     const textboxes = screen.getAllByRole('textbox')
     await user.type(textboxes[0], 'קבוצה')
@@ -117,7 +120,7 @@ describe('Group creation via modal', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByText('+ קבוצה חדשה'))
+    await user.click(screen.getByText('צור קבוצה'))
     await user.click(screen.getByText('צור'))
 
     expect(screen.getByText('שם הקבוצה נדרש')).toBeTruthy()
@@ -128,7 +131,7 @@ describe('Group creation via modal', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByText('+ קבוצה חדשה'))
+    await user.click(screen.getByText('צור קבוצה'))
     await user.type(screen.getByPlaceholderText("למשל: מחלקה א'"), 'קבוצה')
     await user.click(screen.getByText('צור'))
 
@@ -139,7 +142,7 @@ describe('Group creation via modal', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByText('+ קבוצה חדשה'))
+    await user.click(screen.getByText('צור קבוצה'))
     const textboxes = screen.getAllByRole('textbox')
     await user.type(textboxes[0], 'קבוצה')
     await user.type(textboxes[1], 'Alice')
@@ -278,6 +281,7 @@ describe('HomeScreen — delete group', () => {
       expect(getGroups()).toHaveLength(0)
     })
 
-    expect(screen.getByText('אין קבוצות עדיין. צור קבוצה כדי להתחיל.')).toBeTruthy()
+    // After deleting the last group, the welcome state should appear
+    expect(screen.getByText('ברוך הבא! כדי להתחיל, צור קבוצת לוחמים שמורה')).toBeTruthy()
   })
 })

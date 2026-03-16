@@ -97,6 +97,7 @@ afterEach(() => {
 
 describe('Header visibility across screens', () => {
   it('renders on HomeScreen', () => {
+    upsertGroup(makeGroup())
     renderFullApp('/')
     expect(screen.getByText('רשימת שמירה')).toBeTruthy()
     expect(screen.getByRole('banner')).toBeTruthy()
@@ -199,7 +200,9 @@ describe('Header home navigation', () => {
 })
 
 describe('Header does not show duplicate branding on HomeScreen', () => {
-  it('app name appears exactly once on HomeScreen (only in header, not in page content)', () => {
+  it('app name appears exactly once on normal HomeScreen (only in header, not in page content)', () => {
+    // Seed a group so the normal HomeScreen renders (not the welcome state)
+    upsertGroup(makeGroup())
     renderFullApp('/')
     const matches = screen.getAllByText('רשימת שמירה')
     expect(matches).toHaveLength(1)

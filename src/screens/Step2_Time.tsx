@@ -114,11 +114,11 @@ export default function Step2_Time() {
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={2} total={4} />
-      <h1 className="mb-6 text-xl font-bold text-gray-100">הגדרת זמנים</h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">הגדרת זמנים</h1>
 
       {/* Start time */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-400">שעת התחלה</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שעת התחלה</label>
         <TimePicker
           value={startTime}
           onChange={v => { setStartTime(v); setError('') }}
@@ -128,8 +128,8 @@ export default function Step2_Time() {
 
       {/* End time (optional) */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-400">
-          שעת סיום <span className="text-gray-500">(אופציונלי)</span>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">
+          שעת סיום <span className="text-gray-400 dark:text-gray-500">(אופציונלי)</span>
         </label>
         <TimePicker
           value={endTime}
@@ -141,8 +141,8 @@ export default function Step2_Time() {
       {/* Fixed duration — only relevant when end time is empty */}
       {!endTime && (
         <div className="mb-4">
-          <label className="mb-1 block text-sm text-gray-400">
-            משך קבוע לכל שומר <span className="text-gray-500">(דקות)</span>
+          <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">
+            משך קבוע לכל שומר <span className="text-gray-400 dark:text-gray-500">(דקות)</span>
           </label>
           <input
             type="number"
@@ -150,14 +150,14 @@ export default function Step2_Time() {
             value={fixedDuration}
             onChange={e => { setFixedDuration(e.target.value); setError('') }}
             placeholder="למשל: 90"
-            className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+            className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
           />
         </div>
       )}
 
       {/* Rounding algorithm */}
       <div className="mb-5">
-        <label className="mb-2 block text-sm text-gray-400">עיגול משך המשמרת</label>
+        <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">עיגול משך המשמרת</label>
         <div className="flex flex-col gap-2">
           {(
             [
@@ -168,7 +168,7 @@ export default function Step2_Time() {
           ).map(opt => (
             <label
               key={opt.value}
-              className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-800 px-4 py-3"
+              className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 dark:bg-gray-800"
             >
               <input
                 type="radio"
@@ -178,9 +178,9 @@ export default function Step2_Time() {
                 onChange={() => setRounding(opt.value)}
                 className="accent-blue-500"
               />
-              <span className="text-sm text-gray-100">{opt.label}</span>
+              <span className="text-sm text-gray-900 dark:text-gray-100">{opt.label}</span>
               {opt.recommended && (
-                <span className="rounded-md bg-blue-900/60 px-1.5 py-0.5 text-xs text-blue-300">
+                <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
                   מומלץ
                 </span>
               )}
@@ -192,11 +192,11 @@ export default function Step2_Time() {
       {/* Uneven distribution mode — only shown when relevant */}
       {isUneven && (
         <div className="mb-5">
-          <label className="mb-2 block text-sm text-gray-400">
+          <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">
             חלוקה לא שווה — {baseCount} חיילים על {timeBasedStations.length} עמדות
           </label>
           <div className="flex flex-col gap-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-800 px-4 py-3">
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 dark:bg-gray-800">
               <input
                 type="radio"
                 name="unevenMode"
@@ -205,11 +205,11 @@ export default function Step2_Time() {
                 className="accent-blue-500"
               />
               <div>
-                <p className="text-sm text-gray-100">משך שווה לכולם</p>
-                <p className="text-xs text-gray-400">עמדה עם פחות שומרים מסיימת מוקדם יותר</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">משך שווה לכולם</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">עמדה עם פחות שומרים מסיימת מוקדם יותר</p>
               </div>
             </label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-800 px-4 py-3">
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 dark:bg-gray-800">
               <input
                 type="radio"
                 name="unevenMode"
@@ -218,8 +218,8 @@ export default function Step2_Time() {
                 className="accent-blue-500"
               />
               <div>
-                <p className="text-sm text-gray-100">סיום שווה לכולם</p>
-                <p className="text-xs text-gray-400">עמדה עם פחות שומרים — משמרת ארוכה יותר</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">סיום שווה לכולם</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">עמדה עם פחות שומרים — משמרת ארוכה יותר</p>
               </div>
             </label>
           </div>
@@ -228,19 +228,19 @@ export default function Step2_Time() {
 
       {/* Live preview */}
       {durations.length > 0 && (
-        <div className="mb-5 rounded-2xl bg-gray-800 p-4">
-          <p className="mb-3 text-xs font-semibold text-gray-400">תצוגה מקדימה</p>
+        <div className="mb-5 rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
+          <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">תצוגה מקדימה</p>
           <div className="flex flex-col gap-2">
             {timeBasedStations.map((station, i) => {
               const d = durations[i]
               return (
                 <div key={station.config.id} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">{station.config.name}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{station.config.name}</span>
                   <div className="text-left">
-                    <span className="text-sm font-semibold text-gray-100">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {formatDuration(d.roundedDurationMinutes)}
                     </span>
-                    <span className="mr-2 text-xs text-gray-500">
+                    <span className="mr-2 text-xs text-gray-400 dark:text-gray-500">
                       × {d.participantCount} שומרים
                     </span>
                   </div>
@@ -252,14 +252,14 @@ export default function Step2_Time() {
       )}
 
       {error && (
-        <p className="mb-4 rounded-xl bg-red-900/40 px-4 py-2.5 text-sm text-red-300">{error}</p>
+        <p className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-900/40 dark:text-red-300">{error}</p>
       )}
 
       {/* Navigation */}
       <div className="flex gap-3">
         <button
           onClick={() => navigate('/schedule/new/step1')}
-          className="flex-1 rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
+          className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה
         </button>

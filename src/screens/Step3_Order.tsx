@@ -60,36 +60,36 @@ function SortableRow({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${item.skipped ? 'bg-gray-700/50' : 'bg-gray-700'}`}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${item.skipped ? 'bg-gray-100/50 dark:bg-gray-700/50' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
       <button
         {...attributes}
         {...listeners}
-        className="shrink-0 cursor-grab touch-none text-lg text-gray-500 active:cursor-grabbing"
+        className="shrink-0 cursor-grab touch-none text-lg text-gray-400 dark:text-gray-500 active:cursor-grabbing"
         aria-label="גרור"
       >
         ⠿
       </button>
 
-      <span className={`min-w-0 flex-1 truncate text-sm ${item.skipped ? 'text-gray-500 line-through' : 'text-gray-100'}`}>
+      <span className={`min-w-0 flex-1 truncate text-sm ${item.skipped ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
         {item.name}
       </span>
 
       <button
         onClick={onToggleLock}
-        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.locked ? 'bg-yellow-700/80 text-yellow-100' : 'text-gray-500 active:text-yellow-300'}`}
+        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.locked ? 'bg-yellow-700/80 text-yellow-100' : 'text-gray-400 active:text-yellow-600 dark:text-gray-500 dark:active:text-yellow-300'}`}
       >
         {item.locked ? '🔒' : '🔓'}
       </button>
 
       <button
         onClick={onToggleSkip}
-        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.skipped ? 'bg-gray-600 text-gray-300' : 'text-gray-500 active:text-gray-300'}`}
+        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.skipped ? 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300' : 'text-gray-400 active:text-gray-600 dark:text-gray-500 dark:active:text-gray-300'}`}
       >
         {item.skipped ? 'מדולג' : 'דלג'}
       </button>
 
-      <button onClick={onRemove} className="shrink-0 text-gray-600 active:text-red-400" aria-label="הסר">
+      <button onClick={onRemove} className="shrink-0 text-gray-400 active:text-red-500 dark:text-gray-600 dark:active:text-red-400" aria-label="הסר">
         ✕
       </button>
     </div>
@@ -328,10 +328,10 @@ export default function Step3_Order() {
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={3} total={4} />
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-100">סדר שומרים</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סדר שומרים</h1>
         <button
           onClick={reLottery}
-          className="rounded-xl bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 active:bg-gray-600"
+          className="rounded-xl bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
         >
           הגרלה מחדש
         </button>
@@ -340,13 +340,13 @@ export default function Step3_Order() {
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex flex-col gap-4">
           {stations.map((station, si) => (
-            <div key={station.stationConfigId} className="rounded-2xl bg-gray-800 p-4">
+            <div key={station.stationConfigId} className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-semibold text-gray-100">{station.stationName}</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">{station.stationName}</p>
                 {station.stationType === 'time-based' && (
                   <button
                     onClick={() => shuffleStation(si)}
-                    className="rounded-lg bg-gray-700 px-2.5 py-1 text-xs text-gray-300 active:bg-gray-600"
+                    className="rounded-lg bg-gray-200 px-2.5 py-1 text-xs text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
                   >
                     ערבב
                   </button>
@@ -358,7 +358,7 @@ export default function Step3_Order() {
                   <DroppableZone id={`droppable-${station.stationConfigId}`}>
                     <div className="flex flex-col gap-1.5">
                       {station.participants.length === 0 && (
-                        <p className="py-3 text-center text-xs text-gray-600">גרור שומר לכאן</p>
+                        <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-600">גרור שומר לכאן</p>
                       )}
                       {station.participants.map(item => (
                         <SortableRow
@@ -376,7 +376,7 @@ export default function Step3_Order() {
 
               {station.stationType === 'headcount' && (
                 <div>
-                  <p className="mb-2 text-xs text-gray-400">
+                  <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
                     בחר {station.headcountRequired} שומרים ({station.headcountSelected.length}/{station.headcountRequired})
                   </p>
                   <div className="flex flex-col gap-1.5">
@@ -386,7 +386,7 @@ export default function Step3_Order() {
                       return (
                         <label
                           key={name}
-                          className={`flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 ${sel ? 'bg-blue-900/40' : full ? 'opacity-40' : 'bg-gray-700'}`}
+                          className={`flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 ${sel ? 'bg-blue-100 dark:bg-blue-900/40' : full ? 'opacity-40' : 'bg-gray-100 dark:bg-gray-700'}`}
                         >
                           <input
                             type="checkbox"
@@ -395,7 +395,7 @@ export default function Step3_Order() {
                             onChange={() => toggleHeadcount(si, name)}
                             className="accent-blue-500"
                           />
-                          <span className="text-sm text-gray-100">{name}</span>
+                          <span className="text-sm text-gray-900 dark:text-gray-100">{name}</span>
                         </label>
                       )
                     })}
@@ -408,9 +408,9 @@ export default function Step3_Order() {
 
         <DragOverlay>
           {activeItem && (
-            <div className="flex items-center gap-2 rounded-xl bg-gray-600 px-3 py-2.5 shadow-xl">
-              <span className="text-gray-400">⠿</span>
-              <span className="text-sm text-gray-100">{activeItem.name}</span>
+            <div className="flex items-center gap-2 rounded-xl bg-gray-200 px-3 py-2.5 shadow-xl dark:bg-gray-600">
+              <span className="text-gray-500 dark:text-gray-400">⠿</span>
+              <span className="text-sm text-gray-900 dark:text-gray-100">{activeItem.name}</span>
             </div>
           )}
         </DragOverlay>
@@ -419,7 +419,7 @@ export default function Step3_Order() {
       <div className="mt-6 flex gap-3">
         <button
           onClick={() => navigate('/schedule/new/step2')}
-          className="flex-1 rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
+          className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה
         </button>

@@ -100,8 +100,8 @@ export default function GroupEditScreen() {
   if (notFound) {
     return (
       <div className="mx-auto max-w-lg px-4 py-6">
-        <p className="text-gray-400">קבוצה לא נמצאה.</p>
-        <button onClick={() => navigate('/')} className="mt-4 text-blue-400">חזרה</button>
+        <p className="text-gray-500 dark:text-gray-400">קבוצה לא נמצאה.</p>
+        <button onClick={() => navigate('/')} className="mt-4 text-blue-600 dark:text-blue-400">חזרה</button>
       </div>
     )
   }
@@ -118,33 +118,33 @@ export default function GroupEditScreen() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/')}
-            className="min-h-[44px] px-1 text-gray-400 active:text-gray-200"
+            className="min-h-[44px] px-1 text-gray-500 dark:text-gray-400"
             aria-label="חזרה"
           >
             ←
           </button>
-          <h1 className="text-xl font-bold text-gray-100">עריכת קבוצה</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">עריכת קבוצה</h1>
         </div>
         {/* Autosave indicator */}
         <span
-          className={`text-xs text-green-400 transition-opacity duration-300 ${savedFlash ? 'opacity-100' : 'opacity-0'}`}
+          className={`text-xs text-green-600 transition-opacity duration-300 dark:text-green-400 ${savedFlash ? 'opacity-100' : 'opacity-0'}`}
         >
           ✓ נשמר
         </span>
       </div>
 
       {/* Group name */}
-      <label className="mb-1 block text-sm text-gray-400">שם הקבוצה</label>
+      <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שם הקבוצה</label>
       <input
         type="text"
         value={group.name}
         onChange={e => updateGroupName(e.target.value)}
-        className="mb-6 w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+        className="mb-6 w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
       />
 
       {/* Member count summary */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-300">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
           חברים — {baseCount} בסיס / {homeCount} בית
         </h2>
       </div>
@@ -152,14 +152,14 @@ export default function GroupEditScreen() {
       {/* Member list */}
       <ul className="mb-4 flex flex-col gap-2">
         {group.members.map(member => (
-          <li key={member.id} className="flex items-center gap-2 rounded-2xl bg-gray-800 px-4 py-2.5">
+          <li key={member.id} className="flex items-center gap-2 rounded-2xl bg-gray-50 px-4 py-2.5 dark:bg-gray-800">
             {/* Availability toggle */}
             <button
               onClick={() => toggleAvailability(member.id)}
               className={`min-h-[36px] shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${
                 member.availability === 'base'
                   ? 'bg-green-700 text-green-100'
-                  : 'bg-gray-600 text-gray-300'
+                  : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
               }`}
             >
               {member.availability === 'base' ? 'בסיס' : 'בית'}
@@ -176,12 +176,12 @@ export default function GroupEditScreen() {
                   if (e.key === 'Enter') commitRename(member.id)
                   if (e.key === 'Escape') setEditingMemberId(null)
                 }}
-                className="min-w-0 flex-1 rounded-lg bg-gray-700 px-2 py-1 text-sm text-gray-100 outline-none ring-1 ring-blue-500"
+                className="min-w-0 flex-1 rounded-lg bg-gray-200 px-2 py-1 text-sm text-gray-900 outline-none ring-1 ring-blue-500 dark:bg-gray-700 dark:text-gray-100"
               />
             ) : (
               <button
                 onClick={() => startRename(member)}
-                className="min-h-[36px] min-w-0 flex-1 truncate text-right text-sm text-gray-100"
+                className="min-h-[36px] min-w-0 flex-1 truncate text-right text-sm text-gray-900 dark:text-gray-100"
               >
                 {member.name}
               </button>
@@ -190,7 +190,7 @@ export default function GroupEditScreen() {
             {/* Delete */}
             <button
               onClick={() => setConfirmDeleteMember(member)}
-              className="min-h-[44px] min-w-[44px] shrink-0 text-gray-500 active:text-red-400"
+              className="min-h-[44px] min-w-[44px] shrink-0 text-gray-400 active:text-red-500 dark:text-gray-500 dark:active:text-red-400"
               aria-label="הסר חבר"
             >
               ✕
@@ -207,7 +207,7 @@ export default function GroupEditScreen() {
           onChange={e => setNewMemberName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addMember() }}
           placeholder="הוסף חבר…"
-          className="min-w-0 flex-1 rounded-xl bg-gray-800 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="min-w-0 flex-1 rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
         />
         <button
           onClick={addMember}

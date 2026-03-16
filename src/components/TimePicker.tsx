@@ -78,7 +78,7 @@ function Spinner({ value, min, max, onChange, 'aria-label': ariaLabel }: Spinner
       onKeyDown={handleKeyDown}
       onWheel={handleWheel}
       maxLength={2}
-      className="w-10 select-all bg-transparent text-center text-base tabular-nums text-gray-100 outline-none"
+      className="w-10 select-all bg-transparent text-center text-base tabular-nums text-gray-900 outline-none dark:text-gray-100"
     />
   )
 }
@@ -99,7 +99,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
         type="time"
         value={value}
         onChange={e => onChange(e.target.value)}
-        className={`w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500 [color-scheme:dark] ${className}`}
+        className={`w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 ${className}`}
       />
     )
   }
@@ -107,7 +107,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
   // ── Desktop: two numeric spinners ────────────────────────────────────────
   return (
     <div
-      className={`inline-flex items-center rounded-xl bg-gray-800 px-3 py-2 ring-1 ring-gray-600 focus-within:ring-blue-500 ${className}`}
+      className={`inline-flex items-center rounded-xl bg-gray-100 px-3 py-2 ring-1 ring-gray-300 focus-within:ring-blue-500 dark:bg-gray-800 dark:ring-gray-600 ${className}`}
     >
       <Spinner
         value={hours}
@@ -117,7 +117,7 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
         label="שעות"
         aria-label="שעות"
       />
-      <span className="select-none px-0.5 text-base font-bold text-gray-400">:</span>
+      <span className="select-none px-0.5 text-base font-bold text-gray-500 dark:text-gray-400">:</span>
       <Spinner
         value={minutes}
         min={0}

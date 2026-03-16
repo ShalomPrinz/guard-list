@@ -96,8 +96,8 @@ export default function ContinueRoundScreen() {
   if (!schedule) {
     return (
       <div className="mx-auto max-w-lg px-4 py-6">
-        <p className="text-gray-400">לוח שמירה לא נמצא.</p>
-        <button onClick={() => navigate('/')} className="mt-4 rounded-2xl border border-gray-600 px-4 py-2.5 text-sm text-gray-300 active:bg-gray-800">
+        <p className="text-gray-500 dark:text-gray-400">לוח שמירה לא נמצא.</p>
+        <button onClick={() => navigate('/')} className="mt-4 rounded-2xl border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 active:bg-gray-100 dark:active:bg-gray-800">
           ← חזרה לדף הבית
         </button>
       </div>
@@ -203,28 +203,28 @@ export default function ContinueRoundScreen() {
 
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
-      <button onClick={() => navigate(`/schedule/${schedule.id}/result`)} className="mb-4 min-h-[44px] text-sm text-gray-400 active:text-gray-200">
+      <button onClick={() => navigate(`/schedule/${schedule.id}/result`)} className="mb-4 min-h-[44px] text-sm text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-200">
         ← חזרה
       </button>
 
-      <h1 className="mb-6 text-xl font-bold text-gray-100">המשך סבב</h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">המשך סבב</h1>
 
       {/* Round name */}
       <div className="mb-5">
-        <label className="mb-1 block text-sm text-gray-400">שם הסבב החדש</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שם הסבב החדש</label>
         <input
           value={roundName}
           onChange={e => setRoundName(e.target.value)}
-          className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="w-full rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-gray-100 outline-none ring-1 ring-gray-300 dark:ring-gray-600 focus:ring-blue-500"
         />
       </div>
 
       {/* End time mode — only when stations finish at different times */}
       {stationsHaveDifferentEnds && (
         <div className="mb-5">
-          <p className="mb-2 text-sm text-gray-400">זמן התחלה לסבב החדש</p>
+          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">זמן התחלה לסבב החדש</p>
           <div className="flex flex-col gap-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-800 p-3">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-100 dark:bg-gray-800 p-3">
               <input
                 type="radio"
                 name="endTimeMode"
@@ -233,11 +233,11 @@ export default function ContinueRoundScreen() {
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm font-medium text-gray-100">זמן סיום מתוכנן ({plannedEndTime})</p>
-                <p className="text-xs text-gray-400">כל העמדות מתחילות באותה שעה</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">זמן סיום מתוכנן ({plannedEndTime})</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">כל העמדות מתחילות באותה שעה</p>
               </div>
             </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-800 p-3">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-100 dark:bg-gray-800 p-3">
               <input
                 type="radio"
                 name="endTimeMode"
@@ -246,8 +246,8 @@ export default function ContinueRoundScreen() {
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm font-medium text-gray-100">זמן סיום בפועל לכל עמדה</p>
-                <p className="text-xs text-gray-400">כל עמדה מתחילה מהשעה שבה סיימה בפועל</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">זמן סיום בפועל לכל עמדה</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">כל עמדה מתחילה מהשעה שבה סיימה בפועל</p>
               </div>
             </label>
           </div>
@@ -256,12 +256,12 @@ export default function ContinueRoundScreen() {
 
       {/* Order mode */}
       <div className="mb-5">
-        <p className="mb-2 text-sm text-gray-400">סדר משתתפים</p>
+        <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">סדר משתתפים</p>
         <div className="flex gap-2">
           <button
             onClick={() => setOrderMode('same')}
             className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
-              orderMode === 'same' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 active:bg-gray-600'
+              orderMode === 'same' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 active:bg-gray-200 dark:active:bg-gray-600'
             }`}
           >
             אותו סדר
@@ -269,7 +269,7 @@ export default function ContinueRoundScreen() {
           <button
             onClick={() => setOrderMode('reshuffle')}
             className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
-              orderMode === 'reshuffle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 active:bg-gray-600'
+              orderMode === 'reshuffle' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 active:bg-gray-200 dark:active:bg-gray-600'
             }`}
           >
             הגרלה חדשה
@@ -280,15 +280,15 @@ export default function ContinueRoundScreen() {
       {/* Per-station participant availability + cross-station moves */}
       {tbContStations.length > 0 && (
         <div className="mb-6">
-          <p className="mb-3 text-sm text-gray-400">זמינות משתתפים לסבב זה</p>
+          <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">זמינות משתתפים לסבב זה</p>
           <div className="flex flex-col gap-4">
             {tbContStations.map(cs => (
-              <div key={cs.stationConfigId} className="rounded-2xl bg-gray-800 p-4">
+              <div key={cs.stationConfigId} className="rounded-2xl bg-white dark:bg-gray-800 p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-200">{cs.stationName}</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{cs.stationName}</p>
                   {(stationsHaveDifferentEnds ? endTimeMode === 'actual' : false)
-                    ? <span className="text-xs text-gray-500">מתחיל: {cs.actualEndTime}</span>
-                    : <span className="text-xs text-gray-500">מתחיל: {plannedEndTime}</span>
+                    ? <span className="text-xs text-gray-500">{`מתחיל: ${cs.actualEndTime}`}</span>
+                    : <span className="text-xs text-gray-500">{`מתחיל: ${plannedEndTime}`}</span>
                   }
                 </div>
 
@@ -306,13 +306,13 @@ export default function ContinueRoundScreen() {
                             className={`w-14 shrink-0 rounded-lg py-1 text-xs font-semibold transition-colors ${
                               p.available
                                 ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-500 line-through'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-500 line-through'
                             }`}
                           >
                             {p.available ? 'בסיס' : 'בית'}
                           </button>
 
-                          <span className={`flex-1 text-sm ${p.available ? 'text-gray-100' : 'text-gray-600'}`}>
+                          <span className={`flex-1 text-sm ${p.available ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-600'}`}>
                             {p.name}
                           </span>
 
@@ -321,7 +321,7 @@ export default function ContinueRoundScreen() {
                             <select
                               value=""
                               onChange={e => { if (e.target.value) moveParticipant(p.name, cs.stationConfigId, e.target.value) }}
-                              className="shrink-0 rounded-lg bg-gray-700 px-1 py-1 text-xs text-gray-300 outline-none"
+                              className="shrink-0 rounded-lg bg-gray-100 dark:bg-gray-700 px-1 py-1 text-xs text-gray-700 dark:text-gray-300 outline-none"
                               title="העבר לעמדה"
                             >
                               <option value="">↔</option>

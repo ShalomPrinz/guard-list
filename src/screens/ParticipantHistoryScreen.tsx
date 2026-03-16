@@ -30,12 +30,12 @@ export default function ParticipantHistoryScreen() {
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/statistics')}
-          className="min-h-[44px] px-1 text-sm text-gray-400 active:text-gray-200"
+          className="min-h-[44px] px-1 text-sm text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-200"
         >
           ←
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-100">{name}</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{name}</h1>
           {participant && (
             <p className="text-xs text-gray-500">
               {participant.totalShifts} משמרות · {formatDuration(participant.totalMinutes)}
@@ -49,18 +49,18 @@ export default function ParticipantHistoryScreen() {
       ) : (
         <div className="flex flex-col gap-2">
           {history.map((record, i) => (
-            <div key={i} className="rounded-2xl bg-gray-800 px-4 py-3">
+            <div key={i} className="rounded-2xl bg-white dark:bg-gray-800 px-4 py-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400">{record.date}</span>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{record.date}</span>
                 <span className="text-xs text-gray-500">{record.stationName}</span>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-mono text-sm text-gray-100">
+                <span className="font-mono text-sm text-gray-900 dark:text-gray-100">
                   {record.startTime} – {record.endTime}
                 </span>
-                <span className="text-xs text-gray-400">{formatDuration(record.durationMinutes)}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{formatDuration(record.durationMinutes)}</span>
               </div>
-              <p className="mt-0.5 truncate text-xs text-gray-600">{record.scheduleName}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-600">{record.scheduleName}</p>
             </div>
           ))}
         </div>

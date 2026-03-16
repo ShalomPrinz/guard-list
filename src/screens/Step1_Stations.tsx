@@ -138,10 +138,10 @@ export default function Step1_Stations() {
     return (
       <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
         <StepIndicator current={1} total={4} />
-        <p className="mb-4 text-gray-400">אין קבוצות שמורות. צור קבוצה לפני יצירת לוח שמירה.</p>
+        <p className="mb-4 text-gray-500 dark:text-gray-400">אין קבוצות שמורות. צור קבוצה לפני יצירת לוח שמירה.</p>
         <button
           onClick={() => navigate('/')}
-          className="w-full rounded-2xl border border-gray-600 py-3 text-sm text-gray-300 active:bg-gray-800"
+          className="w-full rounded-2xl border border-gray-300 py-3 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           → חזרה לדף הבית
         </button>
@@ -152,15 +152,15 @@ export default function Step1_Stations() {
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={1} total={4} />
-      <h1 className="mb-6 text-xl font-bold text-gray-100">הגדרת עמדות</h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">הגדרת עמדות</h1>
 
       {/* Group selector */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-400">קבוצה</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">קבוצה</label>
         {groups.length === 1 ? (
-          <div className="rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100">
+          <div className="rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
             {groups[0].name}
-            <span className="mr-2 text-xs text-gray-400">
+            <span className="mr-2 text-xs text-gray-500 dark:text-gray-400">
               ({groups[0].members.filter(m => m.availability === 'base').length} זמינים)
             </span>
           </div>
@@ -168,7 +168,7 @@ export default function Step1_Stations() {
           <select
             value={selectedGroupId}
             onChange={e => { setSelectedGroupId(e.target.value); setError('') }}
-            className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+            className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
           >
             {groups.map(g => (
               <option key={g.id} value={g.id}>
@@ -181,18 +181,18 @@ export default function Step1_Stations() {
 
       {/* Date */}
       <div className="mb-6">
-        <label className="mb-1 block text-sm text-gray-400">תאריך</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">תאריך</label>
         <input
           type="date"
           value={date}
           onChange={e => setDate(e.target.value)}
-          className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500 [color-scheme:dark]"
+          className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
       </div>
 
       {/* Station count selector */}
       <div className="mb-6">
-        <label className="mb-2 block text-sm text-gray-400">מספר עמדות</label>
+        <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">מספר עמדות</label>
         <div className="flex gap-2">
           {[1, 2, 3, 4, 5, 6].map(n => (
             <button
@@ -201,7 +201,7 @@ export default function Step1_Stations() {
               className={`h-10 w-10 rounded-xl text-sm font-semibold transition-colors ${
                 stationCount === n
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 active:bg-gray-600'
+                  : 'bg-gray-200 text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600'
               }`}
             >
               {n}
@@ -213,8 +213,8 @@ export default function Step1_Stations() {
       {/* Station cards */}
       <div className="mb-6 flex flex-col gap-3">
         {stationForms.map((station, i) => (
-          <div key={station.id} className="rounded-2xl bg-gray-800 p-4">
-            <p className="mb-3 text-xs font-semibold text-gray-400">עמדה {i + 1}</p>
+          <div key={station.id} className="rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
+            <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">עמדה {i + 1}</p>
 
             {/* Station name */}
             <input
@@ -222,7 +222,7 @@ export default function Step1_Stations() {
               value={station.name}
               onChange={e => updateStation(i, { name: e.target.value })}
               placeholder={`עמדה ${i + 1}`}
-              className="mb-3 w-full rounded-xl bg-gray-700 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+              className="mb-3 w-full rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
             />
 
             {/* Type toggle */}
@@ -232,7 +232,7 @@ export default function Step1_Stations() {
                 className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${
                   station.type === 'time-based'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-400 active:bg-gray-600'
+                    : 'bg-gray-200 text-gray-600 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:active:bg-gray-600'
                 }`}
               >
                 מבוסס-זמן
@@ -242,7 +242,7 @@ export default function Step1_Stations() {
                 className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${
                   station.type === 'headcount'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-400 active:bg-gray-600'
+                    : 'bg-gray-200 text-gray-600 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:active:bg-gray-600'
                 }`}
               >
                 כוח אדם
@@ -252,13 +252,13 @@ export default function Step1_Stations() {
             {/* Headcount required */}
             {station.type === 'headcount' && (
               <div className="mt-3">
-                <label className="mb-1 block text-xs text-gray-400">מספר משמרים נדרש</label>
+                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">מספר משמרים נדרש</label>
                 <input
                   type="number"
                   min={1}
                   value={station.headcountRequired}
                   onChange={e => updateStation(i, { headcountRequired: Math.max(1, Number(e.target.value)) })}
-                  className="w-24 rounded-xl bg-gray-700 px-3 py-2 text-sm text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+                  className="w-24 rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
                 />
               </div>
             )}
@@ -266,13 +266,13 @@ export default function Step1_Stations() {
         ))}
       </div>
 
-      {error && <p className="mb-4 rounded-xl bg-red-900/40 px-4 py-2.5 text-sm text-red-300">{error}</p>}
+      {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-900/40 dark:text-red-300">{error}</p>}
 
       {/* Navigation */}
       <div className="flex gap-3">
         <button
           onClick={() => navigate('/')}
-          className="flex-1 rounded-2xl border border-gray-600 py-3 text-sm font-medium text-gray-300 active:bg-gray-800"
+          className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה
         </button>

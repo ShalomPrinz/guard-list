@@ -59,26 +59,26 @@ export default function CreateGroupModal({ onCreated, onCancel }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
-      <div className="w-full max-w-lg rounded-t-3xl bg-gray-800 p-6 shadow-xl sm:rounded-2xl">
-        <h2 className="mb-4 text-lg font-semibold text-gray-100">קבוצה חדשה</h2>
+      <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-xl dark:bg-gray-800 sm:rounded-2xl">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">קבוצה חדשה</h2>
 
         {/* Group name */}
-        <label className="mb-1 block text-sm text-gray-400">שם הקבוצה</label>
+        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שם הקבוצה</label>
         <input
           type="text"
           value={groupName}
           onChange={e => { setGroupName(e.target.value); setError('') }}
           placeholder="למשל: מחלקה א'"
-          className="mb-4 w-full rounded-xl bg-gray-700 px-4 py-2.5 text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="mb-4 w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
         />
 
         {/* Members textarea */}
         <div className="mb-1 flex items-center justify-between">
-          <label className="text-sm text-gray-400">חברים (מופרדים בפסיק או שורה)</label>
+          <label className="text-sm text-gray-500 dark:text-gray-400">חברים (מופרדים בפסיק או שורה)</label>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="text-xs text-blue-400 active:text-blue-300"
+            className="text-xs text-blue-600 active:text-blue-500 dark:text-blue-400 dark:active:text-blue-300"
           >
             ייבוא CSV
           </button>
@@ -89,23 +89,23 @@ export default function CreateGroupModal({ onCreated, onCancel }: Props) {
           onChange={e => { setNamesText(e.target.value); setError('') }}
           placeholder={'אלי, בוב, ג\'ק\nאו שורה אחת לכל חבר'}
           rows={5}
-          className="mb-2 w-full resize-none rounded-xl bg-gray-700 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none ring-1 ring-gray-600 focus:ring-blue-500"
+          className="mb-2 w-full resize-none rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
         />
 
         {/* Preview */}
         {parsed.length > 0 && (
-          <p className="mb-3 text-xs text-gray-400">
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             {parsed.length} חברים זוהו
             {parsed.length !== rawCount && ' (כפילויות הוסרו)'}
           </p>
         )}
 
-        {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-gray-600 py-2.5 text-sm font-medium text-gray-300 active:bg-gray-700"
+            className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
           >
             ביטול
           </button>
