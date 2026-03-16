@@ -34,5 +34,6 @@ Migrations live in `docs/migrations/`. Ignore them. Also ignore @docs/implementa
 
 - Every iteration, follow @TESTING.md rules.
 - Run `vitest run --coverage` after every implementation step and every migration. Coverage must stay at or above 90% for `src/logic/` and `src/storage/` before moving on.
+- When fixing an issue, write a dedicated test specifically for the broken feature that had the issue, to prevent any regression.
 - Use `python3` for bash commands
 - All UI text must be in hebrew.
