@@ -10,10 +10,10 @@ Enable creation and management of guard duty rotations with full control over pa
 
 | File | Description |
 |------|-------------|
-| [features.md](features.md) | All functional features and their requirements |
-| [screens.md](screens.md) | Screen flow, UI/UX, and navigation |
-| [data-model.md](data-model.md) | Data structures and persistence |
-| [business-logic.md](business-logic.md) | Scheduling algorithms and calculation rules |
+| [features.md](docs/features.md) | All functional features and their requirements |
+| [screens.md](docs/screens.md) | Screen flow, UI/UX, and navigation |
+| [data-model.md](docs/data-model.md) | Data structures and persistence |
+| [business-logic.md](docs/business-logic.md) | Scheduling algorithms and calculation rules |
 
 ## Core User Flow
 
