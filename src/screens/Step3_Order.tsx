@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -110,6 +110,9 @@ function DroppableZone({ id, children }: { id: string; children: React.ReactNode
 export default function Step3_Order() {
   const navigate = useNavigate()
   const { session, updateStations } = useWizard()
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   if (!session) { navigate('/schedule/new/step1'); return null }
 

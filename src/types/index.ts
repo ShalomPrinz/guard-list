@@ -117,4 +117,6 @@ export interface WizardSession {
   continueEndTimeMode?: ContinueEndTimeMode;
   scheduleName: string;
   date: string;                // YYYY-MM-DD
+  /** Set after first "Create Schedule" — subsequent saves overwrite this schedule id. */
+  createdScheduleId?: string;
 }

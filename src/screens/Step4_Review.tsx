@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -23,7 +23,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useWizard } from '../context/WizardContext'
 import { buildStationSchedule } from '../logic/generateSchedule'
 import { parseTimeToMinutes, minutesToTime, calcStationDurations } from '../logic/scheduling'
-import { addSchedule } from '../storage/schedules'
+import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
 import StepIndicator from '../components/StepIndicator'
 import type { Schedule, ScheduleStation, ScheduledParticipant } from '../types'
@@ -381,6 +381,8 @@ export default function Step4_Review() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
   if (!session) {
     return (
       <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
@@ -415,22 +417,51 @@ export default function Step4_Review() {
   }
 
   function handleMove(itemId: string, fromStationId: string, toStationId: string) {
-    setStations(prev => {
-      const fromSt = prev.find(s => s.stationConfigId === fromStationId)
-      const item = fromSt?.items.find(i => i.id === itemId)
-      if (!item) return prev
-      return prev.map(st => {
-        if (st.stationConfigId === fromStationId) {
-          const newItems = st.items.filter(i => i.id !== itemId)
-          return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
-        }
-        if (st.stationConfigId === toStationId) {
-          const newItems = [...st.items, { ...item, id: `${toStationId}-${Date.now()}` }]
-          return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
-        }
-        return st
-      })
+    if (!session) return
+    const fromSt = stations.find(s => s.stationConfigId === fromStationId)
+    const item = fromSt?.items.find(i => i.id === itemId)
+    if (!item) return
+
+    // Block the move if it would leave the source station empty
+    if (fromSt && fromSt.items.length <= 1) {
+      setError('לא ניתן להעביר — העמדה תישאר ריקה')
+      return
+    }
+
+    setError('')
+
+    // Apply the participant move
+    const moved = stations.map(st => {
+      if (st.stationConfigId === fromStationId) {
+        return { ...st, items: st.items.filter(i => i.id !== itemId) }
+      }
+      if (st.stationConfigId === toStationId) {
+        return { ...st, items: [...st.items, { ...item, id: `${toStationId}-${Date.now()}` }] }
+      }
+      return st
     })
+
+    // Recalculate per-participant durations for all time-based stations using
+    // the rounding algorithm and uneven strategy from the wizard session.
+    const tbStations = moved.filter(s => s.stationType === 'time-based')
+    const counts = tbStations.map(s => s.items.length)
+    const durations = calcStationDurations({
+      startTime: session.timeConfig.startTime,
+      endTime: session.timeConfig.endTime,
+      fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+      roundingAlgorithm: session.timeConfig.roundingAlgorithm,
+      unevenMode: session.timeConfig.unevenMode,
+      stationParticipantCounts: counts,
+    })
+
+    // Update durations and recompute sequential start/end times for each TB station
+    setStations(moved.map(st => {
+      if (st.stationType !== 'time-based') return st
+      const tbIdx = tbStations.findIndex(s => s.stationConfigId === st.stationConfigId)
+      const dur = durations[tbIdx]?.roundedDurationMinutes ?? 60
+      const newItems = st.items.map(it => ({ ...it, durationMinutes: dur }))
+      return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
+    }))
   }
 
   function handleAdd(stationId: string, name: string) {
@@ -514,7 +545,9 @@ export default function Step4_Review() {
       return
     }
 
-    const scheduleId = crypto.randomUUID()
+    // Reuse the same ID on re-save so the schedule is overwritten, not duplicated
+    const isFirstSave = !session.createdScheduleId
+    const scheduleId = session.createdScheduleId ?? crypto.randomUUID()
 
     const scheduleStations: ScheduleStation[] = stations.map(st => {
       if (st.stationType === 'headcount') {
@@ -556,25 +589,45 @@ export default function Step4_Review() {
       quoteAuthor: quoteAuthor.trim() || undefined,
     }
 
-    addSchedule(schedule)
+    upsertSchedule(schedule)
 
-    // Record statistics for time-based stations only
-    for (const st of scheduleStations) {
-      if (st.stationType !== 'time-based') continue
-      for (const p of st.participants) {
-        recordShift(p.name, {
-          scheduleId,
-          scheduleName: name,
-          stationName: st.stationName,
-          date: p.date,
-          startTime: p.startTime,
-          endTime: p.endTime,
-          durationMinutes: p.durationMinutes,
-        })
+    // Record statistics only on the first save to avoid double-counting
+    if (isFirstSave) {
+      for (const st of scheduleStations) {
+        if (st.stationType !== 'time-based') continue
+        for (const p of st.participants) {
+          recordShift(p.name, {
+            scheduleId,
+            scheduleName: name,
+            stationName: st.stationName,
+            date: p.date,
+            startTime: p.startTime,
+            endTime: p.endTime,
+            durationMinutes: p.durationMinutes,
+          })
+        }
       }
     }
 
-    updateSession({ scheduleName: name })
+    // Persist the current review state back into the session so that pressing
+    // Back from ResultScreen restores this exact participant order and names.
+    const updatedStations: typeof session.stations = session.stations.map(ws => {
+      const rs = stations.find(s => s.stationConfigId === ws.config.id)
+      if (!rs) return ws
+      if (ws.config.type === 'headcount') {
+        return { ...ws, headcountParticipants: rs.headcountNames }
+      }
+      return {
+        ...ws,
+        participants: rs.items.map(item => ({
+          name: item.name,
+          locked: item.locked,
+          skipped: false,
+        })),
+      }
+    })
+
+    updateSession({ scheduleName: name, createdScheduleId: scheduleId, stations: updatedStations })
     navigate(`/schedule/${scheduleId}/result`)
   }
 

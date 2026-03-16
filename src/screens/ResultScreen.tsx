@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getScheduleById, updateScheduleName } from '../storage/schedules'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
@@ -7,7 +7,7 @@ import { useWizard } from '../context/WizardContext'
 export default function ResultScreen() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const navigate = useNavigate()
-  const { resetSession } = useWizard()
+  const { session } = useWizard()
 
   const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
 
@@ -15,6 +15,8 @@ export default function ResultScreen() {
   const [editingName, setEditingName] = useState(false)
   const [copied, setCopied] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   if (!schedule) {
     return (
@@ -151,23 +153,14 @@ export default function ResultScreen() {
         ↩ המשך סבב
       </button>
 
-      {schedule.parentScheduleId ? (
-        /* Continuation: back returns to Step4 with wizard state intact */
-        <button
-          onClick={() => navigate('/schedule/new/step4')}
-          className="w-full rounded-2xl border border-gray-600 py-3 text-sm text-gray-300 active:bg-gray-800"
-        >
-          ← חזרה לעריכה
-        </button>
-      ) : (
-        /* New schedule: back goes home and clears wizard state */
-        <button
-          onClick={() => { resetSession(); navigate('/') }}
-          className="w-full rounded-2xl border border-gray-600 py-3 text-sm text-gray-300 active:bg-gray-800"
-        >
-          ← חזרה לדף הבית
-        </button>
-      )}
+      {/* Back: if a wizard session is active return to step4 for re-editing;
+           otherwise (viewing from history) return to home */}
+      <button
+        onClick={() => session ? navigate('/schedule/new/step4') : navigate('/')}
+        className="w-full rounded-2xl border border-gray-600 py-3 text-sm text-gray-300 active:bg-gray-800"
+      >
+        {session ? '← חזרה לעריכה' : '← חזרה לדף הבית'}
+      </button>
     </div>
   )
 }

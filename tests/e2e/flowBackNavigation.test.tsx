@@ -108,24 +108,24 @@ afterEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('Back navigation — new schedule result screen', () => {
-  it('shows "← חזרה לדף הבית" button for a new (non-continuation) schedule', async () => {
+  it('shows "← חזרה לעריכה" button when session is active after creation', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderFullApp()
     await runFullWizard(user)
 
-    expect(screen.getByText('← חזרה לדף הבית')).toBeTruthy()
+    expect(screen.getByText('← חזרה לעריכה')).toBeTruthy()
   })
 
-  it('back from new schedule result navigates to home screen', async () => {
+  it('back from new schedule result returns to step4 (post-create editing)', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderFullApp()
     await runFullWizard(user)
 
-    await user.click(screen.getByText('← חזרה לדף הבית'))
+    await user.click(screen.getByText('← חזרה לעריכה'))
 
-    expect(screen.getByText('רשימת שמירה')).toBeTruthy()
+    expect(screen.getByText('סקירה ועריכה')).toBeTruthy()
   })
 })
 

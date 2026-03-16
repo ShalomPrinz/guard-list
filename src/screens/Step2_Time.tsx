@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroupById } from '../storage/groups'
 import { useWizard } from '../context/WizardContext'
@@ -26,6 +26,9 @@ function formatDuration(minutes: number): string {
 export default function Step2_Time() {
   const navigate = useNavigate()
   const { session, updateTimeConfig } = useWizard()
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   // Guard: must have a session with stations
   if (!session) {

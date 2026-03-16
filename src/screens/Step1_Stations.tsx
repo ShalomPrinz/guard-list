@@ -64,6 +64,8 @@ export default function Step1_Stations() {
 
   // ── Sync station forms when count changes ─────────────────────────────────
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
   useEffect(() => {
     setStationForms(prev => {
       if (stationCount === prev.length) return prev

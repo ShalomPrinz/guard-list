@@ -33,3 +33,14 @@ export function deleteSchedule(id: string, storage: Storage = window.localStorag
 export function updateScheduleName(id: string, name: string, storage: Storage = window.localStorage): void {
   saveSchedules(getSchedules(storage).map(s => s.id === id ? { ...s, name } : s), storage)
 }
+
+export function upsertSchedule(schedule: Schedule, storage: Storage = window.localStorage): void {
+  const schedules = getSchedules(storage)
+  const idx = schedules.findIndex(s => s.id === schedule.id)
+  if (idx >= 0) {
+    schedules[idx] = schedule
+  } else {
+    schedules.push(schedule)
+  }
+  saveSchedules(schedules, storage)
+}
