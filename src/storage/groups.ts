@@ -1,0 +1,36 @@
+import type { Group } from '../types'
+
+const KEY = 'groups'
+
+export function getGroups(storage: Storage = window.localStorage): Group[] {
+  const raw = storage.getItem(KEY)
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as Group[]
+  } catch {
+    return []
+  }
+}
+
+export function saveGroups(groups: Group[], storage: Storage = window.localStorage): void {
+  storage.setItem(KEY, JSON.stringify(groups))
+}
+
+export function getGroupById(id: string, storage: Storage = window.localStorage): Group | undefined {
+  return getGroups(storage).find(g => g.id === id)
+}
+
+export function upsertGroup(group: Group, storage: Storage = window.localStorage): void {
+  const groups = getGroups(storage)
+  const idx = groups.findIndex(g => g.id === group.id)
+  if (idx >= 0) {
+    groups[idx] = group
+  } else {
+    groups.push(group)
+  }
+  saveGroups(groups, storage)
+}
+
+export function deleteGroup(id: string, storage: Storage = window.localStorage): void {
+  saveGroups(getGroups(storage).filter(g => g.id !== id), storage)
+}

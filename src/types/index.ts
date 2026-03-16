@@ -1,0 +1,107 @@
+// ─── Group ───────────────────────────────────────────────────────────────────
+
+export interface Member {
+  id: string;
+  name: string;
+  availability: 'base' | 'home';
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  members: Member[];
+  createdAt: string; // ISO date
+}
+
+// ─── Station Config ───────────────────────────────────────────────────────────
+
+export interface StationConfig {
+  id: string;
+  name: string;
+  type: 'time-based' | 'headcount';
+  headcountRequired?: number;
+}
+
+// ─── Schedule ─────────────────────────────────────────────────────────────────
+
+export interface ScheduledParticipant {
+  name: string;
+  startTime: string;       // "HH:MM"
+  endTime: string;         // "HH:MM"
+  date: string;            // YYYY-MM-DD
+  durationMinutes: number;
+  locked: boolean;
+  skipped: boolean;
+}
+
+export interface ScheduleStation {
+  stationConfigId: string;
+  stationName: string;
+  stationType: 'time-based' | 'headcount';
+  participants: ScheduledParticipant[];
+  headcountParticipants?: string[];
+}
+
+export interface Schedule {
+  id: string;
+  name: string;
+  groupId: string;
+  createdAt: string;       // ISO datetime
+  date: string;            // YYYY-MM-DD
+  parentScheduleId?: string;
+  stations: ScheduleStation[];
+  unevenDistributionMode: 'equal-duration' | 'equal-endtime';
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+export interface ShiftRecord {
+  scheduleId: string;
+  scheduleName: string;
+  stationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+export interface ParticipantStats {
+  totalShifts: number;
+  totalMinutes: number;
+  history: ShiftRecord[];
+}
+
+export interface Statistics {
+  participants: Record<string, ParticipantStats>;
+}
+
+// ─── Wizard Session ───────────────────────────────────────────────────────────
+
+export type RoundingAlgorithm = 'round-up-10' | 'round-up-5' | 'round-nearest';
+export type UnevenMode = 'equal-duration' | 'equal-endtime';
+export type ContinueEndTimeMode = 'planned' | 'actual';
+
+export interface TimeConfig {
+  startTime: string;           // "HH:MM"
+  endTime?: string;            // "HH:MM" — optional
+  fixedDurationMinutes?: number;
+  roundingAlgorithm: RoundingAlgorithm;
+  unevenMode: UnevenMode;
+}
+
+export interface WizardStation {
+  config: StationConfig;
+  participants: string[];      // ordered participant names for time-based
+}
+
+export interface WizardSession {
+  mode: 'new' | 'continue';
+  groupId: string;
+  groupName: string;
+  stations: WizardStation[];
+  timeConfig: TimeConfig;
+  parentScheduleId?: string;
+  continueEndTimeMode?: ContinueEndTimeMode;
+  scheduleName: string;
+  date: string;                // YYYY-MM-DD
+}
