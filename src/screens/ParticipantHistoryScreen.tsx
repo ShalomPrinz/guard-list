@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { getStatistics } from '../storage/statistics'
+import { formatDate } from '../logic/formatting'
 
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -51,7 +52,7 @@ export default function ParticipantHistoryScreen() {
           {history.map((record, i) => (
             <div key={i} className="rounded-2xl bg-white dark:bg-gray-800 px-4 py-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{record.date}</span>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{formatDate(record.date)}</span>
                 <span className="text-xs text-gray-500">{record.stationName}</span>
               </div>
               <div className="flex items-baseline justify-between">

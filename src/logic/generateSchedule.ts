@@ -66,24 +66,11 @@ export function formatScheduleForWhatsApp(schedule: Schedule): string {
   const lines: string[] = [];
   lines.push(`🔒 ${schedule.name}`);
 
-  // Time-based stations first
   for (const station of schedule.stations) {
-    if (station.stationType !== "time-based") continue;
     lines.push("");
     lines.push(`📍 ${station.stationName}`);
     for (const p of station.participants) {
       lines.push(`${p.startTime} ${p.name}`);
-    }
-  }
-
-  // Headcount stations
-  for (const station of schedule.stations) {
-    if (station.stationType !== "headcount") continue;
-    if (!station.headcountParticipants?.length) continue;
-    lines.push("");
-    lines.push(`📍 ${station.stationName}`);
-    for (const name of station.headcountParticipants) {
-      lines.push(name);
     }
   }
 

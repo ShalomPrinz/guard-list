@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroups, deleteGroup } from '../storage/groups'
 import { getSchedules, deleteSchedule } from '../storage/schedules'
+import { formatDate, formatTime } from '../logic/formatting'
 import type { Group, Schedule } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import CreateGroupModal from '../components/CreateGroupModal'
@@ -31,10 +32,8 @@ export default function HomeScreen() {
   }
 
   function formatScheduleDate(isoDate: string) {
-    return new Date(isoDate).toLocaleString('he-IL', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
+    const d = new Date(isoDate)
+    return `${formatDate(d)} ${formatTime(d)}`
   }
 
   // Welcome state — shown when no groups exist yet

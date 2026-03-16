@@ -9,18 +9,16 @@ import StepIndicator from '../components/StepIndicator'
 interface StationForm {
   id: string
   name: string
-  type: StationConfig['type']
-  headcountRequired: number
 }
 
 function defaultStationForm(index: number, saved?: StationConfig): StationForm {
   return {
     id: saved?.id ?? crypto.randomUUID(),
     name: saved?.name ?? `עמדה ${index + 1}`,
-    type: saved?.type ?? 'time-based',
-    headcountRequired: saved?.headcountRequired ?? 2,
   }
 }
+
+const FIXED_COUNTS = [1, 2, 3, 4] as const
 
 export default function Step1_Stations() {
   const navigate = useNavigate()
@@ -35,24 +33,21 @@ export default function Step1_Stations() {
     session?.groupId ?? groups[0]?.id ?? '',
   )
 
-  const today = new Date().toISOString().split('T')[0]
-  const [date, setDate] = useState<string>(session?.date ?? today)
-
   const initCount = session?.stations.length
     ? session.stations.length
     : savedConfigs.length > 0
       ? savedConfigs.length
       : 1
 
-  const [stationCount, setStationCount] = useState(Math.min(initCount, 6))
+  const [stationCount, setStationCount] = useState(initCount)
+  const [useCustom, setUseCustom] = useState(initCount > 4)
+  const [customStr, setCustomStr] = useState(initCount > 4 ? String(initCount) : '')
 
   const [stationForms, setStationForms] = useState<StationForm[]>(() => {
     if (session?.stations.length) {
       return session.stations.map(s => ({
         id: s.config.id,
         name: s.config.name,
-        type: s.config.type,
-        headcountRequired: s.config.headcountRequired ?? 2,
       }))
     }
     return Array.from({ length: stationCount }, (_, i) =>
@@ -77,6 +72,21 @@ export default function Step1_Stations() {
       return [...prev, ...extra]
     })
   }, [stationCount]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Count selector helpers ─────────────────────────────────────────────────
+
+  function handleFixedCount(n: number) {
+    setStationCount(n)
+    setUseCustom(false)
+  }
+
+  function handleCustomChange(val: string) {
+    const n = parseInt(val, 10)
+    if (isNaN(n)) { setCustomStr(val); return }
+    const clamped = Math.min(Math.max(n, 1), 10)
+    setCustomStr(String(clamped))
+    setStationCount(clamped)
+  }
 
   // ── Field updaters ────────────────────────────────────────────────────────
 
@@ -107,11 +117,9 @@ export default function Step1_Stations() {
       config: {
         id: f.id,
         name: f.name.trim() || `עמדה ${stationForms.indexOf(f) + 1}`,
-        type: f.type,
-        headcountRequired: f.type === 'headcount' ? f.headcountRequired : undefined,
+        type: 'time-based',
       },
       participants: [],
-      headcountParticipants: [],
     }))
 
     // Persist station names for next session pre-fill
@@ -119,6 +127,7 @@ export default function Step1_Stations() {
 
     // Preserve timeConfig if same group, reset if group changed
     const preserveTime = session?.groupId === selectedGroupId && session?.timeConfig
+    const today = new Date().toISOString().split('T')[0]
     initSession({
       mode: 'new',
       groupId: selectedGroupId,
@@ -126,7 +135,7 @@ export default function Step1_Stations() {
       stations,
       timeConfig: preserveTime ? session!.timeConfig : { ...DEFAULT_TIME_CONFIG },
       scheduleName: session?.groupId === selectedGroupId ? (session?.scheduleName ?? '') : '',
-      date,
+      date: session?.groupId === selectedGroupId ? (session?.date ?? today) : today,
     })
 
     navigate('/schedule/new/step2')
@@ -155,7 +164,7 @@ export default function Step1_Stations() {
       <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">הגדרת עמדות</h1>
 
       {/* Group selector */}
-      <div className="mb-4">
+      <div className="mb-6">
         <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">קבוצה</label>
         {groups.length === 1 ? (
           <div className="rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
@@ -179,27 +188,16 @@ export default function Step1_Stations() {
         )}
       </div>
 
-      {/* Date */}
-      <div className="mb-6">
-        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">תאריך</label>
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-        />
-      </div>
-
       {/* Station count selector */}
       <div className="mb-6">
         <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">מספר עמדות</label>
         <div className="flex gap-2">
-          {[1, 2, 3, 4, 5, 6].map(n => (
+          {FIXED_COUNTS.map(n => (
             <button
               key={n}
-              onClick={() => setStationCount(n)}
+              onClick={() => handleFixedCount(n)}
               className={`h-10 w-10 rounded-xl text-sm font-semibold transition-colors ${
-                stationCount === n
+                !useCustom && stationCount === n
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600'
               }`}
@@ -207,7 +205,29 @@ export default function Step1_Stations() {
               {n}
             </button>
           ))}
+          <button
+            onClick={() => setUseCustom(true)}
+            className={`h-10 rounded-xl px-3 text-sm font-semibold transition-colors ${
+              useCustom
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600'
+            }`}
+          >
+            אחר..
+          </button>
         </div>
+        {useCustom && (
+          <input
+            type="number"
+            min={5}
+            max={10}
+            value={customStr}
+            onChange={e => handleCustomChange(e.target.value)}
+            placeholder="מספר עמדות"
+            autoFocus
+            className="mt-2 w-32 rounded-xl bg-gray-100 px-4 py-2 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+          />
+        )}
       </div>
 
       {/* Station cards */}
@@ -215,53 +235,13 @@ export default function Step1_Stations() {
         {stationForms.map((station, i) => (
           <div key={station.id} className="rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
             <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">עמדה {i + 1}</p>
-
-            {/* Station name */}
             <input
               type="text"
               value={station.name}
               onChange={e => updateStation(i, { name: e.target.value })}
               placeholder={`עמדה ${i + 1}`}
-              className="mb-3 w-full rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
+              className="w-full rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
             />
-
-            {/* Type toggle */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => updateStation(i, { type: 'time-based' })}
-                className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${
-                  station.type === 'time-based'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-600 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:active:bg-gray-600'
-                }`}
-              >
-                מבוסס-זמן
-              </button>
-              <button
-                onClick={() => updateStation(i, { type: 'headcount' })}
-                className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${
-                  station.type === 'headcount'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-600 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:active:bg-gray-600'
-                }`}
-              >
-                כוח אדם
-              </button>
-            </div>
-
-            {/* Headcount required */}
-            {station.type === 'headcount' && (
-              <div className="mt-3">
-                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">מספר משמרים נדרש</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={station.headcountRequired}
-                  onChange={e => updateStation(i, { headcountRequired: Math.max(1, Number(e.target.value)) })}
-                  className="w-24 rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
-                />
-              </div>
-            )}
           </div>
         ))}
       </div>

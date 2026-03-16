@@ -18,8 +18,7 @@ export interface Group {
 export interface StationConfig {
   id: string;
   name: string;
-  type: 'time-based' | 'headcount';
-  headcountRequired?: number;
+  type: 'time-based';
 }
 
 // ─── Schedule ─────────────────────────────────────────────────────────────────
@@ -37,9 +36,8 @@ export interface ScheduledParticipant {
 export interface ScheduleStation {
   stationConfigId: string;
   stationName: string;
-  stationType: 'time-based' | 'headcount';
+  stationType: 'time-based';
   participants: ScheduledParticipant[];
-  headcountParticipants?: string[];
 }
 
 export interface Schedule {
@@ -99,8 +97,7 @@ export interface WizardParticipant {
 
 export interface WizardStation {
   config: StationConfig;
-  participants: WizardParticipant[];  // ordered list for time-based; empty until Step 3
-  headcountParticipants: string[];    // selected names for headcount stations
+  participants: WizardParticipant[];  // ordered list; empty until Step 3
   /** Continue-round only: overrides the global timeConfig.startTime for this station. */
   startTimeOverride?: string;         // "HH:MM"
   /** Continue-round only: overrides session.date for this station. */

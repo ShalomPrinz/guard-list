@@ -28,8 +28,8 @@ describe('saveStationsConfig / getStationsConfig round-trip', () => {
   it('persists and retrieves configs correctly', () => {
     const storage = createLocalStorageMock()
     const configs = [
-      makeConfig({ id: 'sc1', name: 'Main Gate', type: 'time-based' }),
-      makeConfig({ id: 'sc2', name: 'Watchtower', type: 'headcount', headcountRequired: 3 }),
+      makeConfig({ id: 'sc1', name: 'Main Gate' }),
+      makeConfig({ id: 'sc2', name: 'Watchtower' }),
     ]
     saveStationsConfig(configs, storage)
     expect(getStationsConfig(storage)).toEqual(configs)
@@ -42,10 +42,4 @@ describe('saveStationsConfig / getStationsConfig round-trip', () => {
     expect(getStationsConfig(storage)).toEqual([])
   })
 
-  it('preserves headcountRequired for headcount stations', () => {
-    const storage = createLocalStorageMock()
-    const config = makeConfig({ type: 'headcount', headcountRequired: 5 })
-    saveStationsConfig([config], storage)
-    expect(getStationsConfig(storage)[0].headcountRequired).toBe(5)
-  })
 })

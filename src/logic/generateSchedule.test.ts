@@ -163,42 +163,6 @@ describe('formatScheduleForWhatsApp', () => {
     expect(text).toContain('21:30 Bob')
   })
 
-  it('formats headcount stations with names only (no times)', () => {
-    const schedule = makeSchedule({
-      stations: [
-        {
-          stationConfigId: 'hc1',
-          stationName: 'Patrol',
-          stationType: 'headcount',
-          participants: [],
-          headcountParticipants: ['Carol', 'Dave'],
-        },
-      ],
-    })
-    const text = formatScheduleForWhatsApp(schedule)
-    expect(text).toContain('📍 Patrol')
-    expect(text).toContain('Carol')
-    expect(text).toContain('Dave')
-    // No time prefix on Carol
-    expect(text).not.toMatch(/\d\d:\d\d Carol/)
-  })
-
-  it('skips empty headcount stations', () => {
-    const schedule = makeSchedule({
-      stations: [
-        {
-          stationConfigId: 'hc1',
-          stationName: 'Empty',
-          stationType: 'headcount',
-          participants: [],
-          headcountParticipants: [],
-        },
-      ],
-    })
-    const text = formatScheduleForWhatsApp(schedule)
-    expect(text).not.toContain('📍 Empty')
-  })
-
   it('appends quote when present', () => {
     const text = formatScheduleForWhatsApp(makeSchedule({ quote: 'Be brave', quoteAuthor: 'Sun Tzu' }))
     expect(text).toContain('"Be brave"')
@@ -215,29 +179,30 @@ describe('formatScheduleForWhatsApp', () => {
     expect(text).not.toContain('"')
   })
 
-  it('lists time-based stations before headcount stations', () => {
+  it('lists stations in order', () => {
     const schedule = makeSchedule({
       stations: [
         {
-          stationConfigId: 'hc1',
-          stationName: 'Headcount First',
-          stationType: 'headcount',
-          participants: [],
-          headcountParticipants: ['X'],
-        },
-        {
-          stationConfigId: 'tb1',
-          stationName: 'Time-Based Second',
+          stationConfigId: 'st1',
+          stationName: 'First Station',
           stationType: 'time-based',
           participants: [
             { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
           ],
         },
+        {
+          stationConfigId: 'st2',
+          stationName: 'Second Station',
+          stationType: 'time-based',
+          participants: [
+            { name: 'Bob', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
+          ],
+        },
       ],
     })
     const text = formatScheduleForWhatsApp(schedule)
-    const tbIdx = text.indexOf('Time-Based Second')
-    const hcIdx = text.indexOf('Headcount First')
-    expect(tbIdx).toBeLessThan(hcIdx)
+    const idx1 = text.indexOf('First Station')
+    const idx2 = text.indexOf('Second Station')
+    expect(idx1).toBeLessThan(idx2)
   })
 })

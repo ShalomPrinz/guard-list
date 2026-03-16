@@ -34,10 +34,7 @@ interface ParticipantItem extends WizardParticipant {
 interface StationState {
   stationConfigId: string
   stationName: string
-  stationType: 'time-based' | 'headcount'
-  headcountRequired: number
   participants: ParticipantItem[]
-  headcountSelected: string[]
 }
 
 // ─── Sortable row ─────────────────────────────────────────────────────────────
@@ -122,47 +119,27 @@ export default function Step3_Order() {
   // ── Initialize ────────────────────────────────────────────────────────────
 
   const [stations, setStations] = useState<StationState[]>(() => {
-    // Run the lottery once across all time-based stations
     const shuffled = shuffleArray(baseMembers)
-    const tbIndices = session.stations.map((s, i) => (s.config.type === 'time-based' ? i : -1)).filter(i => i >= 0)
-    const counts = distributeParticipants(baseMembers.length, tbIndices.length)
+    const counts = distributeParticipants(baseMembers.length, session.stations.length)
 
     return session.stations.map((ws, si) => {
-      if (ws.config.type === 'headcount') {
-        return {
-          stationConfigId: ws.config.id,
-          stationName: ws.config.name,
-          stationType: 'headcount' as const,
-          headcountRequired: ws.config.headcountRequired ?? 1,
-          participants: [],
-          headcountSelected: ws.headcountParticipants,
-        }
-      }
-
       // Restore from session if already set (Back navigation)
       if (ws.participants.length > 0) {
         return {
           stationConfigId: ws.config.id,
           stationName: ws.config.name,
-          stationType: 'time-based' as const,
-          headcountRequired: 0,
           participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
-          headcountSelected: [],
         }
       }
 
       // First visit: slice from shuffled pool
-      const tbPos = tbIndices.indexOf(si)
-      const offset = counts.slice(0, tbPos).reduce((a, b) => a + b, 0)
-      const mine = shuffled.slice(offset, offset + counts[tbPos])
+      const offset = counts.slice(0, si).reduce((a, b) => a + b, 0)
+      const mine = shuffled.slice(offset, offset + counts[si])
 
       return {
         stationConfigId: ws.config.id,
         stationName: ws.config.name,
-        stationType: 'time-based' as const,
-        headcountRequired: 0,
         participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false })),
-        headcountSelected: [],
       }
     })
   })
@@ -250,7 +227,6 @@ export default function Step3_Order() {
       const lockedByStation = new Map<number, { idx: number; item: ParticipantItem }[]>()
 
       prev.forEach((s, si) => {
-        if (s.stationType !== 'time-based') return
         const locked: { idx: number; item: ParticipantItem }[] = []
         s.participants.forEach((p, pi) => {
           if (p.locked) locked.push({ idx: pi, item: p })
@@ -263,7 +239,6 @@ export default function Step3_Order() {
       let poolIdx = 0
 
       return prev.map((s, si) => {
-        if (s.stationType !== 'time-based') return s
         const locked = lockedByStation.get(si) ?? []
         const result: ParticipantItem[] = Array(s.participants.length).fill(null)
         locked.forEach(({ idx, item }) => { result[idx] = item })
@@ -291,19 +266,6 @@ export default function Step3_Order() {
     )
   }
 
-  function toggleHeadcount(si: number, name: string) {
-    setStations(prev =>
-      prev.map((s, i) => {
-        if (i !== si) return s
-        if (s.headcountSelected.includes(name)) {
-          return { ...s, headcountSelected: s.headcountSelected.filter(n => n !== name) }
-        }
-        if (s.headcountSelected.length >= s.headcountRequired) return s
-        return { ...s, headcountSelected: [...s.headcountSelected, name] }
-      }),
-    )
-  }
-
   // ── Next ──────────────────────────────────────────────────────────────────
 
   function handleNext() {
@@ -312,10 +274,7 @@ export default function Step3_Order() {
       const s = stations[si]
       return {
         ...ws,
-        participants: s.stationType === 'time-based'
-          ? s.participants.map(({ name, locked, skipped }) => ({ name, locked, skipped }))
-          : [],
-        headcountParticipants: s.stationType === 'headcount' ? s.headcountSelected : ws.headcountParticipants,
+        participants: s.participants.map(({ name, locked, skipped }) => ({ name, locked, skipped })),
       }
     })
     updateStations(updated)
@@ -343,65 +302,32 @@ export default function Step3_Order() {
             <div key={station.stationConfigId} className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold text-gray-900 dark:text-gray-100">{station.stationName}</p>
-                {station.stationType === 'time-based' && (
-                  <button
-                    onClick={() => shuffleStation(si)}
-                    className="rounded-lg bg-gray-200 px-2.5 py-1 text-xs text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
-                  >
-                    ערבב
-                  </button>
-                )}
+                <button
+                  onClick={() => shuffleStation(si)}
+                  className="rounded-lg bg-gray-200 px-2.5 py-1 text-xs text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
+                >
+                  ערבב
+                </button>
               </div>
 
-              {station.stationType === 'time-based' && (
-                <SortableContext items={station.participants.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                  <DroppableZone id={`droppable-${station.stationConfigId}`}>
-                    <div className="flex flex-col gap-1.5">
-                      {station.participants.length === 0 && (
-                        <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-600">גרור שומר לכאן</p>
-                      )}
-                      {station.participants.map(item => (
-                        <SortableRow
-                          key={item.id}
-                          item={item}
-                          onToggleLock={() => patchParticipant(si, item.id, { locked: !item.locked })}
-                          onToggleSkip={() => patchParticipant(si, item.id, { skipped: !item.skipped })}
-                          onRemove={() => removeFromStation(si, item.id)}
-                        />
-                      ))}
-                    </div>
-                  </DroppableZone>
-                </SortableContext>
-              )}
-
-              {station.stationType === 'headcount' && (
-                <div>
-                  <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                    בחר {station.headcountRequired} שומרים ({station.headcountSelected.length}/{station.headcountRequired})
-                  </p>
+              <SortableContext items={station.participants.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                <DroppableZone id={`droppable-${station.stationConfigId}`}>
                   <div className="flex flex-col gap-1.5">
-                    {baseMembers.map(name => {
-                      const sel = station.headcountSelected.includes(name)
-                      const full = !sel && station.headcountSelected.length >= station.headcountRequired
-                      return (
-                        <label
-                          key={name}
-                          className={`flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 ${sel ? 'bg-blue-100 dark:bg-blue-900/40' : full ? 'opacity-40' : 'bg-gray-100 dark:bg-gray-700'}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={sel}
-                            disabled={full}
-                            onChange={() => toggleHeadcount(si, name)}
-                            className="accent-blue-500"
-                          />
-                          <span className="text-sm text-gray-900 dark:text-gray-100">{name}</span>
-                        </label>
-                      )
-                    })}
+                    {station.participants.length === 0 && (
+                      <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-600">גרור שומר לכאן</p>
+                    )}
+                    {station.participants.map(item => (
+                      <SortableRow
+                        key={item.id}
+                        item={item}
+                        onToggleLock={() => patchParticipant(si, item.id, { locked: !item.locked })}
+                        onToggleSkip={() => patchParticipant(si, item.id, { skipped: !item.skipped })}
+                        onRemove={() => removeFromStation(si, item.id)}
+                      />
+                    ))}
                   </div>
-                </div>
-              )}
+                </DroppableZone>
+              </SortableContext>
             </div>
           ))}
         </div>

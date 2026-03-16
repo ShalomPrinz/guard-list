@@ -11,7 +11,7 @@ import type { WizardStation, WizardParticipant, ScheduleStation } from '../types
 
 /** Returns the actual end time and date for the last participant in a station. */
 function stationActualEnd(st: ScheduleStation): { time: string; date: string } | null {
-  if (st.stationType !== 'time-based' || !st.participants.length) return null
+  if (!st.participants.length) return null
   const last = st.participants[st.participants.length - 1]
   return { time: last.endTime, date: last.date }
 }
@@ -27,9 +27,7 @@ function dateTimeToMins(date: string, time: string): number {
 interface ContStation {
   stationConfigId: string
   stationName: string
-  stationType: 'time-based' | 'headcount'
   participants: { name: string; available: boolean }[]
-  headcountParticipants: string[]
   actualEndTime: string  // "HH:MM"
   actualEndDate: string  // "YYYY-MM-DD"
   plannedEndTime: string // for display
@@ -47,8 +45,7 @@ export default function ContinueRoundScreen() {
 
   // ── Derive per-station end times ─────────────────────────────────────────
 
-  const tbStations = schedule?.stations.filter(s => s.stationType === 'time-based') ?? []
-  const endTimes = tbStations.map(s => stationActualEnd(s))
+  const endTimes = (schedule?.stations ?? []).map(s => stationActualEnd(s))
 
   // Planned end = maximum actual end across all stations
   let plannedEndTime = ''
@@ -75,9 +72,7 @@ export default function ContinueRoundScreen() {
       return {
         stationConfigId: st.stationConfigId,
         stationName: st.stationName,
-        stationType: st.stationType,
         participants: st.participants.map(p => ({ name: p.name, available: true })),
-        headcountParticipants: st.headcountParticipants ?? [],
         actualEndTime: end?.time ?? '00:00',
         actualEndDate: end?.date ?? (schedule.date),
         plannedEndTime,
@@ -153,22 +148,20 @@ export default function ContinueRoundScreen() {
         config: {
           id: cs.stationConfigId,
           name: cs.stationName,
-          type: cs.stationType,
+          type: 'time-based',
         },
-        participants: cs.stationType === 'time-based' ? participants : [],
-        headcountParticipants: cs.headcountParticipants,
+        participants,
         startTimeOverride,
         startDateOverride,
       }
     })
 
     // Use the earliest station's actual end as the global start time reference
-    const tbFiltered = contStations.filter(s => s.stationType === 'time-based')
     let globalStartTime: string
     let newDate: string
 
-    if (useActual && tbFiltered.length > 0) {
-      const earliest = tbFiltered.reduce((min, cs) =>
+    if (useActual && contStations.length > 0) {
+      const earliest = contStations.reduce((min, cs) =>
         dateTimeToMins(cs.actualEndDate, cs.actualEndTime) < dateTimeToMins(min.actualEndDate, min.actualEndTime)
           ? cs : min
       )
@@ -198,8 +191,6 @@ export default function ContinueRoundScreen() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-
-  const tbContStations = contStations.filter(s => s.stationType === 'time-based')
 
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
@@ -278,11 +269,11 @@ export default function ContinueRoundScreen() {
       </div>
 
       {/* Per-station participant availability + cross-station moves */}
-      {tbContStations.length > 0 && (
+      {contStations.length > 0 && (
         <div className="mb-6">
           <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">זמינות משתתפים לסבב זה</p>
           <div className="flex flex-col gap-4">
-            {tbContStations.map(cs => (
+            {contStations.map(cs => (
               <div key={cs.stationConfigId} className="rounded-2xl bg-white dark:bg-gray-800 p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{cs.stationName}</p>
@@ -297,7 +288,7 @@ export default function ContinueRoundScreen() {
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {cs.participants.map(p => {
-                      const otherTb = tbContStations.filter(s => s.stationConfigId !== cs.stationConfigId)
+                      const others = contStations.filter(s => s.stationConfigId !== cs.stationConfigId)
                       return (
                         <div key={p.name} className="flex items-center gap-2">
                           {/* Availability toggle */}
@@ -317,7 +308,7 @@ export default function ContinueRoundScreen() {
                           </span>
 
                           {/* Move to another station */}
-                          {otherTb.length > 0 && p.available && (
+                          {others.length > 0 && p.available && (
                             <select
                               value=""
                               onChange={e => { if (e.target.value) moveParticipant(p.name, cs.stationConfigId, e.target.value) }}
@@ -325,7 +316,7 @@ export default function ContinueRoundScreen() {
                               title="העבר לעמדה"
                             >
                               <option value="">↔</option>
-                              {otherTb.map(s => (
+                              {others.map(s => (
                                 <option key={s.stationConfigId} value={s.stationConfigId}>{s.stationName}</option>
                               ))}
                             </select>

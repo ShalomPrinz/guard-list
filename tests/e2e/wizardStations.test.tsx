@@ -134,26 +134,27 @@ describe('Step1_Stations — station count', () => {
   })
 })
 
-describe('Step1_Stations — station type', () => {
-  it('headcount type shows the required-count input', async () => {
+describe('Step1_Stations — custom count', () => {
+  it('clicking "אחר.." shows a custom number input', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
 
-    // Click "כוח אדם" for the first station
-    await user.click(screen.getByText('כוח אדם'))
+    await user.click(screen.getByRole('button', { name: 'אחר..' }))
 
-    expect(screen.getByText('מספר משמרים נדרש')).toBeTruthy()
+    expect(screen.getByPlaceholderText('מספר עמדות')).toBeTruthy()
   })
 
-  it('switching back to time-based hides headcount input', async () => {
+  it('entering a custom count greater than 4 shows that many station cards', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
 
-    await user.click(screen.getByText('כוח אדם'))
-    await user.click(screen.getByText('מבוסס-זמן'))
+    await user.click(screen.getByRole('button', { name: 'אחר..' }))
+    const input = screen.getByPlaceholderText('מספר עמדות')
+    await user.clear(input)
+    await user.type(input, '5')
 
-    expect(screen.queryByText('מספר משמרים נדרש')).toBeNull()
+    expect(screen.getByText('עמדה 5')).toBeTruthy()
   })
 })

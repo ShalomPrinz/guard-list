@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getScheduleById, updateScheduleName } from '../storage/schedules'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
+import { formatDate } from '../logic/formatting'
 import { useWizard } from '../context/WizardContext'
 
 export default function ResultScreen() {
@@ -83,7 +84,7 @@ export default function ResultScreen() {
             🔒 {name}
           </button>
         )}
-        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{schedule.date}</p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{formatDate(schedule.date)}</p>
       </div>
 
       {/* Schedule per station */}
@@ -92,26 +93,18 @@ export default function ResultScreen() {
           <div key={st.stationConfigId} className="rounded-2xl bg-white p-4 dark:bg-gray-800">
             <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">📍 {st.stationName}</p>
 
-            {st.stationType === 'time-based' ? (
-              st.participants.length > 0 ? (
-                <div className="flex flex-col gap-1.5">
-                  {st.participants.map((p, i) => (
-                    <div key={i} className="flex items-baseline gap-3">
-                      <span className="w-11 shrink-0 font-mono text-sm text-gray-500 dark:text-gray-400">{p.startTime}</span>
-                      <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{p.durationMinutes}′</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400 dark:text-gray-500">אין משתתפים</p>
-              )
-            ) : (
-              <div className="flex flex-col gap-1">
-                {(st.headcountParticipants ?? []).map((n, i) => (
-                  <div key={i} className="text-sm text-gray-900 dark:text-gray-100">{n}</div>
+            {st.participants.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {st.participants.map((p, i) => (
+                  <div key={i} className="flex items-baseline gap-3">
+                    <span className="w-11 shrink-0 font-mono text-sm text-gray-500 dark:text-gray-400">{p.startTime}</span>
+                    <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{p.durationMinutes}′</span>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <p className="text-xs text-gray-400 dark:text-gray-500">אין משתתפים</p>
             )}
           </div>
         ))}

@@ -43,9 +43,7 @@ interface ReviewItem {
 interface ReviewStation {
   stationConfigId: string
   stationName: string
-  stationType: 'time-based' | 'headcount'
   items: ReviewItem[]
-  headcountNames: string[]
   startTime: string
   startDate: string
 }
@@ -68,37 +66,21 @@ function recomputeTimes(items: ReviewItem[], startTime: string, startDate: strin
 }
 
 function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['session']>): ReviewStation[] {
-  return session.stations.map(ws => {
-    if (ws.config.type === 'headcount') {
-      return {
-        stationConfigId: ws.config.id,
-        stationName: ws.config.name,
-        stationType: 'headcount' as const,
-        items: [],
-        headcountNames: ws.headcountParticipants,
-        startTime: session.timeConfig.startTime,
-        startDate: session.date,
-      }
-    }
+  const participantCounts = session.stations.map(
+    s => s.participants.filter(p => !p.skipped).length,
+  )
 
-    const baseParticipants = session.stations
-      .filter(s => s.config.type === 'time-based')
-      .map(s => s.participants.filter(p => !p.skipped).length)
+  const durations = calcStationDurations({
+    startTime: session.timeConfig.startTime,
+    endTime: session.timeConfig.endTime,
+    fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+    roundingAlgorithm: session.timeConfig.roundingAlgorithm,
+    unevenMode: session.timeConfig.unevenMode,
+    stationParticipantCounts: participantCounts,
+  })
 
-    const stationIdx = session.stations
-      .filter(s => s.config.type === 'time-based')
-      .findIndex(s => s.config.id === ws.config.id)
-
-    const durations = calcStationDurations({
-      startTime: session.timeConfig.startTime,
-      endTime: session.timeConfig.endTime,
-      fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
-      roundingAlgorithm: session.timeConfig.roundingAlgorithm,
-      unevenMode: session.timeConfig.unevenMode,
-      stationParticipantCounts: baseParticipants,
-    })
-
-    const durationMinutes = durations[stationIdx]?.roundedDurationMinutes ?? 60
+  return session.stations.map((ws, si) => {
+    const durationMinutes = durations[si]?.roundedDurationMinutes ?? 60
 
     const partsWithDuration = ws.participants
       .filter(p => !p.skipped)
@@ -112,7 +94,6 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
     return {
       stationConfigId: ws.config.id,
       stationName: ws.config.name,
-      stationType: 'time-based' as const,
       items: scheduled.map((sp, i) => ({
         id: `${ws.config.id}-${i}`,
         name: sp.name,
@@ -122,7 +103,6 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
         date: sp.date,
         locked: sp.locked,
       })),
-      headcountNames: [],
       startTime: stStartTime,
       startDate: stStartDate,
     }
@@ -164,7 +144,7 @@ function SortableReviewRow({
     opacity: isDragging ? 0.3 : 1,
   }
 
-  const otherStations = allStations.filter(s => s.stationConfigId !== stationId && s.stationType === 'time-based')
+  const otherStations = allStations.filter(s => s.stationConfigId !== stationId)
 
   function commitName() {
     const trimmed = nameVal.trim()
@@ -297,18 +277,6 @@ function ReviewStationCard({
 }) {
   const [addName, setAddName] = useState('')
 
-  if (station.stationType === 'headcount') {
-    return (
-      <div className="rounded-2xl bg-white p-4 dark:bg-gray-800">
-        <p className="mb-2 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
-        <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">כוח אדם ({station.headcountNames.length})</p>
-        {station.headcountNames.map((n, i) => (
-          <div key={i} className="py-0.5 text-sm text-gray-700 dark:text-gray-300">{n}</div>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <div className="rounded-2xl bg-white p-4 dark:bg-gray-800">
       <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
@@ -422,7 +390,6 @@ export default function Step4_Review() {
     const item = fromSt?.items.find(i => i.id === itemId)
     if (!item) return
 
-    // Block the move if it would leave the source station empty
     if (fromSt && fromSt.items.length <= 1) {
       setError('לא ניתן להעביר — העמדה תישאר ריקה')
       return
@@ -430,7 +397,6 @@ export default function Step4_Review() {
 
     setError('')
 
-    // Apply the participant move
     const moved = stations.map(st => {
       if (st.stationConfigId === fromStationId) {
         return { ...st, items: st.items.filter(i => i.id !== itemId) }
@@ -441,10 +407,7 @@ export default function Step4_Review() {
       return st
     })
 
-    // Recalculate per-participant durations for all time-based stations using
-    // the rounding algorithm and uneven strategy from the wizard session.
-    const tbStations = moved.filter(s => s.stationType === 'time-based')
-    const counts = tbStations.map(s => s.items.length)
+    const counts = moved.map(s => s.items.length)
     const durations = calcStationDurations({
       startTime: session.timeConfig.startTime,
       endTime: session.timeConfig.endTime,
@@ -454,11 +417,8 @@ export default function Step4_Review() {
       stationParticipantCounts: counts,
     })
 
-    // Update durations and recompute sequential start/end times for each TB station
-    setStations(moved.map(st => {
-      if (st.stationType !== 'time-based') return st
-      const tbIdx = tbStations.findIndex(s => s.stationConfigId === st.stationConfigId)
-      const dur = durations[tbIdx]?.roundedDurationMinutes ?? 60
+    setStations(moved.map((st, idx) => {
+      const dur = durations[idx]?.roundedDurationMinutes ?? 60
       const newItems = st.items.map(it => ({ ...it, durationMinutes: dur }))
       return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
     }))
@@ -495,18 +455,15 @@ export default function Step4_Review() {
     const activeIdStr = String(active.id)
     const overIdStr = String(over.id)
 
-    // Find which station the dragged item belongs to
     const fromStation = stations.find(st => st.items.some(i => i.id === activeIdStr))
     if (!fromStation) return
 
-    // Check if dropped on a station zone (not an item)
     const toStation = stations.find(st => st.stationConfigId === overIdStr)
     if (toStation && toStation.stationConfigId !== fromStation.stationConfigId) {
       handleMove(activeIdStr, fromStation.stationConfigId, toStation.stationConfigId)
       return
     }
 
-    // Same station sort
     const toItemStation = stations.find(st => st.items.some(i => i.id === overIdStr))
     if (!toItemStation) return
 
@@ -521,7 +478,6 @@ export default function Step4_Review() {
         }))
       }
     } else {
-      // Cross-station: move between stations
       handleMove(activeIdStr, fromStation.stationConfigId, toItemStation.stationConfigId)
     }
   }
@@ -536,29 +492,16 @@ export default function Step4_Review() {
     if (!session) return
     const name = scheduleName.trim() || defaultName
 
-    // Validate
-    const hasParticipants = stations.some(st =>
-      st.stationType === 'time-based' ? st.items.length > 0 : st.headcountNames.length > 0
-    )
+    const hasParticipants = stations.some(st => st.items.length > 0)
     if (!hasParticipants) {
       setError('יש להוסיף לפחות משתתף אחד')
       return
     }
 
-    // Reuse the same ID on re-save so the schedule is overwritten, not duplicated
     const isFirstSave = !session.createdScheduleId
     const scheduleId = session.createdScheduleId ?? crypto.randomUUID()
 
     const scheduleStations: ScheduleStation[] = stations.map(st => {
-      if (st.stationType === 'headcount') {
-        return {
-          stationConfigId: st.stationConfigId,
-          stationName: st.stationName,
-          stationType: 'headcount',
-          participants: [],
-          headcountParticipants: st.headcountNames,
-        }
-      }
       const participants: ScheduledParticipant[] = st.items.map(item => ({
         name: item.name,
         startTime: item.startTime,
@@ -591,10 +534,8 @@ export default function Step4_Review() {
 
     upsertSchedule(schedule)
 
-    // Record statistics only on the first save to avoid double-counting
     if (isFirstSave) {
       for (const st of scheduleStations) {
-        if (st.stationType !== 'time-based') continue
         for (const p of st.participants) {
           recordShift(p.name, {
             scheduleId,
@@ -609,14 +550,9 @@ export default function Step4_Review() {
       }
     }
 
-    // Persist the current review state back into the session so that pressing
-    // Back from ResultScreen restores this exact participant order and names.
     const updatedStations: typeof session.stations = session.stations.map(ws => {
       const rs = stations.find(s => s.stationConfigId === ws.config.id)
       if (!rs) return ws
-      if (ws.config.type === 'headcount') {
-        return { ...ws, headcountParticipants: rs.headcountNames }
-      }
       return {
         ...ws,
         participants: rs.items.map(item => ({
