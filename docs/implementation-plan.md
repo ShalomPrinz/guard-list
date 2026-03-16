@@ -38,7 +38,33 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 3 — Schedule Wizard: Stations & Time (Steps 1 & 2)
+## Step 3 — Tests & Hebrew UI Migration
+
+**Goal:** Implement all tests per `docs/TESTING.md` against the existing code, and migrate all visible UI strings to Hebrew.
+
+**Tell Claude Code:**
+> Read `docs/TESTING.md` in full before starting. Implement everything it specifies for the current codebase (Steps 1–2 are complete).
+>
+> **Unit tests** — create test files in `src/logic/*.test.ts` and `src/storage/*.test.ts`. At this stage, cover the storage helpers: verify typed read/write round-trips correctly, deduplication of member names, and that an empty localStorage returns the correct defaults. Add a `localStorageMock` utility (in-memory Map implementing the Storage interface) to be reused across all future tests.
+>
+> **E2E tests** — create `/tests/e2e/groupManagement.test.tsx`. Mount HomeScreen and GroupEditScreen with a clean `localStorageMock`. Test: create a group, add members, toggle availability between Base/Home, rename a member, delete a member, delete the group. Assert localStorage state after each operation.
+>
+> **Hebrew UI** — go through every rendered string in the existing components (HomeScreen, GroupEditScreen, all buttons, labels, placeholders, confirmation dialogs, error messages) and replace with Hebrew. Hardcode Hebrew directly in the component. Do not introduce any i18n library or translation file. The app must be fully in Hebrew from this point forward; all future steps must also use Hebrew strings only. English remains the language of code, comments, variable names, and all `.md` files.
+>
+> Examples of required Hebrew strings (use these exactly):
+> - קבוצות שמורות (Saved Groups)
+> - צור לוח שמירה (New Schedule)
+> - סטטיסטיקות (Statistics)
+> - עריכה / מחיקה (Edit / Delete)
+> - בסיס / בית (Base / Home availability toggle)
+> - האם אתה בטוח? (confirmation dialog)
+> - שמור / ביטול (Save / Cancel)
+
+**Deliverables:** Full test suite passing for Steps 1–2 scope. All existing UI is in Hebrew. `localStorageMock` utility ready for reuse in all future test steps.
+
+---
+
+## Step 4 — Schedule Wizard: Stations & Time (Steps 1 & 2)
 
 **Goal:** Implement the first two wizard steps with all scheduling math.
 
@@ -55,7 +81,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 4 — Schedule Wizard: Ordering & Review (Steps 3 & 4)
+## Step 5 — Schedule Wizard: Ordering & Review (Steps 3 & 4)
 
 **Goal:** Participant distribution, drag-and-drop ordering, and final review.
 
@@ -70,7 +96,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 5 — Result Screen & Publishing
+## Step 6 — Result Screen & Publishing
 
 **Goal:** Display the final schedule and implement all export/share features.
 
@@ -87,7 +113,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 6 — Past Schedules History & Home Screen Completion
+## Step 7 — Past Schedules History & Home Screen Completion
 
 **Goal:** Wire up past schedules section and round deletion.
 
@@ -102,7 +128,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 7 — Statistics Screen
+## Step 8 — Statistics Screen
 
 **Goal:** Full statistics and history drill-down.
 
@@ -119,7 +145,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 8 — Polish, UX & Edge Cases
+## Step 9 — Polish, UX & Edge Cases
 
 **Goal:** Production-quality feel, mobile polish, and all edge case handling.
 
