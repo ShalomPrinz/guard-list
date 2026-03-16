@@ -29,3 +29,7 @@ export function addSchedule(schedule: Schedule, storage: Storage = window.localS
 export function deleteSchedule(id: string, storage: Storage = window.localStorage): void {
   saveSchedules(getSchedules(storage).filter(s => s.id !== id), storage)
 }
+
+export function updateScheduleName(id: string, name: string, storage: Storage = window.localStorage): void {
+  saveSchedules(getSchedules(storage).map(s => s.id === id ? { ...s, name } : s), storage)
+}

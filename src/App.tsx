@@ -7,6 +7,7 @@ import Step2_Time from './screens/Step2_Time'
 import Step3_Order from './screens/Step3_Order'
 import Step4_Review from './screens/Step4_Review'
 import ResultScreen from './screens/ResultScreen'
+import ContinueRoundScreen from './screens/ContinueRoundScreen'
 import StatisticsScreen from './screens/StatisticsScreen'
 import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
 
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/schedule/new/step3" element={<Step3_Order />} />
           <Route path="/schedule/new/step4" element={<Step4_Review />} />
           <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
+          <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
           <Route path="/statistics" element={<StatisticsScreen />} />
           <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -104,7 +104,10 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
       .filter(p => !p.skipped)
       .map(p => ({ name: p.name, durationMinutes, locked: p.locked }))
 
-    const scheduled = buildStationSchedule(partsWithDuration, session.timeConfig.startTime, session.date)
+    const stStartTime = ws.startTimeOverride ?? session.timeConfig.startTime
+    const stStartDate = ws.startDateOverride ?? session.date
+
+    const scheduled = buildStationSchedule(partsWithDuration, stStartTime, stStartDate)
 
     return {
       stationConfigId: ws.config.id,
@@ -120,8 +123,8 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
         locked: sp.locked,
       })),
       headcountNames: [],
-      startTime: session.timeConfig.startTime,
-      startDate: session.date,
+      startTime: stStartTime,
+      startDate: stStartDate,
     }
   })
 }

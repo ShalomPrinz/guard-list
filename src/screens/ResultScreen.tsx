@@ -1,17 +1,18 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getScheduleById } from '../storage/schedules'
+import { getScheduleById, updateScheduleName } from '../storage/schedules'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
-import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
 
 export default function ResultScreen() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const navigate = useNavigate()
-  const { initSession } = useWizard()
 
   const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
 
+  const [name, setName] = useState(schedule?.name ?? '')
+  const [editingName, setEditingName] = useState(false)
   const [copied, setCopied] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   if (!schedule) {
     return (
@@ -27,7 +28,19 @@ export default function ResultScreen() {
     )
   }
 
-  const whatsappText = formatScheduleForWhatsApp(schedule)
+  // Build WhatsApp text using current (possibly edited) name
+  const displaySchedule = { ...schedule, name }
+  const whatsappText = formatScheduleForWhatsApp(displaySchedule)
+
+  function commitName() {
+    if (!schedule) return
+    const trimmed = name.trim() || schedule.name
+    setName(trimmed)
+    setEditingName(false)
+    if (trimmed !== schedule.name) {
+      updateScheduleName(schedule.id, trimmed)
+    }
+  }
 
   async function handleCopy() {
     try {
@@ -35,49 +48,41 @@ export default function ResultScreen() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
-      // fallback: select from textarea
+      // clipboard not available
     }
   }
 
   function handleWhatsApp() {
-    const encoded = encodeURIComponent(whatsappText)
-    window.open(`https://wa.me/?text=${encoded}`, '_blank')
-  }
-
-  function handleContinueRound() {
-    if (!schedule) return
-    initSession({
-      mode: 'continue',
-      groupId: schedule.groupId,
-      groupName: schedule.name,
-      parentScheduleId: schedule.id,
-      stations: schedule.stations.map(st => ({
-        config: {
-          id: st.stationConfigId,
-          name: st.stationName,
-          type: st.stationType,
-        },
-        participants: st.stationType === 'time-based'
-          ? st.participants.map(p => ({ name: p.name, locked: false, skipped: false }))
-          : [],
-        headcountParticipants: st.headcountParticipants ?? [],
-      })),
-      timeConfig: { ...DEFAULT_TIME_CONFIG },
-      scheduleName: '',
-      date: schedule.date,
-    })
-    navigate('/schedule/new/step1')
+    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank')
   }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
-      {/* Header */}
+      {/* Header — inline-editable round name */}
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-100">{schedule.name}</h1>
-        <p className="text-xs text-gray-500">{schedule.date}</p>
+        {editingName ? (
+          <input
+            ref={nameInputRef}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={e => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') { setName(schedule.name); setEditingName(false) } }}
+            autoFocus
+            className="w-full rounded-xl bg-gray-700 px-3 py-1.5 text-xl font-bold text-gray-100 outline-none ring-2 ring-blue-500"
+          />
+        ) : (
+          <button
+            onClick={() => { setEditingName(true); setTimeout(() => nameInputRef.current?.select(), 0) }}
+            className="text-right text-xl font-bold text-gray-100 underline-offset-2 hover:underline"
+            title="לחץ לשינוי שם"
+          >
+            🔒 {name}
+          </button>
+        )}
+        <p className="mt-1 text-xs text-gray-500">{schedule.date}</p>
       </div>
 
-      {/* Schedule preview */}
+      {/* Schedule per station */}
       <div className="mb-6 flex flex-col gap-4">
         {schedule.stations.map(st => (
           <div key={st.stationConfigId} className="rounded-2xl bg-gray-800 p-4">
@@ -85,11 +90,11 @@ export default function ResultScreen() {
 
             {st.stationType === 'time-based' ? (
               st.participants.length > 0 ? (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   {st.participants.map((p, i) => (
-                    <div key={i} className="flex items-baseline gap-3 text-sm">
-                      <span className="w-12 shrink-0 font-mono text-gray-400">{p.startTime}</span>
-                      <span className="text-gray-100">{p.name}</span>
+                    <div key={i} className="flex items-baseline gap-3">
+                      <span className="w-11 shrink-0 font-mono text-sm text-gray-400">{p.startTime}</span>
+                      <span className="flex-1 text-sm text-gray-100">{p.name}</span>
                       <span className="text-xs text-gray-500">{p.durationMinutes}′</span>
                     </div>
                   ))}
@@ -99,8 +104,8 @@ export default function ResultScreen() {
               )
             ) : (
               <div className="flex flex-col gap-1">
-                {(st.headcountParticipants ?? []).map((name, i) => (
-                  <div key={i} className="text-sm text-gray-100">{name}</div>
+                {(st.headcountParticipants ?? []).map((n, i) => (
+                  <div key={i} className="text-sm text-gray-100">{n}</div>
                 ))}
               </div>
             )}
@@ -118,14 +123,12 @@ export default function ResultScreen() {
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* WhatsApp buttons */}
       <div className="mb-3 flex gap-3">
         <button
           onClick={handleCopy}
           className={`flex-1 rounded-2xl py-3 text-sm font-semibold transition-colors ${
-            copied
-              ? 'bg-green-700 text-white'
-              : 'bg-gray-700 text-gray-100 active:bg-gray-600'
+            copied ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-100 active:bg-gray-600'
           }`}
         >
           {copied ? '✓ הועתק!' : '📋 העתק לוואצאפ'}
@@ -138,8 +141,9 @@ export default function ResultScreen() {
         </button>
       </div>
 
+      {/* Continue round */}
       <button
-        onClick={handleContinueRound}
+        onClick={() => navigate(`/schedule/${schedule.id}/continue`)}
         className="mb-3 w-full rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
       >
         ↩ המשך סבב
