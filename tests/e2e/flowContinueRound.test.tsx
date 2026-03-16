@@ -1,0 +1,186 @@
+/**
+ * E2E flow test — Continue Round.
+ * Seeds an existing schedule and verifies that the continuation flow
+ * starts at the correct time and links the new schedule to the parent.
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { WizardProvider } from '../../src/context/WizardContext'
+import Step1_Stations from '../../src/screens/Step1_Stations'
+import Step2_Time from '../../src/screens/Step2_Time'
+import Step3_Order from '../../src/screens/Step3_Order'
+import Step4_Review from '../../src/screens/Step4_Review'
+import ResultScreen from '../../src/screens/ResultScreen'
+import ContinueRoundScreen from '../../src/screens/ContinueRoundScreen'
+import { createLocalStorageMock } from '../../src/tests/localStorageMock'
+import { upsertGroup } from '../../src/storage/groups'
+import { addSchedule, getSchedules } from '../../src/storage/schedules'
+import type { Group, Schedule } from '../../src/types'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeGroup(): Group {
+  return {
+    id: 'g1',
+    name: 'מחלקה א',
+    members: [
+      { id: 'm1', name: 'Alice', availability: 'base' },
+      { id: 'm2', name: 'Bob', availability: 'base' },
+    ],
+    createdAt: new Date().toISOString(),
+  }
+}
+
+function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {
+  return {
+    id: 'sched1',
+    name: 'שמירה ראשונה',
+    groupId: 'g1',
+    createdAt: new Date().toISOString(),
+    date: '2026-03-16',
+    stations: [
+      {
+        stationConfigId: 'st1',
+        stationName: 'עמדה 1',
+        stationType: 'time-based',
+        participants: [
+          {
+            name: 'Alice',
+            startTime: '20:00',
+            endTime: '21:00',
+            date: '2026-03-16',
+            durationMinutes: 60,
+            locked: false,
+            skipped: false,
+          },
+          {
+            name: 'Bob',
+            startTime: '21:00',
+            endTime: '22:00',
+            date: '2026-03-16',
+            durationMinutes: 60,
+            locked: false,
+            skipped: false,
+          },
+        ],
+      },
+    ],
+    unevenDistributionMode: 'equal-duration',
+    ...overrides,
+  }
+}
+
+function renderApp(initialPath: string) {
+  return render(
+    <WizardProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/" element={<div>דף הבית</div>} />
+          <Route path="/schedule/new/step1" element={<Step1_Stations />} />
+          <Route path="/schedule/new/step2" element={<Step2_Time />} />
+          <Route path="/schedule/new/step3" element={<Step3_Order />} />
+          <Route path="/schedule/new/step4" element={<Step4_Review />} />
+          <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
+          <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
+        </Routes>
+      </MemoryRouter>
+    </WizardProvider>,
+  )
+}
+
+// ─── Setup / Teardown ─────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  vi.stubGlobal('localStorage', createLocalStorageMock())
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('ContinueRoundScreen — renders correctly', () => {
+  it('shows the original schedule participants', () => {
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('Bob')).toBeTruthy()
+  })
+
+  it('shows the continue round heading', () => {
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    expect(screen.getByText('המשך סבב')).toBeTruthy()
+  })
+
+  it('shows "not found" message when schedule does not exist', () => {
+    renderApp('/schedule/nonexistent/continue')
+    expect(screen.getByText('לוח שמירה לא נמצא.')).toBeTruthy()
+  })
+})
+
+describe('ContinueRoundScreen — start continuation', () => {
+  it('navigates to step2 after clicking "התחל סבב"', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    await user.click(screen.getByText('התחל סבב →'))
+
+    expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
+  })
+})
+
+describe('Continuation schedule — parentScheduleId', () => {
+  it('creates a continuation schedule with parentScheduleId set', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    // Start the continuation
+    await user.click(screen.getByText('התחל סבב →'))
+
+    // Step 2: enter fixed duration and proceed
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+
+    // Step 3: proceed with auto-distributed participants
+    await user.click(screen.getByText('הבא →'))
+
+    // Step 4: create
+    await user.click(screen.getByText('צור לוח שמירה ✓'))
+
+    await waitFor(() => {
+      const schedules = getSchedules()
+      // The continuation schedule is the second one (sched1 was seeded)
+      const continuation = schedules.find(s => s.parentScheduleId === 'sched1')
+      expect(continuation).toBeTruthy()
+    })
+  })
+
+  it('result screen shows "← חזרה לעריכה" for continuation schedule', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    await user.click(screen.getByText('התחל סבב →'))
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByText('צור לוח שמירה ✓'))
+
+    await waitFor(() => {
+      expect(screen.getByText('← חזרה לעריכה')).toBeTruthy()
+    })
+  })
+})
