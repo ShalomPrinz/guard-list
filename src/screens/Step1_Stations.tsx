@@ -109,6 +109,7 @@ export default function Step1_Stations() {
         headcountRequired: f.type === 'headcount' ? f.headcountRequired : undefined,
       },
       participants: [],
+      headcountParticipants: [],
     }))
 
     // Persist station names for next session pre-fill

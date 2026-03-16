@@ -51,6 +51,8 @@ export interface Schedule {
   parentScheduleId?: string;
   stations: ScheduleStation[];
   unevenDistributionMode: 'equal-duration' | 'equal-endtime';
+  quote?: string;
+  quoteAuthor?: string;
 }
 
 // ─── Statistics ───────────────────────────────────────────────────────────────
@@ -89,9 +91,16 @@ export interface TimeConfig {
   unevenMode: UnevenMode;
 }
 
+export interface WizardParticipant {
+  name: string;
+  locked: boolean;
+  skipped: boolean;
+}
+
 export interface WizardStation {
   config: StationConfig;
-  participants: string[];      // ordered participant names for time-based
+  participants: WizardParticipant[];  // ordered list for time-based; empty until Step 3
+  headcountParticipants: string[];    // selected names for headcount stations
 }
 
 export interface WizardSession {
