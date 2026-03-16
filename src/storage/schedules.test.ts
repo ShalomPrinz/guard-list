@@ -6,6 +6,7 @@ import {
   getScheduleById,
   addSchedule,
   deleteSchedule,
+  updateScheduleName,
 } from './schedules'
 import type { Schedule } from '../types'
 
@@ -78,5 +79,28 @@ describe('deleteSchedule', () => {
     saveSchedules([makeSchedule()], storage)
     deleteSchedule('ghost', storage)
     expect(getSchedules(storage)).toHaveLength(1)
+  })
+})
+
+describe('updateScheduleName', () => {
+  it('renames the target schedule', () => {
+    const storage = createLocalStorageMock()
+    saveSchedules([makeSchedule({ id: 's1', name: 'Old Name' })], storage)
+    updateScheduleName('s1', 'New Name', storage)
+    expect(getScheduleById('s1', storage)?.name).toBe('New Name')
+  })
+
+  it('leaves other schedules untouched', () => {
+    const storage = createLocalStorageMock()
+    saveSchedules([makeSchedule({ id: 's1' }), makeSchedule({ id: 's2', name: 'Other' })], storage)
+    updateScheduleName('s1', 'Changed', storage)
+    expect(getScheduleById('s2', storage)?.name).toBe('Other')
+  })
+
+  it('is a no-op for unknown id', () => {
+    const storage = createLocalStorageMock()
+    saveSchedules([makeSchedule({ id: 's1', name: 'Night Watch' })], storage)
+    updateScheduleName('ghost', 'X', storage)
+    expect(getScheduleById('s1', storage)?.name).toBe('Night Watch')
   })
 })

@@ -8,6 +8,7 @@ import {
   distributeParticipants,
 } from '../logic/scheduling'
 import StepIndicator from '../components/StepIndicator'
+import TimePicker from '../components/TimePicker'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -115,11 +116,10 @@ export default function Step2_Time() {
       {/* Start time */}
       <div className="mb-4">
         <label className="mb-1 block text-sm text-gray-400">שעת התחלה</label>
-        <input
-          type="time"
+        <TimePicker
           value={startTime}
-          onChange={e => { setStartTime(e.target.value); setError('') }}
-          className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500 [color-scheme:dark]"
+          onChange={v => { setStartTime(v); setError('') }}
+          className="w-full"
         />
       </div>
 
@@ -128,11 +128,10 @@ export default function Step2_Time() {
         <label className="mb-1 block text-sm text-gray-400">
           שעת סיום <span className="text-gray-500">(אופציונלי)</span>
         </label>
-        <input
-          type="time"
+        <TimePicker
           value={endTime}
-          onChange={e => { setEndTime(e.target.value); setFixedDuration(''); setError('') }}
-          className="w-full rounded-xl bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-1 ring-gray-600 focus:ring-blue-500 [color-scheme:dark]"
+          onChange={v => { setEndTime(v); setFixedDuration(''); setError('') }}
+          className="w-full"
         />
       </div>
 
