@@ -113,22 +113,7 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 
 ---
 
-## Step 7 — Past Schedules History & Home Screen Completion
-
-**Goal:** Wire up past schedules section and round deletion.
-
-**Tell Claude Code:**
-> Complete the HomeScreen Past Schedules section: list all saved schedules (from localStorage `schedules`) sorted by creation date descending. Each entry shows round name, date, station count. View button navigates to ResultScreen in read-only mode. Delete button (with confirmation) removes only that single round from localStorage without affecting others or statistics.
->
-> In ResultScreen, distinguish read-only mode (from history) vs. active mode (just created). In read-only mode, hide "Continue Round" and publish action buttons (or keep Publish only — decide based on UX).
->
-> Ensure the "Continue Round" feature in ResultScreen correctly links the new round via `parentScheduleId`.
-
-**Deliverables:** Past schedules fully browseable and deletable from Home.
-
----
-
-## Step 8 — Statistics Screen
+## Step 7 — Statistics Screen
 
 **Goal:** Full statistics and history drill-down.
 
@@ -140,12 +125,14 @@ Each step is a self-contained Claude Code prompt. Complete them in order — eac
 > Add "Reset All Statistics" button with a confirmation dialog; clears the `statistics` key from localStorage.
 >
 > Statistics button on HomeScreen navigates here.
+>
+> Add a statistics icon to the statistics button in HomeScreen.
 
 **Deliverables:** Complete statistics feature.
 
 ---
 
-## Step 9 — Polish, UX & Edge Cases
+## Step 8 — Polish, UX & Edge Cases
 
 **Goal:** Production-quality feel, mobile polish, and all edge case handling.
 
