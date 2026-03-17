@@ -119,6 +119,7 @@ describe('Header visibility across screens', () => {
     expect(screen.getByText('רשימת שמירה')).toBeTruthy()
 
     // Step 3
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     expect(screen.getByText('רשימת שמירה')).toBeTruthy()
@@ -151,6 +152,7 @@ describe('Header home navigation', () => {
 
     // Navigate to step 3
     await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     expect(screen.getByText('סדר שומרים')).toBeTruthy()
@@ -172,6 +174,7 @@ describe('Header home navigation', () => {
 
     // Advance into the wizard (step 3 has an active session with stations)
     await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     await user.click(screen.getByText('הבא →'))

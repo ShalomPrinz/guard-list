@@ -1,14 +1,38 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getScheduleById, updateScheduleName } from '../storage/schedules'
+import { getGroupById } from '../storage/groups'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
 import { formatDate } from '../logic/formatting'
-import { useWizard } from '../context/WizardContext'
+import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
+import type { WizardSession, Schedule } from '../types'
+
+function buildSessionFromSchedule(schedule: Schedule): WizardSession {
+  const group = getGroupById(schedule.groupId)
+  const firstParticipant = schedule.stations[0]?.participants[0]
+  const startTime = firstParticipant?.startTime ?? DEFAULT_TIME_CONFIG.startTime
+  const fixedDurationMinutes = firstParticipant?.durationMinutes
+  return {
+    mode: 'new',
+    groupId: schedule.groupId,
+    groupName: group?.name ?? schedule.name,
+    stations: schedule.stations.map(st => ({
+      config: { id: st.stationConfigId, name: st.stationName, type: 'time-based' as const },
+      participants: st.participants.map(p => ({ name: p.name, locked: p.locked, skipped: false })),
+    })),
+    timeConfig: { ...DEFAULT_TIME_CONFIG, startTime, fixedDurationMinutes, unevenMode: schedule.unevenDistributionMode },
+    scheduleName: schedule.name,
+    date: schedule.date,
+    createdScheduleId: schedule.id,
+    quote: schedule.quote,
+    quoteAuthor: schedule.quoteAuthor,
+  }
+}
 
 export default function ResultScreen() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const navigate = useNavigate()
-  const { session } = useWizard()
+  const { session, initSession } = useWizard()
 
   const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
 
@@ -146,13 +170,15 @@ export default function ResultScreen() {
         ↩ המשך סבב
       </button>
 
-      {/* Back: if a wizard session is active return to step4 for re-editing;
-           otherwise (viewing from history) return to home */}
+      {/* Back — always returns to step4 for editing; reconstructs session if viewing from history */}
       <button
-        onClick={() => session ? navigate('/schedule/new/step4') : navigate('/')}
+        onClick={() => {
+          if (!session) initSession(buildSessionFromSchedule(schedule))
+          navigate('/schedule/new/step4')
+        }}
         className="w-full rounded-2xl border border-gray-300 py-3 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
       >
-        {session ? '← חזרה לעריכה' : '← חזרה לדף הבית'}
+        ← חזרה לעריכה
       </button>
     </div>
   )

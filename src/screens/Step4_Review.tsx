@@ -337,10 +337,10 @@ export default function Step4_Review() {
     return buildReviewStations(session)
   })
 
-  const defaultName = session ? `שמירה ${session.date}` : ''
+  const defaultName = 'רשימת שמירה'
   const [scheduleName, setScheduleName] = useState(session?.scheduleName || defaultName)
-  const [quote, setQuote] = useState('')
-  const [quoteAuthor, setQuoteAuthor] = useState('')
+  const [quote, setQuote] = useState(session?.quote ?? '')
+  const [quoteAuthor, setQuoteAuthor] = useState(session?.quoteAuthor ?? '')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -563,7 +563,7 @@ export default function Step4_Review() {
       }
     })
 
-    updateSession({ scheduleName: name, createdScheduleId: scheduleId, stations: updatedStations })
+    updateSession({ scheduleName: name, createdScheduleId: scheduleId, stations: updatedStations, quote: quote.trim() || undefined, quoteAuthor: quoteAuthor.trim() || undefined })
     navigate(`/schedule/${scheduleId}/result`)
   }
 

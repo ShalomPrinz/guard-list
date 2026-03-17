@@ -102,7 +102,11 @@ export default function HomeScreen() {
 
         <ul className="flex flex-col gap-2">
           {groups.map(group => (
-            <li key={group.id} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
+            <li
+              key={group.id}
+              onClick={() => navigate(`/group/${group.id}/edit`)}
+              className="flex cursor-pointer items-center justify-between rounded-2xl bg-white px-4 py-3 active:bg-gray-50 dark:bg-gray-800 dark:active:bg-gray-750"
+            >
               <div>
                 <p className="font-medium text-gray-900 dark:text-gray-100">{group.name}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -112,13 +116,7 @@ export default function HomeScreen() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => navigate(`/group/${group.id}/edit`)}
-                  className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-800 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
-                >
-                  עריכה
-                </button>
-                <button
-                  onClick={() => setConfirmDelete({ type: 'group', id: group.id, name: group.name })}
+                  onClick={e => { e.stopPropagation(); setConfirmDelete({ type: 'group', id: group.id, name: group.name }) }}
                   className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-red-600 active:bg-gray-200 dark:bg-gray-700 dark:text-red-400 dark:active:bg-gray-600"
                 >
                   מחיקה
@@ -140,22 +138,20 @@ export default function HomeScreen() {
         ) : (
           <ul className="flex flex-col gap-2">
             {[...schedules].reverse().map(schedule => (
-              <li key={schedule.id} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
+              <li
+                key={schedule.id}
+                onClick={() => navigate(`/schedule/${schedule.id}/result`)}
+                className="flex cursor-pointer items-center justify-between rounded-2xl bg-white px-4 py-3 active:bg-gray-50 dark:bg-gray-800 dark:active:bg-gray-750"
+              >
                 <div>
                   <p className="font-medium text-gray-900 dark:text-gray-100">{schedule.name || 'ללא שם'}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} תחנות
+                    {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} עמדות
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => navigate(`/schedule/${schedule.id}/result`)}
-                    className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-800 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
-                  >
-                    צפייה
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' })}
+                    onClick={e => { e.stopPropagation(); setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' }) }}
                     className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-red-600 active:bg-gray-200 dark:bg-gray-700 dark:text-red-400 dark:active:bg-gray-600"
                   >
                     מחיקה

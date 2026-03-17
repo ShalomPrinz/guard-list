@@ -49,6 +49,10 @@ async function navigateToStep2(user: ReturnType<typeof userEvent.setup>) {
   expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
 }
 
+async function switchToFixedDurationMode(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
+}
+
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -73,17 +77,28 @@ describe('Step2_Time — step indicator', () => {
 })
 
 describe('Step2_Time — validation', () => {
-  it('shows error when neither end time nor fixed duration set', async () => {
+  it('shows error when end time not set in end-time mode', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep2(user)
 
-    // Click Next without setting any time config (endTime spinner shows "00:00"
-    // but state is still '' — just click next without interacting with spinners)
+    // Default mode is 'end-time'; click Next without setting end time
     await user.click(screen.getByText('הבא →'))
 
-    expect(screen.getByText('יש להזין שעת סיום או משך קבוע')).toBeTruthy()
+    expect(screen.getByText('יש להזין שעת סיום')).toBeTruthy()
+  })
+
+  it('shows error when fixed duration not set in fixed-duration mode', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    await switchToFixedDurationMode(user)
+    await user.click(screen.getByText('הבא →'))
+
+    expect(screen.getByText('יש להזין משך קבוע')).toBeTruthy()
   })
 
   it('shows error when fixed duration is zero', async () => {
@@ -92,6 +107,7 @@ describe('Step2_Time — validation', () => {
     renderApp()
     await navigateToStep2(user)
 
+    await switchToFixedDurationMode(user)
     const durationInput = screen.getByPlaceholderText('למשל: 90')
     await user.clear(durationInput)
     await user.type(durationInput, '0')
@@ -108,6 +124,7 @@ describe('Step2_Time — duration preview', () => {
     renderApp()
     await navigateToStep2(user)
 
+    await switchToFixedDurationMode(user)
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
 
     // Preview should show "× 3 שומרים"
@@ -120,6 +137,7 @@ describe('Step2_Time — duration preview', () => {
     renderApp()
     await navigateToStep2(user)
 
+    await switchToFixedDurationMode(user)
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
 
     // 60 minutes = 1 hour → displayed as "1 ש'"
@@ -148,6 +166,7 @@ describe('Step2_Time — navigation', () => {
     renderApp()
     await navigateToStep2(user)
 
+    await switchToFixedDurationMode(user)
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
 
@@ -163,5 +182,103 @@ describe('Step2_Time — navigation', () => {
     await user.click(screen.getByText('← חזרה'))
 
     expect(screen.getByText('הגדרת עמדות')).toBeTruthy()
+  })
+})
+
+describe('Step2_Time — time mode toggle', () => {
+  it('switching from end-time to fixed-duration mode shows the fixed duration input', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    // By default the fixed duration input should NOT be visible
+    expect(screen.queryByPlaceholderText('למשל: 90')).toBeNull()
+
+    await switchToFixedDurationMode(user)
+
+    // Now it should be visible
+    expect(screen.getByPlaceholderText('למשל: 90')).toBeTruthy()
+  })
+
+  it('switching from end-time to fixed-duration clears end time but preserves start time', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    // Start time is 20:00 by default. Switch to fixed-duration mode.
+    await switchToFixedDurationMode(user)
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+
+    // Navigate to step3 — start time must have been preserved
+    expect(screen.getByText('שלב 3')).toBeTruthy()
+  })
+
+  it('switching back from fixed-duration to end-time hides fixed duration and shows end time input', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    await switchToFixedDurationMode(user)
+    expect(screen.getByPlaceholderText('למשל: 90')).toBeTruthy()
+
+    // Switch back to end-time mode
+    await user.click(screen.getByRole('button', { name: 'שעת סיום' }))
+
+    // Fixed duration input should be gone
+    expect(screen.queryByPlaceholderText('למשל: 90')).toBeNull()
+  })
+
+  it('switching to end-time mode and clicking Next without end time shows error', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    // Already in end-time mode; click Next without entering end time
+    await user.click(screen.getByText('הבא →'))
+    expect(screen.getByText('יש להזין שעת סיום')).toBeTruthy()
+  })
+})
+
+describe('TimePicker — desktop spinner zero-padding', () => {
+  it('zero-pads single-digit hours on blur', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    // Find the hours spinner for the start time (aria-label="שעות")
+    const hourInputs = screen.getAllByRole('textbox', { name: 'שעות' })
+    const startHourInput = hourInputs[0]
+
+    // click triggers onFocus which selects all; then type replaces the selection
+    await user.click(startHourInput)
+    await user.clear(startHourInput)
+    await user.type(startHourInput, '9')
+    await user.tab()
+
+    // After blur the spinner should show "09"
+    expect((startHourInput as HTMLInputElement).value).toBe('09')
+  })
+
+  it('zero-pads single-digit minutes on blur', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep2(user)
+
+    const minuteInputs = screen.getAllByRole('textbox', { name: 'דקות' })
+    const startMinuteInput = minuteInputs[0]
+
+    await user.click(startMinuteInput)
+    await user.clear(startMinuteInput)
+    await user.type(startMinuteInput, '5')
+    await user.tab()
+
+    expect((startMinuteInput as HTMLInputElement).value).toBe('05')
   })
 })

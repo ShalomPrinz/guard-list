@@ -85,6 +85,7 @@ function renderFullApp(initialPath = '/schedule/new/step1') {
 
 async function runFullWizard(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByText('הבא →'))
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))
   await user.click(screen.getByText('הבא →'))
@@ -138,6 +139,7 @@ describe('Back navigation — continuation result screen', () => {
 
     // Complete the continuation wizard
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     await user.click(screen.getByText('הבא →'))
@@ -155,6 +157,7 @@ describe('Back navigation — continuation result screen', () => {
     renderFullApp('/schedule/sched1/continue')
 
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     await user.click(screen.getByText('הבא →'))
@@ -192,6 +195,7 @@ describe('Back navigation — within wizard', () => {
     renderFullApp()
 
     await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     expect(screen.getByText('סדר שומרים')).toBeTruthy()

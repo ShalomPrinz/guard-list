@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroupById } from '../storage/groups'
 import { useWizard } from '../context/WizardContext'
-import type { RoundingAlgorithm, UnevenMode } from '../types'
+import type { RoundingAlgorithm, UnevenMode, TimeInputMode } from '../types'
 import {
   calcStationDurations,
   distributeParticipants,
   computeEndDate,
 } from '../logic'
+import { formatDate } from '../logic/formatting'
 import StepIndicator from '../components/StepIndicator'
 import TimePicker from '../components/TimePicker'
 
@@ -43,6 +44,14 @@ export default function Step2_Time() {
   const today = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(session.date || today)
   const [startTime, setStartTime] = useState(tc.startTime)
+
+  // Derive initial mode: prefer stored timeInputMode, then infer from values
+  const initialMode: TimeInputMode =
+    tc.timeInputMode ??
+    (tc.fixedDurationMinutes !== undefined ? 'fixed-duration' :
+     tc.endTime !== undefined ? 'end-time' : 'end-time')
+
+  const [timeMode, setTimeMode] = useState<TimeInputMode>(initialMode)
   const [endTime, setEndTime] = useState(tc.endTime ?? '')
   const [fixedDuration, setFixedDuration] = useState(
     tc.fixedDurationMinutes !== undefined ? String(tc.fixedDurationMinutes) : '',
@@ -52,6 +61,22 @@ export default function Step2_Time() {
   const [error, setError] = useState('')
   const [endDate, setEndDate] = useState(() => computeEndDate(session.date || today, tc.startTime, tc.endTime ?? ''))
   const userEditedEndDate = useRef(false)
+
+  // ── Mode switching ─────────────────────────────────────────────────────────
+
+  function handleModeChange(mode: TimeInputMode) {
+    if (mode === timeMode) return
+    if (mode === 'fixed-duration') {
+      // Leaving end-time mode: clear end time
+      setEndTime('')
+      userEditedEndDate.current = false
+    } else {
+      // Leaving fixed-duration mode: clear fixed duration
+      setFixedDuration('')
+    }
+    setTimeMode(mode)
+    setError('')
+  }
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -76,8 +101,8 @@ export default function Step2_Time() {
     expectedCounts.length > 0
       ? calcStationDurations({
           startTime,
-          endTime: endTime || undefined,
-          fixedDurationMinutes: fixedDurationNum,
+          endTime: timeMode === 'end-time' ? (endTime || undefined) : undefined,
+          fixedDurationMinutes: timeMode === 'fixed-duration' ? fixedDurationNum : undefined,
           roundingAlgorithm: rounding,
           unevenMode: isUneven ? unevenMode : 'equal-duration',
           stationParticipantCounts: expectedCounts,
@@ -93,15 +118,16 @@ export default function Step2_Time() {
   }, [startDate, startTime, endTime])
 
   const autoEndDate = computeEndDate(startDate, startTime, endTime)
-  const showEndDate = endTime !== '' && autoEndDate !== startDate
+  const showEndDate = timeMode === 'end-time' && endTime !== '' && autoEndDate !== startDate
 
   // ── Validation ────────────────────────────────────────────────────────────
 
   function validate(): string | null {
     if (!startTime) return 'יש להזין שעת התחלה'
-    if (!endTime && !fixedDuration) return 'יש להזין שעת סיום או משך קבוע'
-    if (fixedDuration !== '' && (isNaN(Number(fixedDuration)) || Number(fixedDuration) <= 0)) {
-      return 'משך חייב להיות מספר חיובי'
+    if (timeMode === 'end-time' && !endTime) return 'יש להזין שעת סיום'
+    if (timeMode === 'fixed-duration') {
+      if (!fixedDuration) return 'יש להזין משך קבוע'
+      if (isNaN(Number(fixedDuration)) || Number(fixedDuration) <= 0) return 'משך חייב להיות מספר חיובי'
     }
     const anyZero = durations.some(d => d.roundedDurationMinutes <= 0)
     if (anyZero) return 'משך המשמרת חייב להיות גדול מ-0'
@@ -117,10 +143,11 @@ export default function Step2_Time() {
     updateSession({ date: startDate })
     updateTimeConfig({
       startTime,
-      endTime: endTime || undefined,
-      fixedDurationMinutes: fixedDuration !== '' ? Number(fixedDuration) : undefined,
+      endTime: timeMode === 'end-time' ? (endTime || undefined) : undefined,
+      fixedDurationMinutes: timeMode === 'fixed-duration' && fixedDuration !== '' ? Number(fixedDuration) : undefined,
       roundingAlgorithm: rounding,
       unevenMode,
+      timeInputMode: timeMode,
     })
     navigate('/schedule/new/step3')
   }
@@ -135,6 +162,7 @@ export default function Step2_Time() {
       {/* Start date */}
       <div className="mb-4">
         <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">תאריך התחלה</label>
+        <p className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">{formatDate(startDate)}</p>
         <input
           type="date"
           value={startDate}
@@ -153,32 +181,63 @@ export default function Step2_Time() {
         />
       </div>
 
-      {/* End time (optional) */}
+      {/* Mode toggle */}
       <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">
-          שעת סיום <span className="text-gray-400 dark:text-gray-500">(אופציונלי)</span>
-        </label>
-        <TimePicker
-          value={endTime}
-          onChange={v => { setEndTime(v); setFixedDuration(''); setError('') }}
-          className="w-full"
-        />
-        {/* End date — shown when schedule crosses midnight, editable */}
-        {showEndDate && (
-          <div className="mt-2">
-            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">תאריך סיום</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => { userEditedEndDate.current = true; setEndDate(e.target.value) }}
-              className="w-full rounded-xl bg-gray-100 px-4 py-2 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-            />
-          </div>
-        )}
+        <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+          <button
+            type="button"
+            onClick={() => handleModeChange('end-time')}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+              timeMode === 'end-time'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            שעת סיום
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('fixed-duration')}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+              timeMode === 'fixed-duration'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            זמן קבוע לכל לוחם
+          </button>
+        </div>
       </div>
 
-      {/* Fixed duration — only relevant when end time is empty */}
-      {!endTime && (
+      {/* End time — shown when mode is 'end-time' */}
+      {timeMode === 'end-time' && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">שעת סיום</label>
+          <TimePicker
+            value={endTime}
+            onChange={v => { setEndTime(v); setError('') }}
+            className="w-full"
+          />
+          {/* End date — shown when schedule crosses midnight, editable */}
+          {showEndDate && (
+            <div className="mt-2">
+              <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">תאריך סיום</label>
+              <p className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                {formatDate(userEditedEndDate.current ? endDate : autoEndDate)}
+              </p>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => { userEditedEndDate.current = true; setEndDate(e.target.value) }}
+                className="w-full rounded-xl bg-gray-100 px-4 py-2 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fixed duration — shown when mode is 'fixed-duration' */}
+      {timeMode === 'fixed-duration' && (
         <div className="mb-4">
           <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">
             משך קבוע לכל שומר <span className="text-gray-400 dark:text-gray-500">(דקות)</span>

@@ -149,7 +149,8 @@ describe('Continuation schedule — parentScheduleId', () => {
     // Start the continuation
     await user.click(screen.getByText('התחל סבב →'))
 
-    // Step 2: enter fixed duration and proceed
+    // Step 2: select fixed-duration mode, enter duration and proceed
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
 
@@ -174,6 +175,7 @@ describe('Continuation schedule — parentScheduleId', () => {
     renderApp('/schedule/sched1/continue')
 
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     await user.click(screen.getByText('הבא →'))

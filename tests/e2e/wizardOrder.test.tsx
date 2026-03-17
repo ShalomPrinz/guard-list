@@ -50,7 +50,8 @@ async function navigateToStep3(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByText('הבא →'))
   expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
 
-  // Step 2 → Step 3: enter fixed duration
+  // Step 2 → Step 3: select fixed-duration mode, enter duration
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))
   expect(screen.getByText('סדר שומרים')).toBeTruthy()

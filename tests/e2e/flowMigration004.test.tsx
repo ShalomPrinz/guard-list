@@ -84,6 +84,7 @@ function renderApp() {
 /** Navigate through all 4 steps of a single-station wizard (3 members, 60 min). */
 async function runSingleStationWizard(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByText('הבא →'))                       // step1 → step2
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))                       // step2 → step3
   await user.click(screen.getByText('הבא →'))                       // step3 → step4
@@ -100,6 +101,7 @@ async function runSingleStationWizard(user: ReturnType<typeof userEvent.setup>) 
 async function navigateToStep4TwoStationsFixed(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: '2' }))       // select 2 stations
   await user.click(screen.getByText('הבא →'))                       // step1 → step2
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))                       // step2 → step3
   await user.click(screen.getByText('הבא →'))                       // step3 → step4

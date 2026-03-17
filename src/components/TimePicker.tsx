@@ -107,7 +107,8 @@ export default function TimePicker({ value, onChange, className = '' }: TimePick
   // ── Desktop: two numeric spinners ────────────────────────────────────────
   return (
     <div
-      className={`inline-flex items-center rounded-xl bg-gray-100 px-3 py-2 ring-1 ring-gray-300 focus-within:ring-blue-500 dark:bg-gray-800 dark:ring-gray-600 ${className}`}
+      dir="ltr"
+      className="inline-flex items-center rounded-xl bg-gray-100 px-3 py-2 ring-1 ring-gray-300 focus-within:ring-blue-500 dark:bg-gray-800 dark:ring-gray-600"
     >
       <Spinner
         value={hours}

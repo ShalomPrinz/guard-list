@@ -80,6 +80,7 @@ export interface Statistics {
 export type RoundingAlgorithm = 'round-up-10' | 'round-up-5' | 'round-nearest';
 export type UnevenMode = 'equal-duration' | 'equal-endtime';
 export type ContinueEndTimeMode = 'planned' | 'actual';
+export type TimeInputMode = 'end-time' | 'fixed-duration';
 
 export interface TimeConfig {
   startTime: string;           // "HH:MM"
@@ -87,6 +88,7 @@ export interface TimeConfig {
   fixedDurationMinutes?: number;
   roundingAlgorithm: RoundingAlgorithm;
   unevenMode: UnevenMode;
+  timeInputMode?: TimeInputMode;
 }
 
 export interface WizardParticipant {
@@ -116,4 +118,6 @@ export interface WizardSession {
   date: string;                // YYYY-MM-DD
   /** Set after first "Create Schedule" — subsequent saves overwrite this schedule id. */
   createdScheduleId?: string;
+  quote?: string;
+  quoteAuthor?: string;
 }

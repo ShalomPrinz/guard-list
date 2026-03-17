@@ -56,7 +56,8 @@ async function runFullWizard(user: ReturnType<typeof userEvent.setup>) {
   // Step 1: select group + default 1 station → Next
   await user.click(screen.getByText('הבא →'))
 
-  // Step 2: enter fixed duration → Next
+  // Step 2: select fixed-duration mode, enter duration → Next
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))
 

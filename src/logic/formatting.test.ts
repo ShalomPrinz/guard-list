@@ -44,6 +44,15 @@ describe('formatDate', () => {
     const d = new Date(2026, 0, 5) // Jan 5
     expect(formatDate(d)).toBe('05/01/2026')
   })
+
+  it('always returns DD/MM/YYYY regardless of locale (does not use toLocaleDateString)', () => {
+    // These dates would produce MM/DD/YYYY in US locale if toLocaleDateString() were used
+    expect(formatDate('2026-03-07')).toBe('07/03/2026') // would be "3/7/2026" in US locale
+    expect(formatDate('2026-11-02')).toBe('02/11/2026') // would be "11/2/2026" in US locale
+    // Date object path also stays locale-independent
+    const d = new Date(2026, 10, 2) // November 2
+    expect(formatDate(d)).toBe('02/11/2026')
+  })
 })
 
 // ─── crossesMidnight ─────────────────────────────────────────────────────────
@@ -97,5 +106,31 @@ describe('computeEndDate', () => {
 
   it('returns start date when start time is empty', () => {
     expect(computeEndDate('2026-03-16', '', '22:00')).toBe('2026-03-16')
+  })
+
+  it('updates end date when start time changes from non-crossing to crossing range', () => {
+    // Non-crossing: same day
+    expect(computeEndDate('2026-03-16', '08:00', '16:00')).toBe('2026-03-16')
+    // Now the start time changes so that endTime < startTime → crosses midnight
+    expect(computeEndDate('2026-03-16', '22:00', '16:00')).toBe('2026-03-17')
+  })
+
+  it('updates end date when end time changes from non-crossing to crossing range', () => {
+    // Non-crossing
+    expect(computeEndDate('2026-03-16', '20:00', '22:00')).toBe('2026-03-16')
+    // End time moves to before start time → crosses midnight
+    expect(computeEndDate('2026-03-16', '20:00', '06:00')).toBe('2026-03-17')
+  })
+
+  // Simulates the userOverrodeEndDate guard: when the user has manually set
+  // the end date, the component skips calling setEndDate(computeEndDate(...)).
+  // Here we verify that computeEndDate itself would return a different value,
+  // confirming that skipping the update preserves the user's choice.
+  it('computeEndDate returns next-day when crossing midnight, confirming guard is needed to preserve user override', () => {
+    const userChosenDate = '2026-03-20' // user manually picked this
+    const autoCalculated = computeEndDate('2026-03-16', '22:00', '06:00')
+    // Auto would be 2026-03-17, not the user's choice
+    expect(autoCalculated).toBe('2026-03-17')
+    expect(autoCalculated).not.toBe(userChosenDate)
   })
 })

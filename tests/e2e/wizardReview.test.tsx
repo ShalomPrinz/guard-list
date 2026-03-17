@@ -52,7 +52,8 @@ function renderApp() {
 async function navigateToStep4(user: ReturnType<typeof userEvent.setup>) {
   // Step 1 → 2
   await user.click(screen.getByText('הבא →'))
-  // Step 2 → 3
+  // Step 2 → 3: select fixed-duration mode, enter duration
+  await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
   await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
   await user.click(screen.getByText('הבא →'))
   // Step 3 → 4

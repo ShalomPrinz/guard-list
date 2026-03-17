@@ -71,7 +71,8 @@ describe('Two time-based stations', () => {
     await user.click(screen.getByRole('button', { name: '2' }))
     await user.click(screen.getByText('הבא →'))
 
-    // Step 2: enter fixed duration
+    // Step 2: select fixed-duration mode, enter duration
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
 
@@ -96,7 +97,8 @@ describe('Two time-based stations', () => {
     await user.click(screen.getByRole('button', { name: '2' }))
     await user.click(screen.getByText('הבא →'))
 
-    // Step 2
+    // Step 2: select fixed-duration mode, enter duration
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
 
@@ -127,6 +129,7 @@ describe('Two time-based stations', () => {
 
     await user.click(screen.getByRole('button', { name: '2' }))
     await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
     await user.click(screen.getByText('הבא →'))
