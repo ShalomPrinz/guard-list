@@ -1,7 +1,3 @@
-# To complete CI/CD setup, go to Vercel Dashboard → Project → Settings → Git
-# and add this workflow's job name ("test") as a Required Check.
-# Vercel will not deploy until this job passes.
-
 name: CI
 
 on:
@@ -34,6 +30,6 @@ jobs:
         run: npx vitest run --coverage
 
       - name: Notify Vercel
-        uses: 'vercel/repository-dispatch/actions/status@v1'
+        uses: "vercel/repository-dispatch/actions/status@v1"
         with:
-          name: Vercel - guard-list-vercel: test
+          name: "Vercel - guard-list-vercel: test"
