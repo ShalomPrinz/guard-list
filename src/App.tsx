@@ -11,6 +11,7 @@ import ResultScreen from './screens/ResultScreen'
 import ContinueRoundScreen from './screens/ContinueRoundScreen'
 import StatisticsScreen from './screens/StatisticsScreen'
 import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
+import StandbyScreen from './screens/StandbyScreen'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
             <Route path="/statistics" element={<StatisticsScreen />} />
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
+            <Route path="/standby" element={<StandbyScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

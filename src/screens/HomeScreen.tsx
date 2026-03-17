@@ -81,6 +81,12 @@ export default function HomeScreen() {
           + צור לוח שמירה
         </button>
         <button
+          onClick={() => navigate('/standby')}
+          className="w-full rounded-2xl bg-orange-500 py-4 text-base font-semibold text-white shadow-lg active:bg-orange-600"
+        >
+          🛡️ כיתת כוננות
+        </button>
+        <button
           onClick={() => navigate('/statistics')}
           className="w-full rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
