@@ -1,6 +1,8 @@
 // Global test setup — runs before every test file
 // Runs before modules are imported, so IS_COARSE in TimePicker.tsx evaluates correctly.
 
+window.scrollTo = vi.fn();
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({

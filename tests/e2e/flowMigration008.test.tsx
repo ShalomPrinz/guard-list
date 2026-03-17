@@ -225,7 +225,6 @@ describe('HomeScreen — clickable schedule cards', () => {
 
 describe('ResultScreen — back button behavior', () => {
   it('always shows "חזרה לעריכה" button', async () => {
-    const user = userEvent.setup()
     upsertGroup(makeGroup())
     upsertSchedule(makeSchedule())
     renderHomeApp('/schedule/sched1/result')

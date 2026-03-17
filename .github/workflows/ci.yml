@@ -27,5 +27,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npx tsc --noEmit
+
       - name: Run tests with coverage
         run: npx vitest run --coverage
+
+      - name: Notify Vercel
+        uses: 'vercel/repository-dispatch/actions/status@v1'
+        with:
+          name: Vercel - guard-list-vercel: test
