@@ -21,16 +21,9 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 
 ## Docs
 
-@docs/features.md
-@docs/screens.md
-@docs/data-model.md
 @docs/business-logic.md
 @docs/CONVENTIONS.md
 @docs/ERRORS.md
-
-### Migrations
-
-Migrations live in `docs/migrations/`. Ignore them. Also ignore @docs/implementation-plan.md unless you are told otherwise.
 
 ## Requirements
 

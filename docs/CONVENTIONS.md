@@ -16,7 +16,6 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 ## File & Folder Structure
 
-- One screen per file in `src/screens/`. File name matches the screen name exactly (e.g. `StandbyScreen.tsx`).
 - Shared UI primitives in `src/components/`. Before creating a new component, check this folder — do not duplicate existing ones.
 - All scheduling and calculation logic in `src/logic/` as **pure functions with no React imports**. No exceptions.
 - All localStorage access through typed helpers in `src/storage/`. Never call `localStorage.getItem` / `setItem` directly from a component or screen.

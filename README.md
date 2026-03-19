@@ -6,15 +6,6 @@ A mobile-first web application for managing **guard duty / shift rotation lists*
 
 Enable creation and management of guard duty rotations with full control over participant order, shift times, multi-station assignments, and continuity between rounds — with the primary output being a WhatsApp-shareable text message of the schedule.
 
-## Documentation Index
-
-| File | Description |
-|------|-------------|
-| [features.md](docs/features.md) | All functional features and their requirements |
-| [screens.md](docs/screens.md) | Screen flow, UI/UX, and navigation |
-| [data-model.md](docs/data-model.md) | Data structures and persistence |
-| [business-logic.md](docs/business-logic.md) | Scheduling algorithms and calculation rules |
-
 ## Core User Flow
 
 ```
