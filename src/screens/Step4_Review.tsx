@@ -569,13 +569,13 @@ export default function Step4_Review() {
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={4} total={4} />
       <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
         <button
           onClick={() => navigate('/schedule/new/recalculate', { state: { reviewStations: stations } })}
           className="rounded-xl bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
         >
           חישוב זמנים מחדש
         </button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
       </div>
 
       {/* Schedule name */}
