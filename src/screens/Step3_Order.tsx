@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
@@ -22,13 +23,17 @@ import { CSS } from '@dnd-kit/utilities'
 import { getGroupById } from '../storage/groups'
 import { useWizard } from '../context/WizardContext'
 import { shuffleArray, distributeParticipants } from '../logic'
-import type { WizardParticipant, WizardStation } from '../types'
+import type { Member, WizardSession, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ParticipantItem extends WizardParticipant {
-  id: string // local UUID for DnD (not persisted)
+interface ParticipantItem {
+  id: string
+  name: string
+  locked: boolean
+  skipped: boolean
+  availability?: 'base' | 'home'
 }
 
 interface StationState {
@@ -37,7 +42,53 @@ interface StationState {
   participants: ParticipantItem[]
 }
 
-// ─── Sortable row ─────────────────────────────────────────────────────────────
+interface OrderState {
+  stations: StationState[]
+  unassigned: ParticipantItem[]
+}
+
+// ─── Init helper ──────────────────────────────────────────────────────────────
+
+function initOrderState(session: WizardSession, allMembers: Member[]): OrderState {
+  const baseMembers = allMembers.filter(m => m.availability === 'base').map(m => m.name)
+
+  let stations: StationState[]
+  let assignedNames: Set<string>
+
+  if (session.stations.some(ws => ws.participants.length > 0)) {
+    // Restoring from session (Back navigation)
+    assignedNames = new Set(session.stations.flatMap(ws => ws.participants.map(p => p.name)))
+    stations = session.stations.map(ws => ({
+      stationConfigId: ws.config.id,
+      stationName: ws.config.name,
+      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
+    }))
+  } else {
+    // First visit: distribute base members across stations
+    const shuffled = shuffleArray(baseMembers)
+    const counts = distributeParticipants(baseMembers.length, session.stations.length)
+    assignedNames = new Set<string>()
+
+    stations = session.stations.map((ws, si) => {
+      const offset = counts.slice(0, si).reduce((a, b) => a + b, 0)
+      const mine = shuffled.slice(offset, offset + counts[si])
+      mine.forEach(n => assignedNames.add(n))
+      return {
+        stationConfigId: ws.config.id,
+        stationName: ws.config.name,
+        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false })),
+      }
+    })
+  }
+
+  const unassigned: ParticipantItem[] = allMembers
+    .filter(m => !assignedNames.has(m.name))
+    .map(m => ({ id: crypto.randomUUID(), name: m.name, locked: false, skipped: false, availability: m.availability }))
+
+  return { stations, unassigned }
+}
+
+// ─── Sortable row (in station) ────────────────────────────────────────────────
 
 function SortableRow({
   item,
@@ -93,6 +144,44 @@ function SortableRow({
   )
 }
 
+// ─── Unassigned row ───────────────────────────────────────────────────────────
+
+function UnassignedRow({ item }: { item: ParticipantItem }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id })
+
+  const isHome = item.availability === 'home'
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isHome ? 'bg-gray-50 dark:bg-gray-800/60' : 'bg-gray-100 dark:bg-gray-700'}`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab touch-none text-gray-400 dark:text-gray-500 active:cursor-grabbing"
+        aria-label="גרור לא משובץ"
+      >
+        ⠿
+      </button>
+
+      <span className={`min-w-0 flex-1 truncate text-sm ${isHome ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
+        {item.name}
+      </span>
+
+      {isHome && (
+        <span className="shrink-0 rounded-lg bg-gray-200 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+          בית
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ─── Droppable zone ───────────────────────────────────────────────────────────
+
 function DroppableZone({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
@@ -114,51 +203,29 @@ export default function Step3_Order() {
   if (!session) { navigate('/schedule/new/step1'); return null }
 
   const group = getGroupById(session.groupId)
-  const baseMembers = group?.members.filter(m => m.availability === 'base').map(m => m.name) ?? []
+  const allMembers = group?.members ?? []
 
-  // ── Initialize ────────────────────────────────────────────────────────────
+  // ── State ─────────────────────────────────────────────────────────────────
 
-  const [stations, setStations] = useState<StationState[]>(() => {
-    const shuffled = shuffleArray(baseMembers)
-    const counts = distributeParticipants(baseMembers.length, session.stations.length)
-
-    return session.stations.map((ws, si) => {
-      // Restore from session if already set (Back navigation)
-      if (ws.participants.length > 0) {
-        return {
-          stationConfigId: ws.config.id,
-          stationName: ws.config.name,
-          participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
-        }
-      }
-
-      // First visit: slice from shuffled pool
-      const offset = counts.slice(0, si).reduce((a, b) => a + b, 0)
-      const mine = shuffled.slice(offset, offset + counts[si])
-
-      return {
-        stationConfigId: ws.config.id,
-        stationName: ws.config.name,
-        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false })),
-      }
-    })
-  })
-
-  // ── DnD ───────────────────────────────────────────────────────────────────
+  const [orderState, setOrderState] = useState<OrderState>(() =>
+    initOrderState(session, allMembers)
+  )
 
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  // ── Sensors (1000ms hold to activate drag) ────────────────────────────────
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const findOwnerStation = useCallback(
-    (itemId: string) => stations.findIndex(s => s.participants.some(p => p.id === itemId)),
-    [stations],
-  )
+  // ── DnD helpers ───────────────────────────────────────────────────────────
 
   const activeItem = activeId
-    ? stations.flatMap(s => s.participants).find(p => p.id === activeId)
+    ? (orderState.stations.flatMap(s => s.participants).find(p => p.id === activeId)
+      ?? orderState.unassigned.find(p => p.id === activeId))
     : null
 
   function onDragStart({ active }: DragStartEvent) {
@@ -171,39 +238,104 @@ export default function Step3_Order() {
 
     const aId = String(active.id)
     const oId = String(over.id)
-    const srcIdx = findOwnerStation(aId)
-    if (srcIdx === -1) return
-    const srcPos = stations[srcIdx].participants.findIndex(p => p.id === aId)
+    const { stations, unassigned } = orderState
 
-    // Over a participant item?
-    const dstItemStation = stations.findIndex(s => s.participants.some(p => p.id === oId))
-    if (dstItemStation !== -1) {
-      const dstPos = stations[dstItemStation].participants.findIndex(p => p.id === oId)
-      if (srcIdx === dstItemStation) {
-        setStations(prev =>
-          prev.map((s, i) =>
-            i === srcIdx ? { ...s, participants: arrayMove(s.participants, srcPos, dstPos) } : s,
+    const isFromUnassigned = unassigned.some(p => p.id === aId)
+    const isOverUnassigned = oId === 'droppable-unassigned' || unassigned.some(p => p.id === oId)
+    const srcStationIdx = isFromUnassigned ? -1 : stations.findIndex(s => s.participants.some(p => p.id === aId))
+
+    // ── Reorder within unassigned ──────────────────────────────────────────
+    if (isFromUnassigned && isOverUnassigned) {
+      const srcPos = unassigned.findIndex(p => p.id === aId)
+      const dstPos = unassigned.findIndex(p => p.id === oId)
+      if (srcPos !== -1 && dstPos !== -1) {
+        setOrderState(prev => ({ ...prev, unassigned: arrayMove(prev.unassigned, srcPos, dstPos) }))
+      }
+      return
+    }
+
+    // ── Unassigned → Station ───────────────────────────────────────────────
+    if (isFromUnassigned && !isOverUnassigned) {
+      const srcItem = unassigned.find(p => p.id === aId)
+      if (!srcItem) return
+
+      let dstStationIdx = stations.findIndex(s => `droppable-${s.stationConfigId}` === oId)
+      if (dstStationIdx === -1) dstStationIdx = stations.findIndex(s => s.participants.some(p => p.id === oId))
+      if (dstStationIdx === -1) return
+
+      const dstParticipantIdx = stations[dstStationIdx].participants.findIndex(p => p.id === oId)
+      const movedItem: ParticipantItem = { id: srcItem.id, name: srcItem.name, locked: false, skipped: false }
+
+      setOrderState(prev => ({
+        unassigned: prev.unassigned.filter(p => p.id !== aId),
+        stations: prev.stations.map((s, si) => {
+          if (si !== dstStationIdx) return s
+          const parts = [...s.participants]
+          if (dstParticipantIdx === -1) parts.push(movedItem)
+          else parts.splice(dstParticipantIdx, 0, movedItem)
+          return { ...s, participants: parts }
+        }),
+      }))
+      return
+    }
+
+    // ── Station → Unassigned ───────────────────────────────────────────────
+    if (!isFromUnassigned && isOverUnassigned) {
+      if (srcStationIdx === -1) return
+      const srcItem = stations[srcStationIdx].participants.find(p => p.id === aId)
+      if (!srcItem) return
+
+      const originalMember = allMembers.find(m => m.name === srcItem.name)
+      const availability = originalMember?.availability ?? 'base'
+      const movedItem: ParticipantItem = { ...srcItem, availability }
+      const dstPos = unassigned.findIndex(p => p.id === oId)
+
+      setOrderState(prev => {
+        const newUnassigned = [...prev.unassigned]
+        if (dstPos === -1) newUnassigned.push(movedItem)
+        else newUnassigned.splice(dstPos, 0, movedItem)
+        return {
+          unassigned: newUnassigned,
+          stations: prev.stations.map((s, si) =>
+            si === srcStationIdx ? { ...s, participants: s.participants.filter(p => p.id !== aId) } : s
           ),
-        )
+        }
+      })
+      return
+    }
+
+    // ── Station → Station ──────────────────────────────────────────────────
+    if (srcStationIdx === -1) return
+    const srcPos = stations[srcStationIdx].participants.findIndex(p => p.id === aId)
+
+    const dstItemStationIdx = stations.findIndex(s => s.participants.some(p => p.id === oId))
+    if (dstItemStationIdx !== -1) {
+      const dstPos = stations[dstItemStationIdx].participants.findIndex(p => p.id === oId)
+      if (srcStationIdx === dstItemStationIdx) {
+        setOrderState(prev => ({
+          ...prev,
+          stations: prev.stations.map((s, i) =>
+            i === srcStationIdx ? { ...s, participants: arrayMove(s.participants, srcPos, dstPos) } : s
+          ),
+        }))
       } else {
-        setStations(prev => {
-          const next = prev.map(s => ({ ...s, participants: [...s.participants] }))
-          const [moved] = next[srcIdx].participants.splice(srcPos, 1)
-          next[dstItemStation].participants.splice(dstPos, 0, moved)
-          return next
+        setOrderState(prev => {
+          const newStations = prev.stations.map(s => ({ ...s, participants: [...s.participants] }))
+          const [moved] = newStations[srcStationIdx].participants.splice(srcPos, 1)
+          newStations[dstItemStationIdx].participants.splice(dstPos, 0, moved)
+          return { ...prev, stations: newStations }
         })
       }
       return
     }
 
-    // Over a droppable station zone?
-    const dstZone = stations.findIndex(s => `droppable-${s.stationConfigId}` === oId)
-    if (dstZone !== -1 && dstZone !== srcIdx) {
-      setStations(prev => {
-        const next = prev.map(s => ({ ...s, participants: [...s.participants] }))
-        const [moved] = next[srcIdx].participants.splice(srcPos, 1)
-        next[dstZone].participants.push(moved)
-        return next
+    const dstZoneIdx = stations.findIndex(s => `droppable-${s.stationConfigId}` === oId)
+    if (dstZoneIdx !== -1 && dstZoneIdx !== srcStationIdx) {
+      setOrderState(prev => {
+        const newStations = prev.stations.map(s => ({ ...s, participants: [...s.participants] }))
+        const [moved] = newStations[srcStationIdx].participants.splice(srcPos, 1)
+        newStations[dstZoneIdx].participants.push(moved)
+        return { ...prev, stations: newStations }
       })
     }
   }
@@ -211,22 +343,22 @@ export default function Step3_Order() {
   // ── Shuffle ───────────────────────────────────────────────────────────────
 
   function shuffleStation(si: number) {
-    setStations(prev => {
-      const s = prev[si]
+    setOrderState(prev => {
+      const s = prev.stations[si]
       const unlockedIdx = s.participants.map((p, i) => (p.locked ? -1 : i)).filter(i => i >= 0)
       const shuffled = shuffleArray(s.participants.filter(p => !p.locked))
       const next = [...s.participants]
       unlockedIdx.forEach((idx, k) => { next[idx] = shuffled[k] })
-      return prev.map((st, i) => (i === si ? { ...st, participants: next } : st))
+      return { ...prev, stations: prev.stations.map((st, i) => (i === si ? { ...st, participants: next } : st)) }
     })
   }
 
   function reLottery() {
-    setStations(prev => {
+    setOrderState(prev => {
       const allUnlocked: ParticipantItem[] = []
       const lockedByStation = new Map<number, { idx: number; item: ParticipantItem }[]>()
 
-      prev.forEach((s, si) => {
+      prev.stations.forEach((s, si) => {
         const locked: { idx: number; item: ParticipantItem }[] = []
         s.participants.forEach((p, pi) => {
           if (p.locked) locked.push({ idx: pi, item: p })
@@ -238,7 +370,7 @@ export default function Step3_Order() {
       const pool = shuffleArray(allUnlocked)
       let poolIdx = 0
 
-      return prev.map((s, si) => {
+      const newStations = prev.stations.map((s, si) => {
         const locked = lockedByStation.get(si) ?? []
         const result: ParticipantItem[] = Array(s.participants.length).fill(null)
         locked.forEach(({ idx, item }) => { result[idx] = item })
@@ -247,23 +379,36 @@ export default function Step3_Order() {
         }
         return { ...s, participants: result.filter(Boolean) }
       })
+
+      return { ...prev, stations: newStations }
     })
   }
 
   // ── Participant mutations ─────────────────────────────────────────────────
 
   function patchParticipant(si: number, id: string, patch: Partial<ParticipantItem>) {
-    setStations(prev =>
-      prev.map((s, i) =>
-        i === si ? { ...s, participants: s.participants.map(p => (p.id === id ? { ...p, ...patch } : p)) } : s,
+    setOrderState(prev => ({
+      ...prev,
+      stations: prev.stations.map((s, i) =>
+        i === si ? { ...s, participants: s.participants.map(p => (p.id === id ? { ...p, ...patch } : p)) } : s
       ),
-    )
+    }))
   }
 
   function removeFromStation(si: number, id: string) {
-    setStations(prev =>
-      prev.map((s, i) => (i === si ? { ...s, participants: s.participants.filter(p => p.id !== id) } : s)),
-    )
+    setOrderState(prev => {
+      const station = prev.stations[si]
+      const removed = station.participants.find(p => p.id === id)
+      if (!removed) return prev
+      const originalMember = allMembers.find(m => m.name === removed.name)
+      const availability = originalMember?.availability ?? 'base'
+      return {
+        stations: prev.stations.map((s, i) =>
+          i === si ? { ...s, participants: s.participants.filter(p => p.id !== id) } : s
+        ),
+        unassigned: [...prev.unassigned, { ...removed, availability }],
+      }
+    })
   }
 
   // ── Next ──────────────────────────────────────────────────────────────────
@@ -271,7 +416,7 @@ export default function Step3_Order() {
   function handleNext() {
     if (!session) return
     const updated: WizardStation[] = session.stations.map((ws, si) => {
-      const s = stations[si]
+      const s = orderState.stations[si]
       return {
         ...ws,
         participants: s.participants.map(({ name, locked, skipped }) => ({ name, locked, skipped })),
@@ -282,6 +427,8 @@ export default function Step3_Order() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  const { stations, unassigned } = orderState
 
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
@@ -330,6 +477,22 @@ export default function Step3_Order() {
               </SortableContext>
             </div>
           ))}
+
+          {/* Unassigned section — shown when some members are not in any station */}
+          {unassigned.length > 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-gray-300 p-4 dark:border-gray-600">
+              <p className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">לא משובצים</p>
+              <SortableContext items={unassigned.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                <DroppableZone id="droppable-unassigned">
+                  <div className="flex flex-col gap-1.5">
+                    {unassigned.map(item => (
+                      <UnassignedRow key={item.id} item={item} />
+                    ))}
+                  </div>
+                </DroppableZone>
+              </SortableContext>
+            </div>
+          )}
         </div>
 
         <DragOverlay>

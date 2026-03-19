@@ -18,7 +18,6 @@ export default function StandbyScreen() {
 
   const group = groups.find(g => g.id === selectedGroupId)
   const baseMembers = group?.members.filter(m => m.availability === 'base') ?? []
-  const homeMembers = group?.members.filter(m => m.availability === 'home') ?? []
   const allMembers: Member[] = [...(group?.members ?? [])]
 
   // Initialize selected names when group changes
