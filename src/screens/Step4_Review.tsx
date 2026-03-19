@@ -12,6 +12,7 @@ import {
   pointerWithin,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -254,7 +255,7 @@ const dragCollisionDetection: CollisionDetection = (args) => {
 
 function DroppableZone({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id })
-  return <div ref={setNodeRef} className="min-h-[2rem]">{children}</div>
+  return <div ref={setNodeRef} className="min-h-[2rem] overflow-visible">{children}</div>
 }
 
 // ─── Station card ─────────────────────────────────────────────────────────────
@@ -365,6 +366,8 @@ export default function Step4_Review() {
   )
 
   const [isDragActive, setIsDragActive] = useState(false)
+  // Snapshot of stations at drag-start — used to restore on cancel or to detect cross-station moves in onDragEnd.
+  const stationsSnapshotRef = useRef<ReviewStation[] | null>(null)
 
   useEffect(() => {
     if (!isDragActive) return
@@ -467,39 +470,112 @@ export default function Step4_Review() {
     }))
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    setIsDragActive(false)
-    const { active, over } = event
-    if (!over) return
+  // onDragOver: fires continuously as the pointer moves.
+  // Cross-station: immediately move the item to the hovered position in the target station
+  // so target items shift apart to preview insertion — same pattern as Step3_Order.
+  // No time recalculation here; that happens once in onDragEnd.
+  function handleDragOver({ active, over }: DragOverEvent) {
+    if (!over || active.id === over.id) return
 
     const activeIdStr = String(active.id)
     const overIdStr = String(over.id)
 
-    const fromStation = stations.find(st => st.items.some(i => i.id === activeIdStr))
-    if (!fromStation) return
+    setStations(prev => {
+      const srcIdx = prev.findIndex(st => st.items.some(i => i.id === activeIdStr))
+      if (srcIdx === -1) return prev
 
-    const toStation = stations.find(st => st.stationConfigId === overIdStr)
-    if (toStation && toStation.stationConfigId !== fromStation.stationConfigId) {
-      handleMove(activeIdStr, fromStation.stationConfigId, toStation.stationConfigId)
+      let dstIdx = prev.findIndex(st => st.items.some(i => i.id === overIdStr))
+      if (dstIdx === -1) dstIdx = prev.findIndex(st => st.stationConfigId === overIdStr)
+      if (dstIdx === -1 || dstIdx === srcIdx) return prev
+
+      const activeItem = prev[srcIdx].items.find(i => i.id === activeIdStr)
+      if (!activeItem) return prev
+
+      return prev.map((st, idx) => {
+        if (idx === srcIdx) return { ...st, items: st.items.filter(i => i.id !== activeIdStr) }
+        if (idx === dstIdx) {
+          const items = [...st.items]
+          const pos = items.findIndex(i => i.id === overIdStr)
+          if (pos >= 0) items.splice(pos, 0, activeItem)
+          else items.push(activeItem)
+          return { ...st, items }
+        }
+        return st
+      })
+    })
+  }
+
+  // onDragEnd: finalize same-station sort or accept cross-station move already done by onDragOver.
+  // Recalculates durations for all stations after any reorder (counts may have changed).
+  function handleDragEnd(event: DragEndEvent) {
+    setIsDragActive(false)
+    const { active, over } = event
+
+    const snap = stationsSnapshotRef.current
+    stationsSnapshotRef.current = null
+
+    if (!over) {
+      if (snap) setStations(snap)
       return
     }
 
-    const toItemStation = stations.find(st => st.items.some(i => i.id === overIdStr))
-    if (!toItemStation) return
+    if (!session) return
 
-    if (fromStation.stationConfigId === toItemStation.stationConfigId) {
-      const oldIndex = fromStation.items.findIndex(i => i.id === activeIdStr)
-      const newIndex = fromStation.items.findIndex(i => i.id === overIdStr)
-      if (oldIndex !== newIndex) {
-        setStations(prev => prev.map(st => {
-          if (st.stationConfigId !== fromStation.stationConfigId) return st
-          const newItems = arrayMove(st.items, oldIndex, newIndex)
-          return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
-        }))
+    const activeIdStr = String(active.id)
+    const overIdStr = String(over.id)
+
+    // Find where the item currently is (may have been moved by onDragOver)
+    const curStIdx = stations.findIndex(st => st.items.some(i => i.id === activeIdStr))
+    if (curStIdx === -1) return
+
+    const curStation = stations[curStIdx]
+
+    // Detect cross-station move: compare current station to snapshot's station
+    const originalStation = snap?.find(st => st.items.some(i => i.id === activeIdStr))
+    const isCrossStation = originalStation && originalStation.stationConfigId !== curStation.stationConfigId
+
+    if (isCrossStation) {
+      // Guard: disallow if the source station would have been left empty
+      const srcSnap = snap?.find(st => st.stationConfigId === originalStation!.stationConfigId)
+      if (srcSnap && srcSnap.items.length <= 1) {
+        setError('לא ניתן להעביר — העמדה תישאר ריקה')
+        if (snap) setStations(snap)
+        return
       }
-    } else {
-      handleMove(activeIdStr, fromStation.stationConfigId, toItemStation.stationConfigId)
     }
+
+    // Finalize within-station position (arrayMove if over an item in the same station)
+    const oldIdx = curStation.items.findIndex(i => i.id === activeIdStr)
+    const newIdx = curStation.items.findIndex(i => i.id === overIdStr)
+    let reordered = stations
+    if (oldIdx >= 0 && newIdx >= 0 && oldIdx !== newIdx) {
+      reordered = stations.map((st, i) =>
+        i === curStIdx ? { ...st, items: arrayMove(st.items, oldIdx, newIdx) } : st
+      )
+    }
+
+    // Recalculate durations for all stations (participant counts may have changed)
+    const counts = reordered.map(s => s.items.length)
+    const durations = calcStationDurations({
+      startTime: session.timeConfig.startTime,
+      endTime: session.timeConfig.endTime,
+      fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+      roundingAlgorithm: session.timeConfig.roundingAlgorithm,
+      unevenMode: session.timeConfig.unevenMode,
+      stationParticipantCounts: counts,
+    })
+
+    setStations(reordered.map((st, idx) => {
+      const dur = durations[idx]?.roundedDurationMinutes ?? 60
+      const newItems = st.items.map(it => ({ ...it, durationMinutes: dur }))
+      return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
+    }))
+  }
+
+  function handleDragCancel() {
+    setIsDragActive(false)
+    if (stationsSnapshotRef.current) setStations(stationsSnapshotRef.current)
+    stationsSnapshotRef.current = null
   }
 
   // ── Create schedule ────────────────────────────────────────────────────────
@@ -614,9 +690,10 @@ export default function Step4_Review() {
         sensors={sensors}
         collisionDetection={dragCollisionDetection}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-        onDragStart={() => setIsDragActive(true)}
+        onDragStart={() => { setIsDragActive(true); stationsSnapshotRef.current = stations }}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setIsDragActive(false)}
+        onDragCancel={handleDragCancel}
       >
         <div className="mb-6 flex flex-col gap-4">
           {stations.map(st => (
