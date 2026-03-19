@@ -36,4 +36,4 @@ jobs:
       - name: Notify Vercel
         uses: "vercel/repository-dispatch/actions/status@v1"
         with:
-          name: "Vercel - guard-list-vercel: test"
+          name: "Notify Vercel to Publish App"
