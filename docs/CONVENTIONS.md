@@ -64,6 +64,10 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
   });
   ```
 - Apply this config to every drag instance in the app. Never use a different sensor config.
+- Drag handles always use the shared `DragHandle` component from `src/components/DragHandle.tsx` — never an inline icon element.
+- `DragHandle` always carries `select-none touch-none cursor-grab active:cursor-grabbing`. Never override or remove these classes.
+- All `DndContext` instances must include `measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}` to prevent stale position measurements after scroll.
+- Do NOT use `DragOverlay`. It has a two-render timing bug where `usesDragOverlay` flips from false to true after the overlay measures itself, causing the scroll-delta correction to change mid-drag and producing a visible position jump. Without `DragOverlay`, `useSortable` applies CSS `transform` directly to the item — single render path, no flip, no jump.
 
 ---
 

@@ -46,3 +46,41 @@
 > Run `vitest run --coverage` when done and confirm coverage is ≥90% for `src/logic/` and `src/storage/`.
 
 **Deliverables:** All group members are visible in Step3_Order — assigned members in their station lists, unassigned and "בית" members in the "לא משובצים" section. Dragging any member from "לא משובצים" into a station works correctly and triggers recalculation. Drag activation requires a 1000ms hold with 5px tolerance on all drag-and-drop instances. Tests pass with ≥90% coverage.
+
+---
+
+### Migration 011.1 — Drag & Drop Text Selection & Position Jump Fix
+
+**Type:** Bugfix  
+**Depends on:** Migration 011 complete
+
+**Context:**
+
+> Two UX issues exist with drag and drop across the app following the 1000ms hold threshold introduced in Migration 011. First, holding a finger on a drag handle triggers the browser's native text selection behavior, selecting the handle icon as text and showing the system selection menu — this interferes with the drag activation. Second, once the 1000ms threshold is met and drag mode activates, the dragged item visually jumps far from its original position before following the finger — likely caused by a mismatch between the drag overlay's initial transform offset and the pointer's position relative to the element.
+
+**Goal:** Prevent text selection on drag handles across the app. Keep the dragged item visually anchored to its original position when drag activates.
+
+**Tell Claude Code:**
+
+> **Prevent text selection on drag handles:** Apply `user-select: none` (and its vendor prefixes) to every drag handle element in the app. Do this via a Tailwind utility class — add `select-none` to the drag handle element's className in every component that renders one. Additionally apply `touch-action: none` via Tailwind's `touch-none` class to the same elements — this prevents the browser from intercepting the touch for scrolling or selection during the hold period. Do not apply these classes to the entire list item, only to the drag handle icon element itself so that text elsewhere in the row remains selectable normally.
+>
+> To make this consistent and impossible to forget in future components, add a shared `DragHandle` component (`src/components/DragHandle.tsx`) that renders the drag handle icon and always applies `select-none touch-none cursor-grab active:cursor-grabbing` by default. Replace all existing inline drag handle elements across Step3_Order, Step4_Review, and the "לא משובצים" section with this component. Any future drag surface must use `DragHandle` — never an ad-hoc icon with manual classes.
+>
+> **Fix position jump on drag activation:** The jump is caused by `@dnd-kit`'s default drag overlay picking up the element's position relative to the viewport at the moment of activation, without accounting for the scroll offset or the pointer's position within the element. Fix this by using `@dnd-kit`'s `DragOverlay` with a `dropAnimation={null}` and ensuring the overlay renders the item at its natural size. Additionally, pass `measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}` to the `DndContext` so element positions are measured continuously rather than only on mount — this prevents stale position data after the page has scrolled. If the jump persists, add a `modifiers={[restrictToWindowEdges]}` from `@dnd-kit/modifiers` to constrain the overlay to the viewport without repositioning it. The dragged item should appear to lift in place — not teleport.
+>
+> Apply both fixes to every `DndContext` instance in the app: Step3_Order station lists, the "לא משובצים" section, and Step4_Review.
+>
+> Add the following to `docs/CONVENTIONS.md` under the Drag & Drop section:
+>
+> - Drag handles always use the shared `DragHandle` component — never an inline icon
+> - `DragHandle` always carries `select-none touch-none cursor-grab active:cursor-grabbing`
+> - All `DndContext` instances use `measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}`
+>
+> Add E2E tests in `tests/e2e/dragdrop.test.tsx` covering:
+>
+> - The drag handle element has `user-select: none` and `touch-action: none` styles applied
+> - Dragging a participant within a station list renders the drag overlay at the correct initial position (no jump)
+>
+> Run `vitest run --coverage` when done and confirm coverage is ≥90% for `src/logic/` and `src/storage/`.
+
+**Deliverables:** Holding a finger on any drag handle never triggers text selection or the system selection menu. Dragged items stay visually in place when drag activates — no position jump. All drag handles across the app use the shared `DragHandle` component. `CONVENTIONS.md` updated with the new drag handle rules. Tests pass with ≥90% coverage.

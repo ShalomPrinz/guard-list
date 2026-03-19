@@ -2,14 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
-  DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   closestCenter,
-  type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -27,6 +26,7 @@ import { parseTimeToMinutes, minutesToTime, calcStationDurations } from '../logi
 import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
 import StepIndicator from '../components/StepIndicator'
+import DragHandle from '../components/DragHandle'
 import type { Schedule, ScheduleStation, ScheduledParticipant } from '../types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -120,7 +120,6 @@ function SortableReviewRow({
   onDurationChange,
   onRemove,
   onMove,
-  isDragging,
 }: {
   item: ReviewItem
   stationId: string
@@ -129,9 +128,8 @@ function SortableReviewRow({
   onDurationChange: (id: string, minutes: number) => void
   onRemove: (id: string, stationId: string) => void
   onMove: (itemId: string, fromStationId: string, toStationId: string) => void
-  isDragging: boolean
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState(item.name)
   const [editingDuration, setEditingDuration] = useState(false)
@@ -164,14 +162,7 @@ function SortableReviewRow({
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 dark:bg-gray-700">
       {/* Drag handle */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab touch-none text-gray-400 active:cursor-grabbing dark:text-gray-500"
-        aria-label="גרור לסידור מחדש"
-      >
-        ⠿
-      </button>
+      <DragHandle attributes={attributes} listeners={listeners} label="גרור לסידור מחדש" />
 
       {/* Times */}
       <div className="w-24 shrink-0 text-xs text-gray-500 dark:text-gray-400">
@@ -260,7 +251,6 @@ function DroppableZone({ id, children }: { id: string; children: React.ReactNode
 function ReviewStationCard({
   station,
   allStations,
-  activeId,
   onRename,
   onDurationChange,
   onRemove,
@@ -269,7 +259,6 @@ function ReviewStationCard({
 }: {
   station: ReviewStation
   allStations: ReviewStation[]
-  activeId: string | null
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, stationId: string, minutes: number) => void
   onRemove: (id: string, stationId: string) => void
@@ -295,7 +284,6 @@ function ReviewStationCard({
                 onDurationChange={(id, mins) => onDurationChange(id, station.stationConfigId, mins)}
                 onRemove={onRemove}
                 onMove={onMove}
-                isDragging={activeId === item.id}
               />
             ))}
           </div>
@@ -342,7 +330,6 @@ export default function Step4_Review() {
   const [scheduleName, setScheduleName] = useState(session?.scheduleName || defaultName)
   const [quote, setQuote] = useState(session?.quote ?? '')
   const [quoteAuthor, setQuoteAuthor] = useState(session?.quoteAuthor ?? '')
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const sensors = useSensors(
@@ -445,12 +432,7 @@ export default function Step4_Review() {
     }))
   }
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id))
-  }
-
   function handleDragEnd(event: DragEndEvent) {
-    setActiveId(null)
     const { active, over } = event
     if (!over) return
 
@@ -483,10 +465,6 @@ export default function Step4_Review() {
       handleMove(activeIdStr, fromStation.stationConfigId, toItemStation.stationConfigId)
     }
   }
-
-  const activeItem = activeId
-    ? stations.flatMap(s => s.items).find(i => i.id === activeId)
-    : null
 
   // ── Create schedule ────────────────────────────────────────────────────────
 
@@ -591,7 +569,7 @@ export default function Step4_Review() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         onDragEnd={handleDragEnd}
       >
         <div className="mb-6 flex flex-col gap-4">
@@ -600,7 +578,6 @@ export default function Step4_Review() {
               key={st.stationConfigId}
               station={st}
               allStations={stations}
-              activeId={activeId}
               onRename={handleRename}
               onDurationChange={handleDurationChange}
               onRemove={handleRemove}
@@ -610,15 +587,6 @@ export default function Step4_Review() {
           ))}
         </div>
 
-        <DragOverlay>
-          {activeItem && (
-            <div className="flex items-center gap-2 rounded-xl bg-gray-200 px-3 py-2 shadow-xl dark:bg-gray-600">
-              <span className="w-24 text-xs text-gray-500 dark:text-gray-400">{activeItem.startTime}–{activeItem.endTime}</span>
-              <span className="text-sm text-gray-900 dark:text-gray-100">{activeItem.name}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{activeItem.durationMinutes}′</span>
-            </div>
-          )}
-        </DragOverlay>
       </DndContext>
 
       {/* Quote */}

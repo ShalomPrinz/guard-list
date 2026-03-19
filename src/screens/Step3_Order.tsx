@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
-  DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   useDroppable,
-  type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -25,6 +24,7 @@ import { useWizard } from '../context/WizardContext'
 import { shuffleArray, distributeParticipants } from '../logic'
 import type { Member, WizardSession, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
+import DragHandle from '../components/DragHandle'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,14 +110,7 @@ function SortableRow({
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
       className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${item.skipped ? 'bg-gray-100/50 dark:bg-gray-700/50' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="shrink-0 cursor-grab touch-none text-lg text-gray-400 dark:text-gray-500 active:cursor-grabbing"
-        aria-label="גרור"
-      >
-        ⠿
-      </button>
+      <DragHandle attributes={attributes} listeners={listeners} />
 
       <span className={`min-w-0 flex-1 truncate text-sm ${item.skipped ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
         {item.name}
@@ -158,14 +151,7 @@ function UnassignedRow({ item }: { item: ParticipantItem }) {
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
       className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isHome ? 'bg-gray-50 dark:bg-gray-800/60' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="shrink-0 cursor-grab touch-none text-gray-400 dark:text-gray-500 active:cursor-grabbing"
-        aria-label="גרור לא משובץ"
-      >
-        ⠿
-      </button>
+      <DragHandle attributes={attributes} listeners={listeners} label="גרור לא משובץ" />
 
       <span className={`min-w-0 flex-1 truncate text-sm ${isHome ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
         {item.name}
@@ -211,8 +197,6 @@ export default function Step3_Order() {
     initOrderState(session, allMembers)
   )
 
-  const [activeId, setActiveId] = useState<string | null>(null)
-
   // ── Sensors (1000ms hold to activate drag) ────────────────────────────────
 
   const sensors = useSensors(
@@ -223,17 +207,7 @@ export default function Step3_Order() {
 
   // ── DnD helpers ───────────────────────────────────────────────────────────
 
-  const activeItem = activeId
-    ? (orderState.stations.flatMap(s => s.participants).find(p => p.id === activeId)
-      ?? orderState.unassigned.find(p => p.id === activeId))
-    : null
-
-  function onDragStart({ active }: DragStartEvent) {
-    setActiveId(String(active.id))
-  }
-
   function onDragEnd({ active, over }: DragEndEvent) {
-    setActiveId(null)
     if (!over || active.id === over.id) return
 
     const aId = String(active.id)
@@ -443,7 +417,11 @@ export default function Step3_Order() {
         </button>
       </div>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        onDragEnd={onDragEnd}
+      >
         <div className="flex flex-col gap-4">
           {stations.map((station, si) => (
             <div key={station.stationConfigId} className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
@@ -495,14 +473,6 @@ export default function Step3_Order() {
           )}
         </div>
 
-        <DragOverlay>
-          {activeItem && (
-            <div className="flex items-center gap-2 rounded-xl bg-gray-200 px-3 py-2.5 shadow-xl dark:bg-gray-600">
-              <span className="text-gray-500 dark:text-gray-400">⠿</span>
-              <span className="text-sm text-gray-900 dark:text-gray-100">{activeItem.name}</span>
-            </div>
-          )}
-        </DragOverlay>
       </DndContext>
 
       <div className="mt-6 flex gap-3">
