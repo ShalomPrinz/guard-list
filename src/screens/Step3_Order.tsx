@@ -9,7 +9,9 @@ import {
   useSensor,
   useSensors,
   useDroppable,
+  closestCenter,
   type DragEndEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -107,8 +109,8 @@ function SortableRow({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${item.skipped ? 'bg-gray-100/50 dark:bg-gray-700/50' : 'bg-gray-100 dark:bg-gray-700'}`}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined, boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.18)' : undefined }}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${isDragging ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/30 dark:ring-blue-500' : item.skipped ? 'bg-gray-100/50 dark:bg-gray-700/50' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
       <DragHandle attributes={attributes} listeners={listeners} />
 
@@ -148,8 +150,8 @@ function UnassignedRow({ item }: { item: ParticipantItem }) {
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isHome ? 'bg-gray-50 dark:bg-gray-800/60' : 'bg-gray-100 dark:bg-gray-700'}`}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined, boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.18)' : undefined }}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDragging ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/30 dark:ring-blue-500' : isHome ? 'bg-gray-50 dark:bg-gray-800/60' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
       <DragHandle attributes={attributes} listeners={listeners} label="גרור לא משובץ" />
 
@@ -196,6 +198,8 @@ export default function Step3_Order() {
   const [orderState, setOrderState] = useState<OrderState>(() =>
     initOrderState(session, allMembers)
   )
+  // Snapshot saved on drag start — restored on cancel or release-over-nothing
+  const [snapshot, setSnapshot] = useState<OrderState | null>(null)
 
   // ── Sensors (1000ms hold to activate drag) ────────────────────────────────
 
@@ -207,111 +211,145 @@ export default function Step3_Order() {
 
   // ── DnD helpers ───────────────────────────────────────────────────────────
 
-  function onDragEnd({ active, over }: DragEndEvent) {
+  // Locate which container an item ID belongs to in prev state.
+  // Returns { inUnassigned: true } or { stationIdx: number } or null if not found.
+  function findContainer(prev: OrderState, itemId: string): { inUnassigned: true } | { stationIdx: number } | null {
+    if (prev.unassigned.some(p => p.id === itemId)) return { inUnassigned: true }
+    const idx = prev.stations.findIndex(s => s.participants.some(p => p.id === itemId))
+    if (idx !== -1) return { stationIdx: idx }
+    return null
+  }
+
+  // Resolve which container a drop target (over.id) belongs to.
+  // over.id can be a participant id, a droppable zone id (droppable-<configId>), or
+  // 'droppable-unassigned'.
+  function findTargetContainer(prev: OrderState, overId: string): { inUnassigned: true } | { stationIdx: number } | null {
+    if (overId === 'droppable-unassigned' || prev.unassigned.some(p => p.id === overId)) return { inUnassigned: true }
+    const byItem = prev.stations.findIndex(s => s.participants.some(p => p.id === overId))
+    if (byItem !== -1) return { stationIdx: byItem }
+    const byZone = prev.stations.findIndex(s => `droppable-${s.stationConfigId}` === overId)
+    if (byZone !== -1) return { stationIdx: byZone }
+    return null
+  }
+
+  function onDragStart() {
+    // Snapshot full state so we can restore it on cancel / drop-over-nothing
+    setSnapshot(orderState)
+  }
+
+  // onDragOver: fires continuously as the pointer moves.
+  // When crossing into a different container, immediately move the item there
+  // at the hovered position so target-container items shift apart to preview insertion.
+  function onDragOver({ active, over }: DragOverEvent) {
     if (!over || active.id === over.id) return
 
     const aId = String(active.id)
     const oId = String(over.id)
-    const { stations, unassigned } = orderState
 
-    const isFromUnassigned = unassigned.some(p => p.id === aId)
-    const isOverUnassigned = oId === 'droppable-unassigned' || unassigned.some(p => p.id === oId)
-    const srcStationIdx = isFromUnassigned ? -1 : stations.findIndex(s => s.participants.some(p => p.id === aId))
+    setOrderState(prev => {
+      const src = findContainer(prev, aId)
+      const dst = findTargetContainer(prev, oId)
+      if (!src || !dst) return prev
 
-    // ── Reorder within unassigned ──────────────────────────────────────────
-    if (isFromUnassigned && isOverUnassigned) {
-      const srcPos = unassigned.findIndex(p => p.id === aId)
-      const dstPos = unassigned.findIndex(p => p.id === oId)
-      if (srcPos !== -1 && dstPos !== -1) {
-        setOrderState(prev => ({ ...prev, unassigned: arrayMove(prev.unassigned, srcPos, dstPos) }))
+      // Same container — SortableContext CSS transforms handle the preview; finalize in onDragEnd
+      const srcInUnassigned = 'inUnassigned' in src
+      const dstInUnassigned = 'inUnassigned' in dst
+      if (srcInUnassigned === dstInUnassigned &&
+          (srcInUnassigned || (src as { stationIdx: number }).stationIdx === (dst as { stationIdx: number }).stationIdx)) {
+        return prev
       }
+
+      // Get the active item object
+      const activeItem = srcInUnassigned
+        ? prev.unassigned.find(p => p.id === aId)
+        : prev.stations['stationIdx' in src ? src.stationIdx : 0].participants.find(p => p.id === aId)
+      if (!activeItem) return prev
+
+      // Remove from source container
+      let newUnassigned = srcInUnassigned
+        ? prev.unassigned.filter(p => p.id !== aId)
+        : prev.unassigned
+      let newStations = srcInUnassigned
+        ? prev.stations
+        : prev.stations.map((s, i) =>
+            i === (src as { stationIdx: number }).stationIdx
+              ? { ...s, participants: s.participants.filter(p => p.id !== aId) }
+              : s
+          )
+
+      // Insert into target container at the hovered position
+      if (dstInUnassigned) {
+        const dstPos = newUnassigned.findIndex(p => p.id === oId)
+        const originalMember = allMembers.find(m => m.name === activeItem.name)
+        const movedItem: ParticipantItem = { ...activeItem, availability: originalMember?.availability ?? 'base' }
+        newUnassigned = [...newUnassigned]
+        if (dstPos >= 0) newUnassigned.splice(dstPos, 0, movedItem)
+        else newUnassigned.push(movedItem)
+      } else {
+        const toIdx = (dst as { stationIdx: number }).stationIdx
+        const targetParts = [...newStations[toIdx].participants]
+        const dstPos = targetParts.findIndex(p => p.id === oId)
+        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, skipped: false }
+        if (dstPos >= 0) targetParts.splice(dstPos, 0, movedItem)
+        else targetParts.push(movedItem)
+        newStations = newStations.map((s, i) => i === toIdx ? { ...s, participants: targetParts } : s)
+      }
+
+      return { stations: newStations, unassigned: newUnassigned }
+    })
+  }
+
+  // onDragEnd: finalize same-container sort; restore snapshot on cancel (over = null).
+  function onDragEnd({ active, over }: DragEndEvent) {
+    setSnapshot(null)
+
+    if (!over) {
+      // Released over nothing — restore to pre-drag state
+      if (snapshot) setSnapshot(null), setOrderState(snapshot)
       return
     }
+    if (active.id === over.id) return
 
-    // ── Unassigned → Station ───────────────────────────────────────────────
-    if (isFromUnassigned && !isOverUnassigned) {
-      const srcItem = unassigned.find(p => p.id === aId)
-      if (!srcItem) return
+    const aId = String(active.id)
+    const oId = String(over.id)
 
-      let dstStationIdx = stations.findIndex(s => `droppable-${s.stationConfigId}` === oId)
-      if (dstStationIdx === -1) dstStationIdx = stations.findIndex(s => s.participants.some(p => p.id === oId))
-      if (dstStationIdx === -1) return
+    setOrderState(prev => {
+      const src = findContainer(prev, aId)
+      const dst = findTargetContainer(prev, oId)
+      if (!src || !dst) return prev
 
-      const dstParticipantIdx = stations[dstStationIdx].participants.findIndex(p => p.id === oId)
-      const movedItem: ParticipantItem = { id: srcItem.id, name: srcItem.name, locked: false, skipped: false }
+      const srcInUnassigned = 'inUnassigned' in src
+      const dstInUnassigned = 'inUnassigned' in dst
+      const sameContainer = srcInUnassigned === dstInUnassigned &&
+        (srcInUnassigned || (src as { stationIdx: number }).stationIdx === (dst as { stationIdx: number }).stationIdx)
 
-      setOrderState(prev => ({
-        unassigned: prev.unassigned.filter(p => p.id !== aId),
-        stations: prev.stations.map((s, si) => {
-          if (si !== dstStationIdx) return s
-          const parts = [...s.participants]
-          if (dstParticipantIdx === -1) parts.push(movedItem)
-          else parts.splice(dstParticipantIdx, 0, movedItem)
-          return { ...s, participants: parts }
-        }),
-      }))
-      return
-    }
+      if (!sameContainer) return prev // cross-container already handled by onDragOver
 
-    // ── Station → Unassigned ───────────────────────────────────────────────
-    if (!isFromUnassigned && isOverUnassigned) {
-      if (srcStationIdx === -1) return
-      const srcItem = stations[srcStationIdx].participants.find(p => p.id === aId)
-      if (!srcItem) return
-
-      const originalMember = allMembers.find(m => m.name === srcItem.name)
-      const availability = originalMember?.availability ?? 'base'
-      const movedItem: ParticipantItem = { ...srcItem, availability }
-      const dstPos = unassigned.findIndex(p => p.id === oId)
-
-      setOrderState(prev => {
-        const newUnassigned = [...prev.unassigned]
-        if (dstPos === -1) newUnassigned.push(movedItem)
-        else newUnassigned.splice(dstPos, 0, movedItem)
+      // Same container: do arrayMove to finalize the sort
+      if (srcInUnassigned) {
+        const fromPos = prev.unassigned.findIndex(p => p.id === aId)
+        const toPos = prev.unassigned.findIndex(p => p.id === oId)
+        if (fromPos < 0 || toPos < 0 || fromPos === toPos) return prev
+        return { ...prev, unassigned: arrayMove(prev.unassigned, fromPos, toPos) }
+      } else {
+        const stIdx = (src as { stationIdx: number }).stationIdx
+        const fromPos = prev.stations[stIdx].participants.findIndex(p => p.id === aId)
+        const toPos = prev.stations[stIdx].participants.findIndex(p => p.id === oId)
+        if (fromPos < 0 || toPos < 0 || fromPos === toPos) return prev
         return {
-          unassigned: newUnassigned,
-          stations: prev.stations.map((s, si) =>
-            si === srcStationIdx ? { ...s, participants: s.participants.filter(p => p.id !== aId) } : s
-          ),
-        }
-      })
-      return
-    }
-
-    // ── Station → Station ──────────────────────────────────────────────────
-    if (srcStationIdx === -1) return
-    const srcPos = stations[srcStationIdx].participants.findIndex(p => p.id === aId)
-
-    const dstItemStationIdx = stations.findIndex(s => s.participants.some(p => p.id === oId))
-    if (dstItemStationIdx !== -1) {
-      const dstPos = stations[dstItemStationIdx].participants.findIndex(p => p.id === oId)
-      if (srcStationIdx === dstItemStationIdx) {
-        setOrderState(prev => ({
           ...prev,
           stations: prev.stations.map((s, i) =>
-            i === srcStationIdx ? { ...s, participants: arrayMove(s.participants, srcPos, dstPos) } : s
+            i === stIdx ? { ...s, participants: arrayMove(s.participants, fromPos, toPos) } : s
           ),
-        }))
-      } else {
-        setOrderState(prev => {
-          const newStations = prev.stations.map(s => ({ ...s, participants: [...s.participants] }))
-          const [moved] = newStations[srcStationIdx].participants.splice(srcPos, 1)
-          newStations[dstItemStationIdx].participants.splice(dstPos, 0, moved)
-          return { ...prev, stations: newStations }
-        })
+        }
       }
-      return
-    }
+    })
+  }
 
-    const dstZoneIdx = stations.findIndex(s => `droppable-${s.stationConfigId}` === oId)
-    if (dstZoneIdx !== -1 && dstZoneIdx !== srcStationIdx) {
-      setOrderState(prev => {
-        const newStations = prev.stations.map(s => ({ ...s, participants: [...s.participants] }))
-        const [moved] = newStations[srcStationIdx].participants.splice(srcPos, 1)
-        newStations[dstZoneIdx].participants.push(moved)
-        return { ...prev, stations: newStations }
-      })
-    }
+  // onDragCancel: fired on keyboard Escape — restore snapshot
+  function onDragCancel() {
+    if (snapshot) setOrderState(snapshot)
+    setSnapshot(null)
   }
 
   // ── Shuffle ───────────────────────────────────────────────────────────────
@@ -419,8 +457,12 @@ export default function Step3_Order() {
 
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCenter}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
         onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
       >
         <div className="flex flex-col gap-4">
           {stations.map((station, si) => (

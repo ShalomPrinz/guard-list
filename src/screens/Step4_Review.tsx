@@ -140,7 +140,8 @@ function SortableReviewRow({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.18)' : undefined,
   }
 
   const otherStations = allStations.filter(s => s.stationConfigId !== stationId)
@@ -160,7 +161,7 @@ function SortableReviewRow({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 dark:bg-gray-700">
+    <div ref={setNodeRef} style={style} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDragging ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/30 dark:ring-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`}>
       {/* Drag handle */}
       <DragHandle attributes={attributes} listeners={listeners} label="גרור לסידור מחדש" />
 
