@@ -9,6 +9,8 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -240,6 +242,14 @@ function SortableReviewRow({
   )
 }
 
+// ─── Collision detection ──────────────────────────────────────────────────────
+
+const dragCollisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args)
+  if (pointerHits.length > 0) return pointerHits
+  return closestCenter(args)
+}
+
 // ─── Droppable zone ───────────────────────────────────────────────────────────
 
 function DroppableZone({ id, children }: { id: string; children: React.ReactNode }) {
@@ -269,7 +279,7 @@ function ReviewStationCard({
   const [addName, setAddName] = useState('')
 
   return (
-    <div className="rounded-2xl bg-white p-4 dark:bg-gray-800">
+    <div className="rounded-2xl bg-white p-4 dark:bg-gray-800 overflow-visible">
       <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
 
       <SortableContext items={station.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
@@ -353,6 +363,15 @@ export default function Step4_Review() {
     useSensor(PointerSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
+
+  const [isDragActive, setIsDragActive] = useState(false)
+
+  useEffect(() => {
+    if (!isDragActive) return
+    const prev = document.body.style.touchAction
+    document.body.style.touchAction = 'none'
+    return () => { document.body.style.touchAction = prev }
+  }, [isDragActive])
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
@@ -449,6 +468,7 @@ export default function Step4_Review() {
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    setIsDragActive(false)
     const { active, over } = event
     if (!over) return
 
@@ -592,9 +612,11 @@ export default function Step4_Review() {
       {/* Stations */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={dragCollisionDetection}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        onDragStart={() => setIsDragActive(true)}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => setIsDragActive(false)}
       >
         <div className="mb-6 flex flex-col gap-4">
           {stations.map(st => (

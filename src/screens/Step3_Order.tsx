@@ -10,6 +10,8 @@ import {
   useSensors,
   useDroppable,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
@@ -173,10 +175,20 @@ function UnassignedRow({ item }: { item: ParticipantItem }) {
 function DroppableZone({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} className={`min-h-8 rounded-xl transition-colors ${isOver ? 'ring-1 ring-blue-500/40' : ''}`}>
+    <div ref={setNodeRef} className={`min-h-8 rounded-xl transition-colors overflow-visible ${isOver ? 'ring-1 ring-blue-500/40' : ''}`}>
       {children}
     </div>
   )
+}
+
+// ─── Collision detection ──────────────────────────────────────────────────────
+// Use pointer position first (better cross-container detection on mobile touch),
+// fallback to closest center for same-container sort previews.
+
+const dragCollisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args)
+  if (pointerHits.length > 0) return pointerHits
+  return closestCenter(args)
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -200,6 +212,16 @@ export default function Step3_Order() {
   )
   // Snapshot saved on drag start — restored on cancel or release-over-nothing
   const [snapshot, setSnapshot] = useState<OrderState | null>(null)
+  const [isDragActive, setIsDragActive] = useState(false)
+
+  // Lock body touch-action during drag so the scroll container cannot intercept
+  // touch events while a drag gesture is in progress (critical on mobile Safari).
+  useEffect(() => {
+    if (!isDragActive) return
+    const prev = document.body.style.touchAction
+    document.body.style.touchAction = 'none'
+    return () => { document.body.style.touchAction = prev }
+  }, [isDragActive])
 
   // ── Sensors (1000ms hold to activate drag) ────────────────────────────────
 
@@ -233,6 +255,7 @@ export default function Step3_Order() {
   }
 
   function onDragStart() {
+    setIsDragActive(true)
     // Snapshot full state so we can restore it on cancel / drop-over-nothing
     setSnapshot(orderState)
   }
@@ -301,6 +324,7 @@ export default function Step3_Order() {
 
   // onDragEnd: finalize same-container sort; restore snapshot on cancel (over = null).
   function onDragEnd({ active, over }: DragEndEvent) {
+    setIsDragActive(false)
     setSnapshot(null)
 
     if (!over) {
@@ -348,6 +372,7 @@ export default function Step3_Order() {
 
   // onDragCancel: fired on keyboard Escape — restore snapshot
   function onDragCancel() {
+    setIsDragActive(false)
     if (snapshot) setOrderState(snapshot)
     setSnapshot(null)
   }
@@ -457,7 +482,7 @@ export default function Step3_Order() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={dragCollisionDetection}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
@@ -466,7 +491,7 @@ export default function Step3_Order() {
       >
         <div className="flex flex-col gap-4">
           {stations.map((station, si) => (
-            <div key={station.stationConfigId} className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
+            <div key={station.stationConfigId} className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800 overflow-visible">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold text-gray-900 dark:text-gray-100">{station.stationName}</p>
                 <button
@@ -499,7 +524,7 @@ export default function Step3_Order() {
           ))}
 
           {/* Unassigned section — always rendered as a valid drop target */}
-          <div className="rounded-2xl border-2 border-dashed border-gray-300 p-4 dark:border-gray-600">
+          <div className="rounded-2xl border-2 border-dashed border-gray-300 p-4 dark:border-gray-600 overflow-visible">
             <p className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">לא משובצים</p>
             <SortableContext items={unassigned.map(p => p.id)} strategy={verticalListSortingStrategy}>
               <DroppableZone id="droppable-unassigned">
