@@ -25,6 +25,8 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 @docs/screens.md
 @docs/data-model.md
 @docs/business-logic.md
+@docs/CONVENTIONS.md
+@docs/ERRORS.md
 
 ### Migrations
 
@@ -37,3 +39,18 @@ Migrations live in `docs/migrations/`. Ignore them. Also ignore @docs/implementa
 - When fixing an issue, write a dedicated test specifically for the broken feature that had the issue, to prevent any regression.
 - Use `python3` for bash commands
 - All UI text must be in hebrew.
+
+## Commands
+
+| Purpose                            | Command                                      |
+| ---------------------------------- | -------------------------------------------- |
+| Type check (must pass before done) | `npx tsc --noEmit`                           |
+| Run all tests with coverage        | `npx vitest run --coverage`                  |
+| Run a single test file             | `npx vitest run tests/e2e/fileName.test.tsx` |
+| Dev server                         | `npm run dev`                                |
+| Production build                   | `npm run build`                              |
+
+**After every migration, run these two in order before declaring done:**
+
+1. `npx tsc --noEmit` — zero errors required
+2. `npx vitest run --coverage` — ≥90% coverage required for `src/logic/` and `src/storage/`
