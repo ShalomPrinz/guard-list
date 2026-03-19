@@ -104,14 +104,16 @@ describe('Migration 011 — לא משובצים section visibility', () => {
     expect(screen.getByText('לא משובצים')).toBeTruthy()
   })
 
-  it('hides "לא משובצים" section when all members are base and all assigned to stations', async () => {
+  it('always shows "לא משובצים" section even when all members are base and assigned', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroupAllBase())
     renderApp()
     await navigateToStep3(user)
 
-    // All 3 base members should be assigned to the single station, no unassigned section
-    expect(screen.queryByText('לא משובצים')).toBeNull()
+    // "לא משובצים" section is always rendered (Migration 012 — never conditionally removed)
+    expect(screen.getByText('לא משובצים')).toBeTruthy()
+    // Placeholder text shown when section is empty
+    expect(screen.getByText('גרור לוחם לכאן להוצאה מהרשימה')).toBeTruthy()
   })
 })
 
@@ -168,22 +170,25 @@ describe('Migration 011 — remove from station to "לא משובצים"', () =>
     })
   })
 
-  it('"לא משובצים" section appears when a member is removed from the only station (all-base group)', async () => {
+  it('"לא משובצים" section is always present and shows removed member after removal (all-base group)', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroupAllBase())
     renderApp()
     await navigateToStep3(user)
 
-    // Initially no "לא משובצים" section
-    expect(screen.queryByText('לא משובצים')).toBeNull()
+    // "לא משובצים" section is always rendered (Migration 012)
+    expect(screen.getByText('לא משובצים')).toBeTruthy()
+    // Initially shows placeholder since all are assigned
+    expect(screen.getByText('גרור לוחם לכאן להוצאה מהרשימה')).toBeTruthy()
 
     // Remove one participant from the station
     const removeButtons = screen.getAllByLabelText('הסר')
     await user.click(removeButtons[0])
 
-    // Now "לא משובצים" should appear
+    // After removing, a member appears in "לא משובצים" and placeholder disappears
     await waitFor(() => {
       expect(screen.getByText('לא משובצים')).toBeTruthy()
+      expect(screen.queryByText('גרור לוחם לכאן להוצאה מהרשימה')).toBeNull()
     })
   })
 })

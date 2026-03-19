@@ -11,7 +11,7 @@ export default function DragHandle({ attributes, listeners, label = 'גרור' }
     <button
       {...attributes}
       {...listeners}
-      className="shrink-0 select-none touch-none cursor-grab active:cursor-grabbing text-gray-400 dark:text-gray-500"
+      className="shrink-0 select-none touch-none cursor-grab active:cursor-grabbing text-gray-400 dark:text-gray-500 p-3"
       aria-label={label}
     >
       ⠿

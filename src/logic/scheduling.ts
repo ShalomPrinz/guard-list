@@ -1,4 +1,5 @@
-import type { RoundingAlgorithm, UnevenMode } from '../types'
+import type { RoundingAlgorithm, UnevenMode, ScheduledParticipant } from '../types'
+import { buildStationSchedule } from './generateSchedule'
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 
@@ -123,6 +124,34 @@ export function calcStationDurations(params: {
       }
     })
   }
+}
+
+// ─── Recalculate station times ────────────────────────────────────────────────
+
+/**
+ * Redistribute time evenly among participants so the last one finishes at `endTime`.
+ * Returns empty array if no participants.
+ * Handles midnight crossover: if endTime <= startTime in minutes, adds 24h to endTime.
+ */
+export function recalculateStation(
+  participants: Array<{ name: string; locked: boolean }>,
+  startTime: string,
+  startDate: string,
+  endTime: string,
+  roundingAlgorithm: RoundingAlgorithm,
+): ScheduledParticipant[] {
+  if (participants.length === 0) return []
+
+  const startMins = parseTimeToMinutes(startTime)
+  let endMins = parseTimeToMinutes(endTime)
+  if (endMins <= startMins) endMins += 1440 // midnight crossover
+
+  const totalMinutes = endMins - startMins
+  const rawDuration = totalMinutes / participants.length
+  const durationMinutes = applyRounding(rawDuration, roundingAlgorithm)
+
+  const withDuration = participants.map(p => ({ ...p, durationMinutes }))
+  return buildStationSchedule(withDuration, startTime, startDate)
 }
 
 // ─── Participant distribution ─────────────────────────────────────────────────

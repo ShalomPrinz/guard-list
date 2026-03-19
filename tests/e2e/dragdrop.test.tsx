@@ -118,3 +118,49 @@ describe('DragHandle — Step4_Review', () => {
     }
   })
 })
+
+describe('"לא משובצים" section — always rendered', () => {
+  it('is rendered even when no participants are unassigned initially', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep3(user)
+
+    // The section header should always be present
+    expect(screen.getByText('לא משובצים')).toBeTruthy()
+  })
+
+  it('remains rendered after removing all participants from a station', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep3(user)
+
+    // Remove a participant by clicking ✕ button — they go to unassigned
+    const removeButtons = screen.getAllByLabelText('הסר')
+    if (removeButtons.length > 0) {
+      await user.click(removeButtons[0])
+    }
+
+    // "לא משובצים" section must still be present
+    expect(screen.getByText('לא משובצים')).toBeTruthy()
+  })
+
+  it('shows placeholder text when unassigned section is empty', async () => {
+    const user = userEvent.setup()
+    // All members are base — will all be assigned initially
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep3(user)
+
+    // When no one is unassigned, the placeholder should appear
+    const placeholder = screen.queryByText('גרור לוחם לכאן להוצאה מהרשימה')
+    // It may or may not be there depending on distribution, but the section header always is
+    expect(screen.getByText('לא משובצים')).toBeTruthy()
+    // If no unassigned, placeholder appears
+    const unassignedHandles = screen.queryAllByLabelText('גרור לא משובץ')
+    if (unassignedHandles.length === 0) {
+      expect(placeholder).toBeTruthy()
+    }
+  })
+})

@@ -456,21 +456,22 @@ export default function Step3_Order() {
             </div>
           ))}
 
-          {/* Unassigned section — shown when some members are not in any station */}
-          {unassigned.length > 0 && (
-            <div className="rounded-2xl border-2 border-dashed border-gray-300 p-4 dark:border-gray-600">
-              <p className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">לא משובצים</p>
-              <SortableContext items={unassigned.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                <DroppableZone id="droppable-unassigned">
-                  <div className="flex flex-col gap-1.5">
-                    {unassigned.map(item => (
-                      <UnassignedRow key={item.id} item={item} />
-                    ))}
-                  </div>
-                </DroppableZone>
-              </SortableContext>
-            </div>
-          )}
+          {/* Unassigned section — always rendered as a valid drop target */}
+          <div className="rounded-2xl border-2 border-dashed border-gray-300 p-4 dark:border-gray-600">
+            <p className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">לא משובצים</p>
+            <SortableContext items={unassigned.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              <DroppableZone id="droppable-unassigned">
+                <div className="flex flex-col gap-1.5">
+                  {unassigned.length === 0 && (
+                    <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-600">גרור לוחם לכאן להוצאה מהרשימה</p>
+                  )}
+                  {unassigned.map(item => (
+                    <UnassignedRow key={item.id} item={item} />
+                  ))}
+                </div>
+              </DroppableZone>
+            </SortableContext>
+          </div>
         </div>
 
       </DndContext>

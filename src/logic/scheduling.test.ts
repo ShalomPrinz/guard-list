@@ -6,6 +6,7 @@ import {
   applyRounding,
   calcStationDurations,
   distributeParticipants,
+  recalculateStation,
 } from './scheduling'
 
 // ─── parseTimeToMinutes ───────────────────────────────────────────────────────
@@ -202,5 +203,70 @@ describe('distributeParticipants', () => {
 
   it('total equals 1 across 3 stations → [1, 0, 0]', () => {
     expect(distributeParticipants(1, 3)).toEqual([1, 0, 0])
+  })
+})
+
+// ─── recalculateStation ───────────────────────────────────────────────────────
+
+describe('recalculateStation', () => {
+  const participants = [
+    { name: 'Alice', locked: false },
+    { name: 'Bob', locked: false },
+    { name: 'Charlie', locked: false },
+  ]
+
+  it('returns empty array when no participants', () => {
+    const result = recalculateStation([], '20:00', '2026-01-01', '23:00', 'round-up-10')
+    expect(result).toEqual([])
+  })
+
+  it('distributes time evenly among 3 participants (3h / 3 = 60min each)', () => {
+    const result = recalculateStation(participants, '20:00', '2026-01-01', '23:00', 'round-nearest')
+    expect(result).toHaveLength(3)
+    expect(result[0].startTime).toBe('20:00')
+    expect(result[0].durationMinutes).toBe(60)
+    expect(result[1].startTime).toBe('21:00')
+    expect(result[2].startTime).toBe('22:00')
+    expect(result[2].endTime).toBe('23:00')
+  })
+
+  it('applies rounding (round-up-10): 100min / 3 = 33.3 → 40min each', () => {
+    // 20:00 to 21:40 = 100 min / 3 = 33.33 → rounds up to 40
+    const result = recalculateStation(participants, '20:00', '2026-01-01', '21:40', 'round-up-10')
+    expect(result[0].durationMinutes).toBe(40)
+  })
+
+  it('handles midnight crossover: endTime < startTime adds 24h', () => {
+    // 23:00 → 01:00 = 120 min, 2 participants → 60 min each
+    const twoParticipants = [
+      { name: 'Alice', locked: false },
+      { name: 'Bob', locked: false },
+    ]
+    const result = recalculateStation(twoParticipants, '23:00', '2026-01-01', '01:00', 'round-nearest')
+    expect(result).toHaveLength(2)
+    expect(result[0].durationMinutes).toBe(60)
+    expect(result[0].startTime).toBe('23:00')
+    expect(result[1].startTime).toBe('00:00')
+    expect(result[1].date).toBe('2026-01-02')
+  })
+
+  it('preserves participant names and locked flags', () => {
+    const lockedParticipants = [
+      { name: 'Alice', locked: true },
+      { name: 'Bob', locked: false },
+    ]
+    const result = recalculateStation(lockedParticipants, '20:00', '2026-01-01', '22:00', 'round-nearest')
+    expect(result[0].name).toBe('Alice')
+    expect(result[0].locked).toBe(true)
+    expect(result[1].name).toBe('Bob')
+    expect(result[1].locked).toBe(false)
+  })
+
+  it('single participant gets the full duration', () => {
+    const one = [{ name: 'Solo', locked: false }]
+    const result = recalculateStation(one, '08:00', '2026-01-01', '10:00', 'round-nearest')
+    expect(result[0].durationMinutes).toBe(120)
+    expect(result[0].startTime).toBe('08:00')
+    expect(result[0].endTime).toBe('10:00')
   })
 })

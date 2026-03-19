@@ -68,6 +68,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - `DragHandle` always carries `select-none touch-none cursor-grab active:cursor-grabbing`. Never override or remove these classes.
 - All `DndContext` instances must include `measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}` to prevent stale position measurements after scroll.
 - Do NOT use `DragOverlay`. It has a two-render timing bug where `usesDragOverlay` flips from false to true after the overlay measures itself, causing the scroll-delta correction to change mid-drag and producing a visible position jump. Without `DragOverlay`, `useSortable` applies CSS `transform` directly to the item — single render path, no flip, no jump.
+- The "לא משובצים" section in `Step3_Order` is **never conditionally unmounted**. It is always rendered with an empty drop zone when item count is zero. This ensures the droppable target is always present in the DOM for cross-station drops.
 
 ---
 

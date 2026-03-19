@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   DndContext,
   MeasuringStrategy,
@@ -319,12 +319,27 @@ function ReviewStationCard({
 
 export default function Step4_Review() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { session, updateSession } = useWizard()
 
   const [stations, setStations] = useState<ReviewStation[]>(() => {
     if (!session) return []
     return buildReviewStations(session)
   })
+
+  // Apply recalculated station data coming back from RecalculateScreen
+  useEffect(() => {
+    const state = location.state as { recalculatedStation?: { stationConfigId: string; items: ReviewItem[] } } | null
+    if (state?.recalculatedStation) {
+      const { stationConfigId, items } = state.recalculatedStation
+      setStations(prev => prev.map(st =>
+        st.stationConfigId === stationConfigId ? { ...st, items } : st
+      ))
+      // Clear the state so re-renders don't re-apply
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const defaultName = 'רשימת שמירה'
   const [scheduleName, setScheduleName] = useState(session?.scheduleName || defaultName)
@@ -552,7 +567,15 @@ export default function Step4_Review() {
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={4} total={4} />
-      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <button
+          onClick={() => navigate('/schedule/new/recalculate', { state: { reviewStations: stations } })}
+          className="rounded-xl bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
+        >
+          חישוב זמנים מחדש
+        </button>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
+      </div>
 
       {/* Schedule name */}
       <div className="mb-4">
