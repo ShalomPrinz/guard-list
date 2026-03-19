@@ -118,19 +118,15 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
 function SortableReviewRow({
   item,
   stationId,
-  allStations,
   onRename,
   onDurationChange,
   onRemove,
-  onMove,
 }: {
   item: ReviewItem
   stationId: string
-  allStations: ReviewStation[]
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, minutes: number) => void
   onRemove: (id: string, stationId: string) => void
-  onMove: (itemId: string, fromStationId: string, toStationId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const [editingName, setEditingName] = useState(false)
@@ -146,8 +142,6 @@ function SortableReviewRow({
     zIndex: isDragging ? 10 : undefined,
     boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.18)' : undefined,
   }
-
-  const otherStations = allStations.filter(s => s.stationConfigId !== stationId)
 
   function commitName() {
     const trimmed = nameVal.trim()
@@ -216,21 +210,6 @@ function SortableReviewRow({
         </button>
       )}
 
-      {/* Move to station */}
-      {otherStations.length > 0 && (
-        <select
-          value=""
-          onChange={e => { if (e.target.value) onMove(item.id, stationId, e.target.value) }}
-          className="shrink-0 rounded bg-gray-200 px-1 py-0.5 text-xs text-gray-700 outline-none dark:bg-gray-600 dark:text-gray-300"
-          title="העבר לעמדה"
-        >
-          <option value="">↔</option>
-          {otherStations.map(s => (
-            <option key={s.stationConfigId} value={s.stationConfigId}>{s.stationName}</option>
-          ))}
-        </select>
-      )}
-
       {/* Remove */}
       <button
         onClick={() => onRemove(item.id, stationId)}
@@ -262,19 +241,15 @@ function DroppableZone({ id, children }: { id: string; children: React.ReactNode
 
 function ReviewStationCard({
   station,
-  allStations,
   onRename,
   onDurationChange,
   onRemove,
-  onMove,
   onAdd,
 }: {
   station: ReviewStation
-  allStations: ReviewStation[]
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, stationId: string, minutes: number) => void
   onRemove: (id: string, stationId: string) => void
-  onMove: (itemId: string, fromStationId: string, toStationId: string) => void
   onAdd: (stationId: string, name: string) => void
 }) {
   const [addName, setAddName] = useState('')
@@ -291,11 +266,9 @@ function ReviewStationCard({
                 key={item.id}
                 item={item}
                 stationId={station.stationConfigId}
-                allStations={allStations}
                 onRename={onRename}
                 onDurationChange={(id, mins) => onDurationChange(id, station.stationConfigId, mins)}
                 onRemove={onRemove}
-                onMove={onMove}
               />
             ))}
           </div>
@@ -407,46 +380,6 @@ export default function Step4_Review() {
     setStations(prev => prev.map(st => {
       if (st.stationConfigId !== stationId) return st
       const newItems = st.items.filter(it => it.id !== itemId)
-      return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
-    }))
-  }
-
-  function handleMove(itemId: string, fromStationId: string, toStationId: string) {
-    if (!session) return
-    const fromSt = stations.find(s => s.stationConfigId === fromStationId)
-    const item = fromSt?.items.find(i => i.id === itemId)
-    if (!item) return
-
-    if (fromSt && fromSt.items.length <= 1) {
-      setError('לא ניתן להעביר — העמדה תישאר ריקה')
-      return
-    }
-
-    setError('')
-
-    const moved = stations.map(st => {
-      if (st.stationConfigId === fromStationId) {
-        return { ...st, items: st.items.filter(i => i.id !== itemId) }
-      }
-      if (st.stationConfigId === toStationId) {
-        return { ...st, items: [...st.items, { ...item, id: `${toStationId}-${Date.now()}` }] }
-      }
-      return st
-    })
-
-    const counts = moved.map(s => s.items.length)
-    const durations = calcStationDurations({
-      startTime: session.timeConfig.startTime,
-      endTime: session.timeConfig.endTime,
-      fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
-      roundingAlgorithm: session.timeConfig.roundingAlgorithm,
-      unevenMode: session.timeConfig.unevenMode,
-      stationParticipantCounts: counts,
-    })
-
-    setStations(moved.map((st, idx) => {
-      const dur = durations[idx]?.roundedDurationMinutes ?? 60
-      const newItems = st.items.map(it => ({ ...it, durationMinutes: dur }))
       return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
     }))
   }
@@ -700,11 +633,9 @@ export default function Step4_Review() {
             <ReviewStationCard
               key={st.stationConfigId}
               station={st}
-              allStations={stations}
               onRename={handleRename}
               onDurationChange={handleDurationChange}
               onRemove={handleRemove}
-              onMove={handleMove}
               onAdd={handleAdd}
             />
           ))}
