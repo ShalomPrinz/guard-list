@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroups } from '../storage/groups'
+import { getScheduleById } from '../storage/schedules'
 import { getStationsConfig, saveStationsConfig } from '../storage/stationsConfig'
 import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
 import type { StationConfig, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
+import TimePicker from '../components/TimePicker'
 
 interface StationForm {
   id: string
@@ -18,6 +20,10 @@ function defaultStationForm(index: number, saved?: StationConfig): StationForm {
   }
 }
 
+type NewStationTime =
+  | { type: 'custom'; time: string }
+  | { type: 'inherit'; stationConfigId: string }
+
 const FIXED_COUNTS = [1, 2, 3, 4] as const
 
 export default function Step1_Stations() {
@@ -26,6 +32,14 @@ export default function Step1_Stations() {
 
   const groups = getGroups()
   const savedConfigs = getStationsConfig()
+
+  const isContinueMode = session?.mode === 'continue'
+  // IDs of stations that were pre-filled from the previous round (they already have startTimeOverride)
+  const sessionStationIds = new Set(session?.stations.map(s => s.config.id) ?? [])
+  // Previous round schedule — needed for inherit-end-time option
+  const parentSchedule = isContinueMode && session?.parentScheduleId
+    ? getScheduleById(session.parentScheduleId)
+    : undefined
 
   // ── Local form state ──────────────────────────────────────────────────────
 
@@ -54,6 +68,9 @@ export default function Step1_Stations() {
       defaultStationForm(i, savedConfigs[i]),
     )
   })
+
+  // Per new-station (in continue mode) start time selection
+  const [newStationTimes, setNewStationTimes] = useState<Record<string, NewStationTime>>({})
 
   const [error, setError] = useState('')
 
@@ -96,6 +113,10 @@ export default function Step1_Stations() {
     )
   }
 
+  function setNewStationTime(stationId: string, sel: NewStationTime) {
+    setNewStationTimes(prev => ({ ...prev, [stationId]: sel }))
+  }
+
   // ── Navigation ────────────────────────────────────────────────────────────
 
   function handleNext() {
@@ -112,15 +133,55 @@ export default function Step1_Stations() {
       return
     }
 
+    // In continue mode, validate that all new stations have a valid start-time selection
+    // (undefined sel means the default custom time is used — that's acceptable)
+    if (isContinueMode) {
+      const newForms = stationForms.filter(f => !sessionStationIds.has(f.id))
+      for (const f of newForms) {
+        const sel = newStationTimes[f.id]
+        if (sel?.type === 'custom' && !sel.time) { setError('יש להזין שעת התחלה לעמדה החדשה'); return }
+        if (sel?.type === 'inherit' && !sel.stationConfigId) { setError('יש לבחור עמדה קיימת'); return }
+      }
+    }
+
     // Build wizard stations (participants populated later in Step 3)
-    const stations: WizardStation[] = stationForms.map(f => ({
-      config: {
-        id: f.id,
-        name: f.name.trim() || `עמדה ${stationForms.indexOf(f) + 1}`,
-        type: 'time-based',
-      },
-      participants: [],
-    }))
+    const stations: WizardStation[] = stationForms.map(f => {
+      // Only look up the session station by exact ID (no fallback by index)
+      const existingSessionStation = isContinueMode
+        ? session!.stations.find(s => s.config.id === f.id)
+        : undefined
+
+      let startTimeOverride: string | undefined
+      let startDateOverride: string | undefined
+
+      if (existingSessionStation) {
+        startTimeOverride = existingSessionStation.startTimeOverride
+        startDateOverride = existingSessionStation.startDateOverride
+      } else if (isContinueMode) {
+        const sel = newStationTimes[f.id]
+        if (!sel || sel.type === 'custom') {
+          // Default: use the global continuation start time
+          startTimeOverride = sel?.time || session!.timeConfig.startTime
+          startDateOverride = session!.date
+        } else if (sel.type === 'inherit' && parentSchedule) {
+          const prevSt = parentSchedule.stations.find(s => s.stationConfigId === sel.stationConfigId)
+          const lastP = prevSt?.participants[prevSt.participants.length - 1]
+          startTimeOverride = lastP?.endTime
+          startDateOverride = lastP?.date
+        }
+      }
+
+      return {
+        config: {
+          id: f.id,
+          name: f.name.trim() || `עמדה ${stationForms.indexOf(f) + 1}`,
+          type: 'time-based',
+        },
+        participants: [],
+        ...(startTimeOverride ? { startTimeOverride } : {}),
+        ...(startDateOverride ? { startDateOverride } : {}),
+      }
+    })
 
     // Persist station names for next session pre-fill
     saveStationsConfig(stations.map(s => s.config))
@@ -129,13 +190,15 @@ export default function Step1_Stations() {
     const preserveTime = session?.groupId === selectedGroupId && session?.timeConfig
     const today = new Date().toISOString().split('T')[0]
     initSession({
-      mode: 'new',
+      mode: isContinueMode ? 'continue' : 'new',
       groupId: selectedGroupId,
       groupName: selectedGroup.name,
       stations,
       timeConfig: preserveTime ? session!.timeConfig : { ...DEFAULT_TIME_CONFIG },
       scheduleName: session?.groupId === selectedGroupId ? (session?.scheduleName ?? '') : '',
       date: session?.groupId === selectedGroupId ? (session?.date ?? today) : today,
+      ...(isContinueMode ? { parentScheduleId: session!.parentScheduleId } : {}),
+      ...(isContinueMode ? { continueEndTimeMode: session!.continueEndTimeMode } : {}),
     })
 
     navigate('/schedule/new/step2')
@@ -232,18 +295,91 @@ export default function Step1_Stations() {
 
       {/* Station cards */}
       <div className="mb-6 flex flex-col gap-3">
-        {stationForms.map((station, i) => (
-          <div key={station.id} className="rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
-            <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">עמדה {i + 1}</p>
-            <input
-              type="text"
-              value={station.name}
-              onChange={e => updateStation(i, { name: e.target.value })}
-              placeholder={`עמדה ${i + 1}`}
-              className="w-full rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
-            />
-          </div>
-        ))}
+        {stationForms.map((station, i) => {
+          const isNewStation = isContinueMode && !sessionStationIds.has(station.id)
+          const sel = newStationTimes[station.id]
+
+          return (
+            <div key={station.id} className="rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
+              <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">עמדה {i + 1}</p>
+              <input
+                type="text"
+                value={station.name}
+                onChange={e => updateStation(i, { name: e.target.value })}
+                placeholder={`עמדה ${i + 1}`}
+                className="w-full rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
+              />
+
+              {/* Start time selection for new stations in continue mode */}
+              {isNewStation && (
+                <div className="mt-3 border-t border-amber-200 pt-3 dark:border-amber-800">
+                  <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    עמדה חדשה — יש לבחור שעת התחלה
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {/* Option A: custom time */}
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`new-station-type-${station.id}`}
+                        checked={!sel || sel.type === 'custom'}
+                        onChange={() => setNewStationTime(station.id, {
+                          type: 'custom',
+                          time: sel?.type === 'custom' ? sel.time : (session?.timeConfig.startTime ?? '20:00'),
+                        })}
+                        className="shrink-0"
+                      />
+                      <span className="text-sm text-gray-800 dark:text-gray-200">שעת התחלה מותאמת אישית</span>
+                    </label>
+                    {(!sel || sel.type === 'custom') && (
+                      <div className="mr-5">
+                        <TimePicker
+                          value={sel?.type === 'custom' ? sel.time : (session?.timeConfig.startTime ?? '20:00')}
+                          onChange={t => setNewStationTime(station.id, { type: 'custom', time: t })}
+                        />
+                      </div>
+                    )}
+
+                    {/* Option B: inherit from previous station */}
+                    {parentSchedule && parentSchedule.stations.length > 0 && (
+                      <>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`new-station-type-${station.id}`}
+                            checked={sel?.type === 'inherit'}
+                            onChange={() => setNewStationTime(station.id, {
+                              type: 'inherit',
+                              stationConfigId: parentSchedule.stations[0].stationConfigId,
+                            })}
+                            className="shrink-0"
+                          />
+                          <span className="text-sm text-gray-800 dark:text-gray-200">התחל לפי עמדה קיימת</span>
+                        </label>
+                        {sel?.type === 'inherit' && (
+                          <select
+                            value={sel.stationConfigId}
+                            onChange={e => setNewStationTime(station.id, { type: 'inherit', stationConfigId: e.target.value })}
+                            className="mr-5 rounded-xl bg-gray-200 px-3 py-2 text-sm text-gray-900 outline-none dark:bg-gray-700 dark:text-gray-100"
+                          >
+                            {parentSchedule.stations.map(st => {
+                              const lastP = st.participants[st.participants.length - 1]
+                              return (
+                                <option key={st.stationConfigId} value={st.stationConfigId}>
+                                  {st.stationName}{lastP ? ` (${lastP.endTime})` : ''}
+                                </option>
+                              )
+                            })}
+                          </select>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-900/40 dark:text-red-300">{error}</p>}

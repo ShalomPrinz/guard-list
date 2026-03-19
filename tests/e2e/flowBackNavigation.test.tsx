@@ -137,8 +137,9 @@ describe('Back navigation — continuation result screen', () => {
     addSchedule(makeSchedule())
     renderFullApp('/schedule/sched1/continue')
 
-    // Complete the continuation wizard
+    // Complete the continuation wizard (now goes through Step1 first)
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByText('הבא →')) // Step1 → Step2
     await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))
@@ -157,6 +158,7 @@ describe('Back navigation — continuation result screen', () => {
     renderFullApp('/schedule/sched1/continue')
 
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByText('הבא →')) // Step1 → Step2
     await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))

@@ -1,7 +1,7 @@
 /**
  * E2E flow test — Continue Round.
  * Seeds an existing schedule and verifies that the continuation flow
- * starts at the correct time and links the new schedule to the parent.
+ * starts at Step1_Stations with pre-filled config and links the new schedule to the parent.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -103,21 +103,20 @@ afterEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ContinueRoundScreen — renders correctly', () => {
-  it('shows the original schedule participants', () => {
-    upsertGroup(makeGroup())
-    addSchedule(makeSchedule())
-    renderApp('/schedule/sched1/continue')
-
-    expect(screen.getByText('Alice')).toBeTruthy()
-    expect(screen.getByText('Bob')).toBeTruthy()
-  })
-
   it('shows the continue round heading', () => {
     upsertGroup(makeGroup())
     addSchedule(makeSchedule())
     renderApp('/schedule/sched1/continue')
 
     expect(screen.getByText('המשך סבב')).toBeTruthy()
+  })
+
+  it('shows round name input pre-filled with continuation name', () => {
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    expect(screen.getByDisplayValue('המשך — שמירה ראשונה')).toBeTruthy()
   })
 
   it('shows "not found" message when schedule does not exist', () => {
@@ -127,7 +126,7 @@ describe('ContinueRoundScreen — renders correctly', () => {
 })
 
 describe('ContinueRoundScreen — start continuation', () => {
-  it('navigates to step2 after clicking "התחל סבב"', async () => {
+  it('navigates to Step1_Stations after clicking "התחל סבב"', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     addSchedule(makeSchedule())
@@ -135,7 +134,20 @@ describe('ContinueRoundScreen — start continuation', () => {
 
     await user.click(screen.getByText('התחל סבב →'))
 
-    expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
+    // Should land on Step1 with station configuration
+    expect(screen.getByText('הגדרת עמדות')).toBeTruthy()
+  })
+
+  it('pre-fills station names from the previous schedule in Step1', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    await user.click(screen.getByText('התחל סבב →'))
+
+    // Station name from previous schedule should be pre-filled
+    expect(screen.getByDisplayValue('עמדה 1')).toBeTruthy()
   })
 })
 
@@ -146,8 +158,13 @@ describe('Continuation schedule — parentScheduleId', () => {
     addSchedule(makeSchedule())
     renderApp('/schedule/sched1/continue')
 
-    // Start the continuation
+    // Start continuation → Step1 (pre-filled stations)
     await user.click(screen.getByText('התחל סבב →'))
+    expect(screen.getByText('הגדרת עמדות')).toBeTruthy()
+
+    // Step1 → Step2
+    await user.click(screen.getByText('הבא →'))
+    expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
 
     // Step 2: select fixed-duration mode, enter duration and proceed
     await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
@@ -162,7 +179,6 @@ describe('Continuation schedule — parentScheduleId', () => {
 
     await waitFor(() => {
       const schedules = getSchedules()
-      // The continuation schedule is the second one (sched1 was seeded)
       const continuation = schedules.find(s => s.parentScheduleId === 'sched1')
       expect(continuation).toBeTruthy()
     })
@@ -175,6 +191,7 @@ describe('Continuation schedule — parentScheduleId', () => {
     renderApp('/schedule/sched1/continue')
 
     await user.click(screen.getByText('התחל סבב →'))
+    await user.click(screen.getByText('הבא →')) // Step1 → Step2
     await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
     await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
     await user.click(screen.getByText('הבא →'))

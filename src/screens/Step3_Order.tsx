@@ -24,9 +24,11 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getGroupById } from '../storage/groups'
+import { getScheduleById } from '../storage/schedules'
 import { useWizard } from '../context/WizardContext'
 import { shuffleArray, distributeParticipants } from '../logic'
-import type { Member, WizardSession, WizardStation } from '../types'
+import { buildContinueRoundQueue, buildContinueRoundStations } from '../logic/continueRound'
+import type { Member, Schedule, WizardSession, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
 
@@ -53,7 +55,7 @@ interface OrderState {
 
 // ─── Init helper ──────────────────────────────────────────────────────────────
 
-function initOrderState(session: WizardSession, allMembers: Member[]): OrderState {
+function initOrderState(session: WizardSession, allMembers: Member[], previousSchedule?: Schedule): OrderState {
   const baseMembers = allMembers.filter(m => m.availability === 'base').map(m => m.name)
 
   let stations: StationState[]
@@ -63,6 +65,16 @@ function initOrderState(session: WizardSession, allMembers: Member[]): OrderStat
     // Restoring from session (Back navigation)
     assignedNames = new Set(session.stations.flatMap(ws => ws.participants.map(p => p.name)))
     stations = session.stations.map(ws => ({
+      stationConfigId: ws.config.id,
+      stationName: ws.config.name,
+      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
+    }))
+  } else if (session.mode === 'continue' && previousSchedule) {
+    // Continue round: smart ordering algorithm
+    const queue = buildContinueRoundQueue(previousSchedule, allMembers)
+    const wizardStations = buildContinueRoundStations(queue, session.stations, previousSchedule)
+    assignedNames = new Set(wizardStations.flatMap(ws => ws.participants.map(p => p.name)))
+    stations = wizardStations.map(ws => ({
       stationConfigId: ws.config.id,
       stationName: ws.config.name,
       participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
@@ -205,10 +217,14 @@ export default function Step3_Order() {
   const group = getGroupById(session.groupId)
   const allMembers = group?.members ?? []
 
+  const previousSchedule = session.mode === 'continue' && session.parentScheduleId
+    ? getScheduleById(session.parentScheduleId)
+    : undefined
+
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [orderState, setOrderState] = useState<OrderState>(() =>
-    initOrderState(session, allMembers)
+    initOrderState(session, allMembers, previousSchedule)
   )
   // Snapshot saved on drag start — restored on cancel or release-over-nothing
   const [snapshot, setSnapshot] = useState<OrderState | null>(null)

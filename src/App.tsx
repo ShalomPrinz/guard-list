@@ -13,6 +13,7 @@ import StatisticsScreen from './screens/StatisticsScreen'
 import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
 import StandbyScreen from './screens/StandbyScreen'
 import RecalculateScreen from './screens/RecalculateScreen'
+import UniteScreen from './screens/UniteScreen'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/schedule/new/recalculate" element={<RecalculateScreen />} />
             <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
             <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
+            <Route path="/schedule/:scheduleId/unite" element={<UniteScreen />} />
             <Route path="/statistics" element={<StatisticsScreen />} />
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
             <Route path="/standby" element={<StandbyScreen />} />

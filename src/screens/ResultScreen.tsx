@@ -162,6 +162,16 @@ export default function ResultScreen() {
         </button>
       </div>
 
+      {/* Unite lists — only for continued rounds */}
+      {schedule.parentScheduleId && (
+        <button
+          onClick={() => navigate(`/schedule/${schedule.id}/unite`)}
+          className="mb-3 w-full rounded-2xl bg-purple-600 py-3 text-sm font-semibold text-white active:bg-purple-700"
+        >
+          🔗 איחוד רשימות
+        </button>
+      )}
+
       {/* Continue round */}
       <button
         onClick={() => navigate(`/schedule/${schedule.id}/continue`)}
