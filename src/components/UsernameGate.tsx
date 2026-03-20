@@ -9,12 +9,15 @@ interface Props {
   onConfirmed: () => void
 }
 
-type GateState = 'idle' | 'loading' | 'blocked'
+type GateState = 'idle' | 'blocked'
 
 export default function UsernameGate({ onConfirmed }: Props) {
   const [input, setInput] = useState('')
   const [validationError, setValidationError] = useState(false)
   const [gateState, setGateState] = useState<GateState>('idle')
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+
+  const isLoading = statusMessage !== null
 
   async function handleConfirm() {
     const trimmed = input.trim()
@@ -23,33 +26,34 @@ export default function UsernameGate({ onConfirmed }: Props) {
       return
     }
 
-    setGateState('loading')
-
     const username = trimmed.toLowerCase()
     const deviceId = getOrCreateDeviceId()
     const deviceKey = `${username}:device`
 
+    setStatusMessage('בודק אם שם המשתמש פנוי...')
+
     const registered = await kvGetRaw<string>(deviceKey)
 
-    if (registered === null) {
-      // First device to claim this username — register it
-      await kvSetRaw(deviceKey, deviceId)
-      // If this device already has local data, upload it under the new username
-      setUsername(trimmed)
-      const hasLocalData = getGroups().length > 0 || getSchedules().length > 0
-      if (hasLocalData) {
-        await pushLocalToCloud()
-      }
-      onConfirmed()
-      return
-    } else if (registered !== deviceId) {
-      // A different device already owns this username
+    if (registered !== null && registered !== deviceId) {
+      setStatusMessage(null)
       setGateState('blocked')
       return
     }
-    // registered === deviceId → same device, proceed
+
+    if (registered === null) {
+      setStatusMessage('רושם אותך במערכת...')
+      await kvSetRaw(deviceKey, deviceId)
+    }
 
     setUsername(trimmed)
+
+    const hasLocalData = getGroups().length > 0 || getSchedules().length > 0
+    if (hasLocalData) {
+      setStatusMessage('שומר את הנתונים הקיימים שלך לענן, זה עלול לקחת רגע...')
+      await pushLocalToCloud()
+    }
+
+    setStatusMessage(null)
     onConfirmed()
   }
 
@@ -84,6 +88,22 @@ export default function UsernameGate({ onConfirmed }: Props) {
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-50 px-6 dark:bg-gray-950">
+        <div
+          className="mb-6 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-400"
+          role="status"
+          aria-label="טוען"
+        />
+        <p className="max-w-xs text-center text-base font-medium text-gray-700 dark:text-gray-300">
+          {statusMessage}
+        </p>
+        <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">אנא המתן...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-50 px-6 dark:bg-gray-950">
       <img
@@ -104,8 +124,7 @@ export default function UsernameGate({ onConfirmed }: Props) {
           onKeyDown={handleKeyDown}
           placeholder="שם משתמש"
           autoFocus
-          disabled={gateState === 'loading'}
-          className="mb-3 w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-center text-base text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-900"
+          className="mb-3 w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-center text-base text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-900"
         />
         {validationError && (
           <p className="mb-3 text-center text-sm text-red-500 dark:text-red-400">
@@ -114,10 +133,9 @@ export default function UsernameGate({ onConfirmed }: Props) {
         )}
         <button
           onClick={() => void handleConfirm()}
-          disabled={gateState === 'loading'}
-          className="min-h-[44px] w-full rounded-2xl bg-blue-600 py-3 text-base font-semibold text-white shadow-lg active:bg-blue-700 disabled:opacity-60 dark:bg-blue-500 dark:active:bg-blue-600"
+          className="min-h-[44px] w-full rounded-2xl bg-blue-600 py-3 text-base font-semibold text-white shadow-lg active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600"
         >
-          {gateState === 'loading' ? '...' : 'כניסה'}
+          כניסה
         </button>
       </div>
     </div>
