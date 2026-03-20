@@ -14,3 +14,5 @@
 | 010 | כיתת כוננות Feature | The app supported only time-based guard duty lists; a lightweight standby-unit flow with no scheduling math was needed. |
 | 011 | Show All Warriors in Order Screen & Drag Hold Threshold | "בית" members were invisible in Step3_Order and drag-and-drop activated too easily during normal touch scrolling. |
 | 012 | Drag Handle Hit Area, Free Dragging, Empty Station Persistence, Recalculate Times | Three remaining drag issues existed after 011.1: undersized hit area, clipped cross-station drag, and disappearing empty "לא משובצים" section; plus no way to recalculate times in Step4_Review. |
+| 013 | Continue Round Order Logic & Unite Lists Feature | The "Continue Round" feature currently skips the stations setup step and uses a fixed participant order. |
+| 014 | Citations Management | Persistent citations DB with CRUD and search, author auto-format to initials + family name, random/collection/manual citation modes in Step4_Review, used citations tracked via usedInListIds, citation counts added to StatisticsScreen |

@@ -86,12 +86,20 @@ export default function HomeScreen() {
         >
           🛡️ כיתת כוננות
         </button>
-        <button
-          onClick={() => navigate('/statistics')}
-          className="w-full rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
-        >
-          📊 סטטיסטיקות
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate('/statistics')}
+            className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+          >
+            📊 סטטיסטיקות
+          </button>
+          <button
+            onClick={() => navigate('/citations')}
+            className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+          >
+            💬 ציטוטים
+          </button>
+        </div>
       </div>
 
       {/* Saved Groups */}

@@ -14,6 +14,7 @@ import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
 import StandbyScreen from './screens/StandbyScreen'
 import RecalculateScreen from './screens/RecalculateScreen'
 import UniteScreen from './screens/UniteScreen'
+import CitationsScreen from './screens/CitationsScreen'
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/statistics" element={<StatisticsScreen />} />
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
             <Route path="/standby" element={<StandbyScreen />} />
+            <Route path="/citations" element={<CitationsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

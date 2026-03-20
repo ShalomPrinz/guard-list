@@ -53,6 +53,15 @@ export interface Schedule {
   quoteAuthor?: string;
 }
 
+// ─── Citations ────────────────────────────────────────────────────────────────
+
+export interface Citation {
+  id: string;
+  text: string;
+  author: string; // stored as formatted string, e.g. "י. ישראלי"
+  usedInListIds: string[]; // schedule ids where this citation was used
+}
+
 // ─── Statistics ───────────────────────────────────────────────────────────────
 
 export interface ShiftRecord {
@@ -120,4 +129,6 @@ export interface WizardSession {
   createdScheduleId?: string;
   quote?: string;
   quoteAuthor?: string;
+  citationMode?: 'random' | 'collection' | 'manual';
+  citationId?: string; // ID of the DB citation selected (random or collection modes)
 }

@@ -28,9 +28,13 @@ import { buildStationSchedule } from '../logic/generateSchedule'
 import { parseTimeToMinutes, minutesToTime, calcStationDurations } from '../logic/scheduling'
 import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
+import { getCitations, markCitationUsed, upsertCitation } from '../storage/citations'
+import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
+import { getGroupById } from '../storage/groups'
+import { pickRandomCitation, formatAuthorName } from '../logic/citations'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
-import type { Schedule, ScheduleStation, ScheduledParticipant } from '../types'
+import type { Schedule, ScheduleStation, ScheduledParticipant, Citation } from '../types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -312,15 +316,27 @@ export default function Step4_Review() {
     return buildReviewStations(session)
   })
 
-  // Apply recalculated station data coming back from RecalculateScreen
+  // Apply recalculated station data coming back from RecalculateScreen,
+  // or a citation selected from CitationsScreen.
   useEffect(() => {
-    const state = location.state as { recalculatedStation?: { stationConfigId: string; items: ReviewItem[] } } | null
+    const state = location.state as {
+      recalculatedStation?: { stationConfigId: string; items: ReviewItem[] }
+      selectedCitation?: Citation
+    } | null
+    let shouldClearState = false
     if (state?.recalculatedStation) {
       const { stationConfigId, items } = state.recalculatedStation
       setStations(prev => prev.map(st =>
         st.stationConfigId === stationConfigId ? { ...st, items } : st
       ))
-      // Clear the state so re-renders don't re-apply
+      shouldClearState = true
+    }
+    if (state?.selectedCitation) {
+      setCitationModeState('collection')
+      setSelectedCitation(state.selectedCitation)
+      shouldClearState = true
+    }
+    if (shouldClearState) {
       navigate(location.pathname, { replace: true, state: null })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,7 +346,42 @@ export default function Step4_Review() {
   const [scheduleName, setScheduleName] = useState(session?.scheduleName || defaultName)
   const [quote, setQuote] = useState(session?.quote ?? '')
   const [quoteAuthor, setQuoteAuthor] = useState(session?.quoteAuthor ?? '')
+  const [citationMode, setCitationModeState] = useState<'random' | 'collection' | 'manual'>(
+    session?.citationMode ?? 'manual'
+  )
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(() => {
+    if (!session?.citationId) return null
+    return getCitations().find(c => c.id === session.citationId) ?? null
+  })
   const [error, setError] = useState('')
+  // Warrior linked to the current DB citation (random or collection mode)
+  const [citationLinkedMemberId, setCitationLinkedMemberId] = useState<string>(() => {
+    if (!session?.citationId) return ''
+    const citation = getCitations().find(c => c.id === session.citationId)
+    if (!citation?.author) return ''
+    const link = getCitationAuthorLinks()[citation.author]
+    return link && link !== 'skip' ? link : ''
+  })
+  // Manual mode: save citation to the DB collection
+  const [saveToCollection, setSaveToCollection] = useState(false)
+  const [manualLinkedMemberId, setManualLinkedMemberId] = useState('')
+
+  function setCitationMode(mode: 'random' | 'collection' | 'manual') {
+    setCitationModeState(mode)
+    if (mode === 'random') {
+      const all = getCitations()
+      const picked = pickRandomCitation(all)
+      setSelectedCitation(picked ?? null)
+    } else if (mode === 'collection') {
+      setSelectedCitation(null)
+    }
+  }
+
+  function handleRerollCitation() {
+    const all = getCitations()
+    const picked = pickRandomCitation(all)
+    setSelectedCitation(picked ?? null)
+  }
 
   const sensors = useSensors(
     useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
@@ -351,6 +402,14 @@ export default function Step4_Review() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
+  // Sync warrior-link dropdown when the selected citation changes (reroll / collection pick)
+  useEffect(() => {
+    if (!selectedCitation?.author) { setCitationLinkedMemberId(''); return }
+    const link = getCitationAuthorLinks()[selectedCitation.author]
+    setCitationLinkedMemberId(link && link !== 'skip' ? link : '')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCitation?.id])
+
   if (!session) {
     return (
       <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
@@ -358,6 +417,8 @@ export default function Step4_Review() {
       </div>
     )
   }
+
+  const groupMembers = getGroupById(session.groupId)?.members ?? []
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -526,6 +587,19 @@ export default function Step4_Review() {
     const isFirstSave = !session.createdScheduleId
     const scheduleId = session.createdScheduleId ?? crypto.randomUUID()
 
+    // Resolve citation for the schedule
+    let finalQuote: string | undefined
+    let finalQuoteAuthor: string | undefined
+    let usedCitationId: string | undefined
+    if ((citationMode === 'random' || citationMode === 'collection') && selectedCitation) {
+      finalQuote = selectedCitation.text
+      finalQuoteAuthor = selectedCitation.author || undefined
+      usedCitationId = selectedCitation.id
+    } else if (citationMode === 'manual') {
+      finalQuote = quote.trim() || undefined
+      finalQuoteAuthor = quoteAuthor.trim() || undefined
+    }
+
     const scheduleStations: ScheduleStation[] = stations.map(st => {
       const participants: ScheduledParticipant[] = st.items.map(item => ({
         name: item.name,
@@ -553,11 +627,27 @@ export default function Step4_Review() {
       parentScheduleId: session.parentScheduleId,
       stations: scheduleStations,
       unevenDistributionMode: session.timeConfig.unevenMode,
-      quote: quote.trim() || undefined,
-      quoteAuthor: quoteAuthor.trim() || undefined,
+      quote: finalQuote,
+      quoteAuthor: finalQuoteAuthor,
     }
 
     upsertSchedule(schedule)
+
+    // Mark DB citation as used (idempotent — storage helper guards duplicates)
+    if (usedCitationId) {
+      markCitationUsed(usedCitationId, scheduleId)
+    }
+
+    // Save manual citation to collection if requested, and warrior link if provided
+    if (citationMode === 'manual' && finalQuote) {
+      const formattedAuthor = finalQuoteAuthor ? formatAuthorName(finalQuoteAuthor) : ''
+      if (saveToCollection) {
+        upsertCitation({ id: crypto.randomUUID(), text: finalQuote, author: formattedAuthor, usedInListIds: [scheduleId] })
+      }
+      if (manualLinkedMemberId && formattedAuthor) {
+        saveCitationAuthorLink(formattedAuthor, manualLinkedMemberId)
+      }
+    }
 
     if (isFirstSave) {
       for (const st of scheduleStations) {
@@ -588,7 +678,16 @@ export default function Step4_Review() {
       }
     })
 
-    updateSession({ scheduleName: name, createdScheduleId: scheduleId, stations: updatedStations, quote: quote.trim() || undefined, quoteAuthor: quoteAuthor.trim() || undefined })
+    updateSession({
+      scheduleName: name,
+      createdScheduleId: scheduleId,
+      stations: updatedStations,
+      quote: finalQuote,
+      quoteAuthor: finalQuoteAuthor,
+      citationMode,
+      citationId: usedCitationId,
+    })
+
     navigate(`/schedule/${scheduleId}/result`)
   }
 
@@ -643,28 +742,167 @@ export default function Step4_Review() {
 
       </DndContext>
 
-      {/* Quote */}
-      <div className="mb-4">
-        <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">ציטוט (אופציונלי)</label>
-        <textarea
-          value={quote}
-          onChange={e => setQuote(e.target.value)}
-          placeholder="הוסף ציטוט..."
-          rows={2}
-          className="w-full resize-none rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-        />
-      </div>
-      {quote.trim() && (
-        <div className="mb-6">
-          <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">מחבר הציטוט</label>
-          <input
-            value={quoteAuthor}
-            onChange={e => setQuoteAuthor(e.target.value)}
-            placeholder="שם המחבר..."
-            className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-          />
+      {/* Citation section */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">ציטוט</label>
+
+        {/* Mode toggle */}
+        <div className="mb-3 flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+          {(['random', 'collection', 'manual'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setCitationMode(mode)}
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
+                citationMode === mode
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                  : 'text-gray-500 active:text-gray-700 dark:text-gray-400'
+              }`}
+            >
+              {mode === 'random' ? 'ציטוט אקראי' : mode === 'collection' ? 'בחר מהאוסף' : 'ציטוט ידני'}
+            </button>
+          ))}
         </div>
-      )}
+
+        {/* Random mode */}
+        {citationMode === 'random' && (
+          <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50">
+            {selectedCitation ? (
+              <>
+                <p className="mb-1 text-sm text-gray-900 dark:text-gray-100">
+                  ״{selectedCitation.text}״
+                </p>
+                {selectedCitation.author && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">— {selectedCitation.author}</p>
+                )}
+                <button
+                  onClick={handleRerollCitation}
+                  className="mt-3 text-xs text-blue-600 dark:text-blue-400"
+                >
+                  הגרל שוב
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">אין ציטוטים זמינים.</p>
+            )}
+          </div>
+        )}
+
+        {/* Collection mode */}
+        {citationMode === 'collection' && (
+          <>
+            {selectedCitation ? (
+              <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50">
+                <p className="mb-1 text-sm text-gray-900 dark:text-gray-100">
+                  ״{selectedCitation.text}״
+                </p>
+                {selectedCitation.author && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">— {selectedCitation.author}</p>
+                )}
+                <button
+                  onClick={() => navigate('/citations', { state: { selectionMode: true } })}
+                  className="mt-3 text-xs text-blue-600 dark:text-blue-400"
+                >
+                  שנה בחירה
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => navigate('/citations', { state: { selectionMode: true } })}
+                className="w-full rounded-xl border border-dashed border-gray-300 py-4 text-sm text-blue-600 dark:border-gray-600 dark:text-blue-400"
+              >
+                בחר מהאוסף →
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Warrior link — shown when a DB citation with an author is selected (random or collection) */}
+        {(citationMode === 'random' || citationMode === 'collection') && selectedCitation?.author && groupMembers.length > 0 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-xs text-gray-400 dark:text-gray-500">לוחם מקושר (אופציונלי)</label>
+            <select
+              value={citationLinkedMemberId}
+              onChange={e => {
+                const val = e.target.value
+                setCitationLinkedMemberId(val)
+                if (val) saveCitationAuthorLink(selectedCitation.author, val)
+                else clearCitationAuthorLink(selectedCitation.author)
+              }}
+              className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="">ללא שיוך</option>
+              {groupMembers.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Manual mode */}
+        {citationMode === 'manual' && (
+          <>
+            <textarea
+              value={quote}
+              onChange={e => setQuote(e.target.value)}
+              placeholder="הוסף ציטוט..."
+              rows={2}
+              className="w-full resize-none rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+            />
+            {quote.trim() && (
+              <>
+                <div className="mt-3">
+                  <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">מחבר הציטוט</label>
+                  <input
+                    value={quoteAuthor}
+                    onChange={e => setQuoteAuthor(e.target.value)}
+                    placeholder="שם המחבר..."
+                    className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+                  />
+                </div>
+                {groupMembers.length > 0 && (
+                  <div className="mt-3">
+                    <label className="mb-1 block text-xs text-gray-400 dark:text-gray-500">שייך ללוחם (אופציונלי)</label>
+                    <select
+                      value={manualLinkedMemberId}
+                      onChange={e => {
+                        const val = e.target.value
+                        setManualLinkedMemberId(val)
+                        if (val && !quoteAuthor.trim()) {
+                          const warrior = groupMembers.find(m => m.id === val)
+                          if (warrior) setQuoteAuthor(formatAuthorName(warrior.name))
+                        }
+                      }}
+                      className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none dark:bg-gray-800 dark:text-gray-100"
+                    >
+                      <option value="">ללא שיוך</option>
+                      {groupMembers.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="mt-3 flex min-h-[44px] items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">שמור לאוסף</span>
+                  <button
+                    role="switch"
+                    aria-checked={saveToCollection}
+                    onClick={() => setSaveToCollection(v => !v)}
+                    className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+                      saveToCollection ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                        saveToCollection ? 'left-0.5 translate-x-5' : 'left-0.5 translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600 dark:bg-red-900/40 dark:text-red-300">{error}</p>}
 
@@ -683,6 +921,7 @@ export default function Step4_Review() {
           צור לוח שמירה ✓
         </button>
       </div>
+
     </div>
   )
 }
