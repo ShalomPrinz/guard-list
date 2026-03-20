@@ -39,6 +39,7 @@ export default function ResultScreen() {
   const [name, setName] = useState(schedule?.name ?? '')
   const [editingName, setEditingName] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showUniteModal, setShowUniteModal] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
@@ -162,14 +163,51 @@ export default function ResultScreen() {
         </button>
       </div>
 
-      {/* Unite lists — only for continued rounds */}
-      {schedule.parentScheduleId && (
-        <button
-          onClick={() => navigate(`/schedule/${schedule.id}/unite`)}
-          className="mb-3 w-full rounded-2xl bg-purple-600 py-3 text-sm font-semibold text-white active:bg-purple-700"
-        >
-          🔗 איחוד רשימות
-        </button>
+      {/* Unite lists — available on every schedule */}
+      <button
+        onClick={() => {
+          if (schedule.parentScheduleId) {
+            setShowUniteModal(true)
+          } else {
+            navigate(`/schedule/${schedule.id}/unite-picker`)
+          }
+        }}
+        className="mb-3 w-full rounded-2xl bg-purple-600 py-3 text-sm font-semibold text-white active:bg-purple-700"
+      >
+        🔗 איחוד רשימות
+      </button>
+
+      {/* Modal — continued round union target selection */}
+      {showUniteModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-gray-800">
+            <h2 className="mb-4 text-center text-base font-semibold text-gray-900 dark:text-gray-100">בחר רשימה לאיחוד</h2>
+            <button
+              onClick={() => {
+                setShowUniteModal(false)
+                navigate(`/schedule/${schedule.id}/unite/${schedule.parentScheduleId}`)
+              }}
+              className="mb-2 min-h-[44px] w-full rounded-2xl bg-purple-600 py-3 text-sm font-semibold text-white active:bg-purple-700"
+            >
+              איחוד עם הרשימה הקודמת
+            </button>
+            <button
+              onClick={() => {
+                setShowUniteModal(false)
+                navigate(`/schedule/${schedule.id}/unite-picker`)
+              }}
+              className="mb-2 min-h-[44px] w-full rounded-2xl border border-purple-400 py-3 text-sm font-semibold text-purple-700 active:bg-purple-50 dark:border-purple-500 dark:text-purple-400 dark:active:bg-purple-900/20"
+            >
+              איחוד עם רשימה אחרת
+            </button>
+            <button
+              onClick={() => setShowUniteModal(false)}
+              className="min-h-[44px] w-full rounded-2xl py-3 text-sm text-gray-500 dark:text-gray-400"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Continue round */}

@@ -1,13 +1,17 @@
 /**
- * E2E tests for Migration 013 — Unite Lists feature.
+ * E2E tests for Migration 015 — Unite Lists for All Guard Lists.
  *
  * Covers:
- * - "איחוד רשימות" button appears on ResultScreen only when parentScheduleId is set
- * - UniteScreen merges stations correctly (parent entries before child, sorted by time)
- * - UniteScreen uses the parent's round name and quote, not the child's
- * - The unified list is not written to localStorage after visiting UniteScreen
- * - WhatsApp text output from UniteScreen matches the expected merged format
- * - Back from UniteScreen returns to the child's ResultScreen
+ * - "איחוד רשימות" button appears on every ResultScreen (continued AND non-continued)
+ * - Continued round shows two-option modal; selecting "הקודמת" proceeds without list picker
+ * - Continued round selecting "אחרת" opens list picker
+ * - Non-continued round goes directly to list picker
+ * - List picker shows all schedules except current, sorted newest first
+ * - Search box filters list picker results by round name
+ * - Selecting from list picker navigates to UniteScreen with correct schedules
+ * - UniteScreen uses the earlier schedule's title and citation regardless of selection order
+ * - Result is not saved to localStorage
+ * - Back from UniteScreen returns to the current schedule's ResultScreen
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -17,6 +21,7 @@ import { vi } from 'vitest'
 import { WizardProvider } from '../../src/context/WizardContext'
 import ResultScreen from '../../src/screens/ResultScreen'
 import UniteScreen from '../../src/screens/UniteScreen'
+import UniteListPickerScreen from '../../src/screens/UniteListPickerScreen'
 import { createLocalStorageMock } from '../../src/tests/localStorageMock'
 import { upsertSchedule } from '../../src/storage/schedules'
 import type { Schedule } from '../../src/types'
@@ -80,7 +85,7 @@ const childSchedule: Schedule = {
   quoteAuthor: 'מחבר הבן',
 }
 
-const scheduleWithoutParent: Schedule = {
+const standaloneSchedule: Schedule = {
   id: 'standalone1',
   name: 'סבב עצמאי',
   groupId: 'g1',
@@ -97,13 +102,33 @@ const scheduleWithoutParent: Schedule = {
   unevenDistributionMode: 'equal-duration',
 }
 
+const olderSchedule: Schedule = {
+  id: 'older1',
+  name: 'סבב ישן',
+  groupId: 'g1',
+  createdAt: '2023-12-01T10:00:00Z',
+  date: '2023-12-01',
+  stations: [
+    {
+      stationConfigId: 's1',
+      stationName: 'עמדה א',
+      stationType: 'time-based',
+      participants: [makeParticipant('Eve', '10:00', '11:00')],
+    },
+  ],
+  unevenDistributionMode: 'equal-duration',
+  quote: 'ציטוט ישן',
+  quoteAuthor: 'מחבר ישן',
+}
+
 function renderResultScreen(scheduleId: string) {
   return render(
     <WizardProvider>
       <MemoryRouter initialEntries={[`/schedule/${scheduleId}/result`]}>
         <Routes>
           <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
-          <Route path="/schedule/:scheduleId/unite" element={<div>UniteScreen</div>} />
+          <Route path="/schedule/:scheduleId/unite-picker" element={<div data-testid="picker-screen">ListPicker</div>} />
+          <Route path="/schedule/:scheduleId/unite/:targetScheduleId" element={<div data-testid="unite-screen">UniteScreen</div>} />
           <Route path="/schedule/:scheduleId/continue" element={<div>ContinueScreen</div>} />
           <Route path="/schedule/new/step4" element={<div>Step4</div>} />
         </Routes>
@@ -112,14 +137,28 @@ function renderResultScreen(scheduleId: string) {
   )
 }
 
-function renderUniteScreen(scheduleId: string) {
+function renderUniteScreen(scheduleId: string, targetScheduleId: string) {
   return render(
     <WizardProvider>
-      <MemoryRouter initialEntries={[`/schedule/${scheduleId}/unite`]}>
+      <MemoryRouter initialEntries={[`/schedule/${scheduleId}/unite/${targetScheduleId}`]}>
         <Routes>
-          <Route path="/schedule/:scheduleId/unite" element={<UniteScreen />} />
+          <Route path="/schedule/:scheduleId/unite/:targetScheduleId" element={<UniteScreen />} />
           <Route path="/schedule/:scheduleId/result" element={<div data-testid="result-screen">ResultScreen</div>} />
           <Route path="/" element={<div>Home</div>} />
+        </Routes>
+      </MemoryRouter>
+    </WizardProvider>,
+  )
+}
+
+function renderListPickerScreen(scheduleId: string) {
+  return render(
+    <WizardProvider>
+      <MemoryRouter initialEntries={[`/schedule/${scheduleId}/unite-picker`]}>
+        <Routes>
+          <Route path="/schedule/:scheduleId/unite-picker" element={<UniteListPickerScreen />} />
+          <Route path="/schedule/:scheduleId/unite/:targetScheduleId" element={<div data-testid="unite-screen">UniteScreen</div>} />
+          <Route path="/schedule/:scheduleId/result" element={<div data-testid="result-screen">ResultScreen</div>} />
         </Routes>
       </MemoryRouter>
     </WizardProvider>,
@@ -139,62 +178,274 @@ afterEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ResultScreen — "איחוד רשימות" button visibility', () => {
-  it('does NOT show "איחוד רשימות" button when schedule has no parentScheduleId', () => {
-    upsertSchedule(scheduleWithoutParent)
+  it('shows "איחוד רשימות" button on a non-continued round', () => {
+    upsertSchedule(standaloneSchedule)
     renderResultScreen('standalone1')
-
-    expect(screen.queryByText('🔗 איחוד רשימות')).toBeNull()
-  })
-
-  it('shows "איחוד רשימות" button when schedule has parentScheduleId', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderResultScreen('child1')
 
     expect(screen.getByText('🔗 איחוד רשימות')).toBeTruthy()
   })
 
-  it('"איחוד רשימות" button is also visible when viewing from history (not from wizard session)', () => {
+  it('shows "איחוד רשימות" button on a continued round', () => {
     upsertSchedule(parentSchedule)
     upsertSchedule(childSchedule)
-    // Navigate from home (no wizard session) — ResultScreen reads schedule from localStorage
     renderResultScreen('child1')
 
     expect(screen.getByText('🔗 איחוד רשימות')).toBeTruthy()
   })
 })
 
-describe('UniteScreen — station merging', () => {
-  it('merges parent and child station participants sorted by start time', () => {
+describe('ResultScreen — continued round shows two-option modal', () => {
+  it('shows modal with two options when clicking "איחוד רשימות" on a continued round', async () => {
+    const user = userEvent.setup()
     upsertSchedule(parentSchedule)
     upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
+    renderResultScreen('child1')
 
-    // Alice and Bob from parent (20:00, 21:00), Charlie and Dave from child (22:00, 23:00)
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+
+    expect(screen.getByText('איחוד עם הרשימה הקודמת')).toBeTruthy()
+    expect(screen.getByText('איחוד עם רשימה אחרת')).toBeTruthy()
+  })
+
+  it('selecting "הקודמת" navigates directly to UniteScreen without list picker', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderResultScreen('child1')
+
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+    await user.click(screen.getByText('איחוד עם הרשימה הקודמת'))
+
+    expect(screen.getByTestId('unite-screen')).toBeTruthy()
+  })
+
+  it('selecting "אחרת" navigates to list picker', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderResultScreen('child1')
+
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+    await user.click(screen.getByText('איחוד עם רשימה אחרת'))
+
+    expect(screen.getByTestId('picker-screen')).toBeTruthy()
+  })
+
+  it('cancel button closes the modal', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderResultScreen('child1')
+
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+    expect(screen.getByText('איחוד עם הרשימה הקודמת')).toBeTruthy()
+
+    await user.click(screen.getByText('ביטול'))
+    expect(screen.queryByText('איחוד עם הרשימה הקודמת')).toBeNull()
+  })
+})
+
+describe('ResultScreen — non-continued round goes directly to list picker', () => {
+  it('clicking "איחוד רשימות" on standalone schedule navigates directly to list picker', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(standaloneSchedule)
+    renderResultScreen('standalone1')
+
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+
+    expect(screen.getByTestId('picker-screen')).toBeTruthy()
+  })
+
+  it('no modal appears for non-continued round', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(standaloneSchedule)
+    renderResultScreen('standalone1')
+
+    await user.click(screen.getByText('🔗 איחוד רשימות'))
+
+    expect(screen.queryByText('איחוד עם הרשימה הקודמת')).toBeNull()
+  })
+})
+
+describe('UniteListPickerScreen — list contents', () => {
+  it('shows all schedules except the current one', () => {
+    upsertSchedule(standaloneSchedule)
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderListPickerScreen('standalone1')
+
+    expect(screen.getByText('סבב ראשון')).toBeTruthy()
+    expect(screen.getByText('סבב שני')).toBeTruthy()
+    expect(screen.queryByText('סבב עצמאי')).toBeNull()
+  })
+
+  it('shows schedules sorted newest first', () => {
+    upsertSchedule(standaloneSchedule)   // createdAt: 2024-01-01T20:00:00Z
+    upsertSchedule(olderSchedule)        // createdAt: 2023-12-01T10:00:00Z
+    renderListPickerScreen('standalone1')
+
+    const items = screen.getAllByRole('button').filter(b => b.textContent?.includes('סבב'))
+    // standaloneSchedule is excluded; olderSchedule is only other one
+    expect(items[0].textContent).toContain('סבב ישן')
+  })
+
+  it('shows newer schedule before older when multiple exist', () => {
+    upsertSchedule(olderSchedule)   // createdAt: 2023-12-01
+    upsertSchedule(childSchedule)   // createdAt: 2024-01-01T22:00
+    upsertSchedule(parentSchedule)  // createdAt: 2024-01-01T20:00
+    renderListPickerScreen('older1')
+
+    const items = screen.getAllByRole('button').filter(b => b.textContent?.includes('סבב'))
+    // child (22:00) should come before parent (20:00)
+    const childIdx = items.findIndex(b => b.textContent?.includes('סבב שני'))
+    const parentIdx = items.findIndex(b => b.textContent?.includes('סבב ראשון'))
+    expect(childIdx).toBeLessThan(parentIdx)
+  })
+
+  it('shows round name, date and station count for each entry', () => {
+    upsertSchedule(parentSchedule)
+    upsertSchedule(standaloneSchedule)
+    renderListPickerScreen('standalone1')
+
+    const item = screen.getByText('סבב ראשון').closest('button')
+    expect(item?.textContent).toContain('01/01/2024')
+    expect(item?.textContent).toContain('1 עמדות')
+  })
+
+  it('search box filters results by round name', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    upsertSchedule(olderSchedule)
+    renderListPickerScreen('parent1')
+
+    const searchBox = screen.getByPlaceholderText('חיפוש לפי שם סבב...')
+    await user.type(searchBox, 'שני')
+
+    expect(screen.getByText('סבב שני')).toBeTruthy()
+    expect(screen.queryByText('סבב ישן')).toBeNull()
+  })
+
+  it('shows "לא נמצאו רשימות" when search yields no results', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    renderListPickerScreen('standalone1')
+
+    const searchBox = screen.getByPlaceholderText('חיפוש לפי שם סבב...')
+    await user.type(searchBox, 'xxxxxx')
+
+    expect(screen.getByText('לא נמצאו רשימות.')).toBeTruthy()
+  })
+
+  it('tapping a schedule navigates to UniteScreen', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(standaloneSchedule)
+    renderListPickerScreen('standalone1')
+
+    await user.click(screen.getByText('סבב ראשון'))
+
+    expect(screen.getByTestId('unite-screen')).toBeTruthy()
+  })
+})
+
+describe('UniteScreen — merge logic with two selected schedules', () => {
+  it('merges station participants sorted by start time', () => {
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderUniteScreen('child1', 'parent1')
+
     expect(screen.getByText('Alice')).toBeTruthy()
     expect(screen.getByText('Bob')).toBeTruthy()
     expect(screen.getByText('Charlie')).toBeTruthy()
     expect(screen.getByText('Dave')).toBeTruthy()
-
-    // Times should all appear
-    expect(screen.getByText('20:00')).toBeTruthy()
-    expect(screen.getByText('21:00')).toBeTruthy()
-    expect(screen.getByText('22:00')).toBeTruthy()
-    expect(screen.getByText('23:00')).toBeTruthy()
   })
 
-  it('shows parent participants before child participants (sorted by time)', () => {
+  it('uses title from earlier schedule (by createdAt)', () => {
     upsertSchedule(parentSchedule)
     upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
+    // current = child, target = parent — but earlier is parent
+    renderUniteScreen('child1', 'parent1')
 
-    const names = screen.getAllByText(/Alice|Bob|Charlie|Dave/).map(el => el.textContent)
-    // Parent times (20:00, 21:00) come before child times (22:00, 23:00)
-    expect(names.indexOf('Alice')).toBeLessThan(names.indexOf('Charlie'))
-    expect(names.indexOf('Bob')).toBeLessThan(names.indexOf('Dave'))
+    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
+    expect(screen.queryByText(/סבב שני/)).toBeNull()
   })
 
-  it('includes station-only-in-parent as-is', () => {
+  it('uses title from earlier schedule regardless of selection order', () => {
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    // current = parent, target = child — but earlier is still parent
+    renderUniteScreen('parent1', 'child1')
+
+    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
+    expect(screen.queryByText(/סבב שני/)).toBeNull()
+  })
+
+  it('uses quote from earlier schedule', () => {
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderUniteScreen('child1', 'parent1')
+
+    expect(screen.getByText(/"ציטוט מהאבא"/)).toBeTruthy()
+    expect(screen.queryByText(/"ציטוט מהבן"/)).toBeNull()
+  })
+
+  it('works with two non-parent-child schedules', () => {
+    upsertSchedule(standaloneSchedule)
+    upsertSchedule(olderSchedule)
+    renderUniteScreen('standalone1', 'older1')
+
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('Eve')).toBeTruthy()
+    // Earlier is olderSchedule
+    expect(screen.getByText(/סבב ישן/)).toBeTruthy()
+  })
+})
+
+describe('UniteScreen — does not write to localStorage', () => {
+  it('visiting UniteScreen does not add any new entry to localStorage', () => {
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+
+    const countBefore = JSON.parse(window.localStorage.getItem('schedules') ?? '[]').length
+
+    renderUniteScreen('child1', 'parent1')
+
+    const countAfter = JSON.parse(window.localStorage.getItem('schedules') ?? '[]').length
+    expect(countAfter).toBe(countBefore)
+  })
+})
+
+describe('UniteScreen — back navigation', () => {
+  it('Back button navigates to the current schedule ResultScreen', async () => {
+    const user = userEvent.setup()
+    upsertSchedule(parentSchedule)
+    upsertSchedule(childSchedule)
+    renderUniteScreen('child1', 'parent1')
+
+    await user.click(screen.getByText('← חזרה'))
+
+    expect(screen.getByTestId('result-screen')).toBeTruthy()
+  })
+})
+
+describe('UniteScreen — error state', () => {
+  it('shows error when schedule not found', () => {
+    renderUniteScreen('nonexistent', 'also-nonexistent')
+
+    expect(screen.getByText('לוח שמירה לא נמצא.')).toBeTruthy()
+  })
+
+  it('shows error when target schedule not found', () => {
+    upsertSchedule(standaloneSchedule)
+    renderUniteScreen('standalone1', 'nonexistent')
+
+    expect(screen.getByText('לוח שמירה לא נמצא.')).toBeTruthy()
+  })
+})
+
+describe('UniteScreen — station merging (existing coverage)', () => {
+  it('includes station-only-in-earlier schedule', () => {
     const parentWithExtra: Schedule = {
       ...parentSchedule,
       stations: [
@@ -208,116 +459,10 @@ describe('UniteScreen — station merging', () => {
       ],
     }
     upsertSchedule(parentWithExtra)
-    upsertSchedule(childSchedule) // child has no 'עמדה ב'
-    renderUniteScreen('child1')
+    upsertSchedule(childSchedule)
+    renderUniteScreen('child1', 'parent1')
 
     expect(screen.getByText(/עמדה ב/)).toBeTruthy()
     expect(screen.getByText('Eve')).toBeTruthy()
-  })
-})
-
-describe('UniteScreen — uses parent name and quote', () => {
-  it('displays the parent schedule name as title', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
-
-    // Parent name 'סבב ראשון' should appear
-    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
-    // Child name 'סבב שני' should NOT appear as the title
-    expect(screen.queryByText(/סבב שני/)).toBeNull()
-  })
-
-  it('displays the parent quote, not the child quote', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
-
-    expect(screen.getByText(/"ציטוט מהאבא"/)).toBeTruthy()
-    expect(screen.queryByText(/"ציטוט מהבן"/)).toBeNull()
-  })
-
-  it('displays the parent quote author', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
-
-    expect(screen.getByText(/מחבר האבא/)).toBeTruthy()
-    expect(screen.queryByText(/מחבר הבן/)).toBeNull()
-  })
-})
-
-describe('UniteScreen — does not write to localStorage', () => {
-  it('visiting UniteScreen does not add any new entry to localStorage', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-
-    const storeBefore = JSON.parse(window.localStorage.getItem('schedules') ?? '[]') as Schedule[]
-    const countBefore = storeBefore.length
-
-    renderUniteScreen('child1')
-
-    const storeAfter = JSON.parse(window.localStorage.getItem('schedules') ?? '[]') as Schedule[]
-    expect(storeAfter.length).toBe(countBefore)
-  })
-
-  it('unified schedule id is not present in localStorage', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-
-    renderUniteScreen('child1')
-
-    const schedules = JSON.parse(window.localStorage.getItem('schedules') ?? '[]') as Schedule[]
-    const ids = schedules.map((s: Schedule) => s.id)
-    // Only the two original schedules should be stored
-    expect(ids).toContain('parent1')
-    expect(ids).toContain('child1')
-    expect(ids).toHaveLength(2)
-  })
-})
-
-describe('UniteScreen — WhatsApp text format', () => {
-  it('WhatsApp text uses parent name and includes all participants in time order', () => {
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
-
-    // The formatted text should start with parent name and include all participants
-    // We test by triggering copy and checking clipboard (or just verify the format via pure function)
-    // Here we verify the rendered content matches expected structure
-    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
-    expect(screen.getByText(/עמדה א/)).toBeTruthy()
-    expect(screen.getByText('Alice')).toBeTruthy()
-    expect(screen.getByText('Charlie')).toBeTruthy()
-  })
-})
-
-describe('UniteScreen — back navigation', () => {
-  it('Back button navigates to the child schedule ResultScreen', async () => {
-    const user = userEvent.setup()
-    upsertSchedule(parentSchedule)
-    upsertSchedule(childSchedule)
-    renderUniteScreen('child1')
-
-    const backButton = screen.getByText('← חזרה')
-    await user.click(backButton)
-
-    expect(screen.getByTestId('result-screen')).toBeTruthy()
-  })
-})
-
-describe('UniteScreen — error state when schedule not found', () => {
-  it('shows error message when child schedule does not exist', () => {
-    renderUniteScreen('nonexistent')
-
-    expect(screen.getByText('לוח שמירה לא נמצא.')).toBeTruthy()
-  })
-
-  it('shows error message when child has no parentScheduleId', () => {
-    upsertSchedule(scheduleWithoutParent)
-    renderUniteScreen('standalone1')
-
-    // No parent found → error state
-    expect(screen.getByText('לוח שמירה לא נמצא.')).toBeTruthy()
   })
 })

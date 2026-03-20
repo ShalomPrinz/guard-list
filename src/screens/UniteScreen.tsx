@@ -4,16 +4,16 @@ import { getScheduleById } from '../storage/schedules'
 import { uniteSchedules, formatUnifiedScheduleForWhatsApp } from '../logic/continueRound'
 
 export default function UniteScreen() {
-  const { scheduleId } = useParams<{ scheduleId: string }>()
+  const { scheduleId, targetScheduleId } = useParams<{ scheduleId: string; targetScheduleId: string }>()
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
-  const child = scheduleId ? getScheduleById(scheduleId) : undefined
-  const parent = child?.parentScheduleId ? getScheduleById(child.parentScheduleId) : undefined
+  const scheduleA = scheduleId ? getScheduleById(scheduleId) : undefined
+  const scheduleB = targetScheduleId ? getScheduleById(targetScheduleId) : undefined
 
-  if (!child || !parent) {
+  if (!scheduleA || !scheduleB) {
     return (
       <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
         <p className="text-gray-500 dark:text-gray-400">לוח שמירה לא נמצא.</p>
@@ -27,7 +27,11 @@ export default function UniteScreen() {
     )
   }
 
-  const unified = uniteSchedules(parent, child)
+  // Title and citation always come from the earlier schedule (lower createdAt)
+  const earlier = scheduleA.createdAt <= scheduleB.createdAt ? scheduleA : scheduleB
+  const later = scheduleA.createdAt <= scheduleB.createdAt ? scheduleB : scheduleA
+
+  const unified = uniteSchedules(earlier, later)
   const whatsappText = formatUnifiedScheduleForWhatsApp(unified)
 
   async function handleCopy() {
@@ -48,7 +52,7 @@ export default function UniteScreen() {
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       {/* Back button */}
       <button
-        onClick={() => navigate(`/schedule/${child.id}/result`)}
+        onClick={() => navigate(`/schedule/${scheduleId}/result`)}
         className="mb-4 min-h-[44px] text-sm text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-200"
       >
         ← חזרה

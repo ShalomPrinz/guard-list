@@ -14,6 +14,7 @@ import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
 import StandbyScreen from './screens/StandbyScreen'
 import RecalculateScreen from './screens/RecalculateScreen'
 import UniteScreen from './screens/UniteScreen'
+import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
 
 export default function App() {
@@ -31,7 +32,8 @@ export default function App() {
             <Route path="/schedule/new/recalculate" element={<RecalculateScreen />} />
             <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
             <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
-            <Route path="/schedule/:scheduleId/unite" element={<UniteScreen />} />
+            <Route path="/schedule/:scheduleId/unite-picker" element={<UniteListPickerScreen />} />
+            <Route path="/schedule/:scheduleId/unite/:targetScheduleId" element={<UniteScreen />} />
             <Route path="/statistics" element={<StatisticsScreen />} />
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
             <Route path="/standby" element={<StandbyScreen />} />
