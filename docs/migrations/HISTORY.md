@@ -17,3 +17,4 @@
 | 013 | Continue Round Order Logic & Unite Lists Feature | The "Continue Round" feature currently skips the stations setup step and uses a fixed participant order. |
 | 014 | Citations Management | Persistent citations DB with CRUD and search, author auto-format to initials + family name, random/collection/manual citation modes in Step4_Review, used citations tracked via usedInListIds, citation counts added to StatisticsScreen |
 | 015 | Unite Lists for All Guard Lists | The "איחוד רשימות" button currently appears only on ResultScreen when the schedule has a parentScheduleId, and it only unites the current round with its direct parent. |
+| 016 | Vercel KV Persistence | All app data currently lives in `localStorage` with no backend and no cloud persistence — data is lost when the user clears the browser or switches devices. |

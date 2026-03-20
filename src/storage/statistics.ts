@@ -1,4 +1,5 @@
 import type { Statistics, ShiftRecord } from '../types'
+import { kvSet } from './cloudStorage'
 
 const KEY = 'statistics'
 
@@ -36,4 +37,5 @@ export function recordShift(
   p.totalMinutes += record.durationMinutes
   p.history.push(record)
   saveStatistics(stats, storage)
+  void kvSet('statistics:' + participantName, p)
 }

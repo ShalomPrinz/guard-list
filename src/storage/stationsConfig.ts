@@ -1,4 +1,5 @@
 import type { StationConfig } from '../types'
+import { kvSet } from './cloudStorage'
 
 const KEY = 'stations_config'
 
@@ -14,4 +15,5 @@ export function getStationsConfig(storage: Storage = window.localStorage): Stati
 
 export function saveStationsConfig(configs: StationConfig[], storage: Storage = window.localStorage): void {
   storage.setItem(KEY, JSON.stringify(configs))
+  configs.forEach(c => void kvSet('stationConfigs:' + c.id, c))
 }

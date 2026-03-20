@@ -1,4 +1,5 @@
 import type { Schedule } from '../types'
+import { kvSet, kvDel } from './cloudStorage'
 
 const KEY = 'schedules'
 
@@ -24,14 +25,19 @@ export function addSchedule(schedule: Schedule, storage: Storage = window.localS
   const schedules = getSchedules(storage)
   schedules.push(schedule)
   saveSchedules(schedules, storage)
+  void kvSet('schedules:' + schedule.groupId + ':' + schedule.id, schedule)
 }
 
 export function deleteSchedule(id: string, storage: Storage = window.localStorage): void {
+  const schedule = getScheduleById(id, storage)
   saveSchedules(getSchedules(storage).filter(s => s.id !== id), storage)
+  if (schedule) void kvDel('schedules:' + schedule.groupId + ':' + id)
 }
 
 export function updateScheduleName(id: string, name: string, storage: Storage = window.localStorage): void {
   saveSchedules(getSchedules(storage).map(s => s.id === id ? { ...s, name } : s), storage)
+  const updated = getScheduleById(id, storage)
+  if (updated) void kvSet('schedules:' + updated.groupId + ':' + id, updated)
 }
 
 export function upsertSchedule(schedule: Schedule, storage: Storage = window.localStorage): void {
@@ -43,4 +49,5 @@ export function upsertSchedule(schedule: Schedule, storage: Storage = window.loc
     schedules.push(schedule)
   }
   saveSchedules(schedules, storage)
+  void kvSet('schedules:' + schedule.groupId + ':' + schedule.id, schedule)
 }

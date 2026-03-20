@@ -32,6 +32,9 @@ jobs:
 
       - name: Run tests with coverage
         run: npx vitest run --coverage
+        env:
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
 
       - name: Notify Vercel
         uses: "vercel/repository-dispatch/actions/status@v1"

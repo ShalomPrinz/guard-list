@@ -1,4 +1,5 @@
 import type { Citation } from '../types'
+import { kvSet, kvDel } from './cloudStorage'
 
 const KEY = 'citations'
 
@@ -25,10 +26,12 @@ export function upsertCitation(citation: Citation, storage: Storage = window.loc
     citations.push(citation)
   }
   saveCitations(citations, storage)
+  void kvSet('citations:' + citation.id, citation)
 }
 
 export function deleteCitation(id: string, storage: Storage = window.localStorage): void {
   saveCitations(getCitations(storage).filter(c => c.id !== id), storage)
+  void kvDel('citations:' + id)
 }
 
 export function markCitationUsed(id: string, scheduleId: string, storage: Storage = window.localStorage): void {
@@ -37,5 +40,6 @@ export function markCitationUsed(id: string, scheduleId: string, storage: Storag
   if (idx >= 0 && !citations[idx].usedInListIds.includes(scheduleId)) {
     citations[idx] = { ...citations[idx], usedInListIds: [...citations[idx].usedInListIds, scheduleId] }
     saveCitations(citations, storage)
+    void kvSet('citations:' + id, citations[idx])
   }
 }

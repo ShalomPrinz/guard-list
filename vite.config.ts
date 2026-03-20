@@ -10,6 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/logic/**', 'src/storage/**'],
+      exclude: ['src/storage/index.ts'],
       thresholds: { lines: 90 },
     },
   },

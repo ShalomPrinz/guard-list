@@ -1,4 +1,5 @@
 import type { Group } from '../types'
+import { kvSet, kvDel } from './cloudStorage'
 
 const KEY = 'groups'
 
@@ -29,8 +30,10 @@ export function upsertGroup(group: Group, storage: Storage = window.localStorage
     groups.push(group)
   }
   saveGroups(groups, storage)
+  void kvSet('groups:' + group.id, group)
 }
 
 export function deleteGroup(id: string, storage: Storage = window.localStorage): void {
   saveGroups(getGroups(storage).filter(g => g.id !== id), storage)
+  void kvDel('groups:' + id)
 }

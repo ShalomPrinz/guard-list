@@ -1,3 +1,5 @@
+import { kvSet } from './cloudStorage'
+
 const THEME_KEY = 'theme'
 
 export function getTheme(storage: Storage = window.localStorage): 'dark' | 'light' | null {
@@ -8,4 +10,5 @@ export function getTheme(storage: Storage = window.localStorage): 'dark' | 'ligh
 
 export function saveTheme(theme: 'dark' | 'light', storage: Storage = window.localStorage): void {
   storage.setItem(THEME_KEY, theme)
+  void kvSet('prefs:global', { theme })
 }

@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { WizardProvider } from './context/WizardContext'
+import { syncFromCloud } from './storage/syncFromCloud'
 import Layout from './components/Layout'
 import HomeScreen from './screens/HomeScreen'
 import GroupEditScreen from './screens/GroupEditScreen'
@@ -18,6 +20,10 @@ import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
 
 export default function App() {
+  useEffect(() => {
+    void syncFromCloud()
+  }, [])
+
   return (
     <WizardProvider>
       <BrowserRouter>
