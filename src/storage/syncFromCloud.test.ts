@@ -11,11 +11,12 @@ vi.mock('./cloudStorage', () => ({
   isKvAvailable: true,
 }))
 
-import { kvGet, kvList } from './cloudStorage'
-import { syncFromCloud } from './syncFromCloud'
+import { kvGet, kvList, kvSet } from './cloudStorage'
+import { syncFromCloud, pushLocalToCloud } from './syncFromCloud'
 
 const mockedKvList = vi.mocked(kvList)
 const mockedKvGet = vi.mocked(kvGet)
+const mockedKvSet = vi.mocked(kvSet)
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
@@ -32,6 +33,8 @@ describe('syncFromCloud', () => {
 
   beforeEach(() => {
     storage = createLocalStorageMock()
+    // Set a username so syncFromCloud doesn't return early
+    storage.setItem('username', 'testuser')
     vi.stubGlobal('localStorage', storage)
     vi.clearAllMocks()
     mockedKvList.mockResolvedValue([])
@@ -180,5 +183,93 @@ describe('syncFromCloud', () => {
     expect(storage.getItem('groups')).toBeNull()
     expect(storage.getItem('citations')).toBeNull()
     expect(storage.getItem('statistics')).toBeNull()
+  })
+
+  it('returns early and calls no KV helpers when username is null', async () => {
+    storage.removeItem('username')
+
+    await syncFromCloud()
+
+    expect(mockedKvList).not.toHaveBeenCalled()
+    expect(mockedKvGet).not.toHaveBeenCalled()
+  })
+})
+
+describe('pushLocalToCloud', () => {
+  let storage: Storage
+
+  beforeEach(() => {
+    storage = createLocalStorageMock()
+    storage.setItem('username', 'testuser')
+    vi.stubGlobal('localStorage', storage)
+    vi.clearAllMocks()
+    mockedKvSet.mockResolvedValue(undefined)
+  })
+
+  it('uploads groups to KV', async () => {
+    const group = makeGroup()
+    storage.setItem('groups', JSON.stringify([group]))
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).toHaveBeenCalledWith('groups:g1', group)
+  })
+
+  it('uploads schedules to KV', async () => {
+    const schedule: Schedule = {
+      id: 'sched1',
+      name: 'Test',
+      groupId: 'g1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      date: '2026-01-01',
+      stations: [],
+      unevenDistributionMode: 'equal-duration',
+    }
+    storage.setItem('schedules', JSON.stringify([schedule]))
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).toHaveBeenCalledWith('schedules:g1:sched1', schedule)
+  })
+
+  it('uploads citations to KV', async () => {
+    const citation: Citation = { id: 'c1', text: 'Hello', author: 'Author', usedInListIds: [] }
+    storage.setItem('citations', JSON.stringify([citation]))
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).toHaveBeenCalledWith('citations:c1', citation)
+  })
+
+  it('uploads statistics to KV per participant', async () => {
+    const stats = { participants: { Alice: { totalShifts: 2, totalMinutes: 120, history: [] } } }
+    storage.setItem('statistics', JSON.stringify(stats))
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).toHaveBeenCalledWith('statistics:Alice', stats.participants.Alice)
+  })
+
+  it('uploads theme prefs to KV', async () => {
+    storage.setItem('theme', 'dark')
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).toHaveBeenCalledWith('prefs:global', { theme: 'dark' })
+  })
+
+  it('does nothing when username is null', async () => {
+    storage.removeItem('username')
+    storage.setItem('groups', JSON.stringify([makeGroup()]))
+
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).not.toHaveBeenCalled()
+  })
+
+  it('does not call kvSet when localStorage is empty', async () => {
+    await pushLocalToCloud()
+
+    expect(mockedKvSet).not.toHaveBeenCalled()
   })
 })

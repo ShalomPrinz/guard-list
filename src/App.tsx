@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { WizardProvider } from './context/WizardContext'
 import { syncFromCloud } from './storage/syncFromCloud'
+import { getUsername } from './storage/userStorage'
+import UsernameGate from './components/UsernameGate'
 import Layout from './components/Layout'
 import HomeScreen from './screens/HomeScreen'
 import GroupEditScreen from './screens/GroupEditScreen'
@@ -20,9 +22,15 @@ import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
 
 export default function App() {
+  const [hasUsername, setHasUsername] = useState(() => getUsername() !== null)
+
   useEffect(() => {
-    void syncFromCloud()
-  }, [])
+    if (hasUsername) void syncFromCloud()
+  }, [hasUsername])
+
+  if (!hasUsername) {
+    return <UsernameGate onConfirmed={() => setHasUsername(true)} />
+  }
 
   return (
     <WizardProvider>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../context/WizardContext'
+import { getUsername } from '../storage/userStorage'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -36,6 +37,11 @@ export default function Header() {
           />
           <span className="text-base font-bold text-gray-900 dark:text-gray-100">רשימת שמירה</span>
         </button>
+        {getUsername() && (
+          <span className="mx-2 text-xs text-gray-400 dark:text-gray-500">
+            שלום, {getUsername()}
+          </span>
+        )}
         <button
           onClick={toggleTheme}
           aria-label={isDark ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
