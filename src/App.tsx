@@ -16,7 +16,6 @@ import ContinueRoundScreen from './screens/ContinueRoundScreen'
 import StatisticsScreen from './screens/StatisticsScreen'
 import ParticipantHistoryScreen from './screens/ParticipantHistoryScreen'
 import StandbyScreen from './screens/StandbyScreen'
-import RecalculateScreen from './screens/RecalculateScreen'
 import UniteScreen from './screens/UniteScreen'
 import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
@@ -43,7 +42,6 @@ export default function App() {
             <Route path="/schedule/new/step2" element={<Step2_Time />} />
             <Route path="/schedule/new/step3" element={<Step3_Order />} />
             <Route path="/schedule/new/step4" element={<Step4_Review />} />
-            <Route path="/schedule/new/recalculate" element={<RecalculateScreen />} />
             <Route path="/schedule/:scheduleId/result" element={<ResultScreen />} />
             <Route path="/schedule/:scheduleId/continue" element={<ContinueRoundScreen />} />
             <Route path="/schedule/:scheduleId/unite-picker" element={<UniteListPickerScreen />} />

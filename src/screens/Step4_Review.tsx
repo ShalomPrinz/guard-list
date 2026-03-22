@@ -25,7 +25,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useWizard } from '../context/WizardContext'
 import { buildStationSchedule } from '../logic/generateSchedule'
-import { parseTimeToMinutes, minutesToTime, calcStationDurations } from '../logic/scheduling'
+import { parseTimeToMinutes, minutesToTime, calcStationDurations, recalculateStation } from '../logic/scheduling'
 import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
 import { getCitations, markCitationUsed, upsertCitation } from '../storage/citations'
@@ -121,16 +121,12 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
 
 function SortableReviewRow({
   item,
-  stationId,
   onRename,
   onDurationChange,
-  onRemove,
 }: {
   item: ReviewItem
-  stationId: string
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, minutes: number) => void
-  onRemove: (id: string, stationId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const [editingName, setEditingName] = useState(false)
@@ -214,14 +210,6 @@ function SortableReviewRow({
         </button>
       )}
 
-      {/* Remove */}
-      <button
-        onClick={() => onRemove(item.id, stationId)}
-        className="shrink-0 text-red-500 active:text-red-400 dark:text-red-400 dark:active:text-red-300"
-        aria-label="הסר"
-      >
-        ✕
-      </button>
     </div>
   )
 }
@@ -247,20 +235,40 @@ function ReviewStationCard({
   station,
   onRename,
   onDurationChange,
-  onRemove,
   onAdd,
+  onEndTimeChange,
 }: {
   station: ReviewStation
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, stationId: string, minutes: number) => void
-  onRemove: (id: string, stationId: string) => void
   onAdd: (stationId: string, name: string) => void
+  onEndTimeChange: (stationId: string, endTime: string) => void
 }) {
   const [addName, setAddName] = useState('')
 
+  const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
+
+  function commitEndTime(val: string) {
+    if (val && val.length === 5) onEndTimeChange(station.stationConfigId, val)
+  }
+
   return (
     <div className="rounded-2xl bg-white p-4 dark:bg-gray-800 overflow-visible">
-      <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-gray-400 dark:text-gray-500">סיום:</span>
+          <input
+            key={computedEndTime}
+            type="time"
+            defaultValue={computedEndTime}
+            onBlur={e => commitEndTime(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commitEndTime((e.target as HTMLInputElement).value) }}
+            className="rounded-lg bg-gray-100 px-2 py-1 text-xs text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
+            aria-label={`שעת סיום עמדה ${station.stationName}`}
+          />
+        </div>
+      </div>
 
       <SortableContext items={station.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
         <DroppableZone id={station.stationConfigId}>
@@ -269,10 +277,8 @@ function ReviewStationCard({
               <SortableReviewRow
                 key={item.id}
                 item={item}
-                stationId={station.stationConfigId}
                 onRename={onRename}
                 onDurationChange={(id, mins) => onDurationChange(id, station.stationConfigId, mins)}
-                onRemove={onRemove}
               />
             ))}
           </div>
@@ -316,21 +322,12 @@ export default function Step4_Review() {
     return buildReviewStations(session)
   })
 
-  // Apply recalculated station data coming back from RecalculateScreen,
-  // or a citation selected from CitationsScreen.
+  // Apply a citation selected from CitationsScreen.
   useEffect(() => {
     const state = location.state as {
-      recalculatedStation?: { stationConfigId: string; items: ReviewItem[] }
       selectedCitation?: Citation
     } | null
     let shouldClearState = false
-    if (state?.recalculatedStation) {
-      const { stationConfigId, items } = state.recalculatedStation
-      setStations(prev => prev.map(st =>
-        st.stationConfigId === stationConfigId ? { ...st, items } : st
-      ))
-      shouldClearState = true
-    }
     if (state?.selectedCitation) {
       setCitationModeState('collection')
       setSelectedCitation(state.selectedCitation)
@@ -437,11 +434,23 @@ export default function Step4_Review() {
     }))
   }
 
-  function handleRemove(itemId: string, stationId: string) {
+  function handleEndTimeChange(stationId: string, endTime: string) {
     setStations(prev => prev.map(st => {
       if (st.stationConfigId !== stationId) return st
-      const newItems = st.items.filter(it => it.id !== itemId)
-      return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
+      const parts = st.items.map(it => ({ name: it.name, locked: it.locked }))
+      if (parts.length === 0) return st
+      const algo = session!.timeConfig.roundingAlgorithm ?? 'round-up-10'
+      const recalculated = recalculateStation(parts, st.startTime, st.startDate, endTime, algo)
+      const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
+        id: st.items[j]?.id ?? `${stationId}-recalc-${j}`,
+        name: sp.name,
+        durationMinutes: sp.durationMinutes,
+        startTime: sp.startTime,
+        endTime: sp.endTime,
+        date: sp.date,
+        locked: sp.locked,
+      }))
+      return { ...st, items: newItems }
     }))
   }
 
@@ -696,15 +705,7 @@ export default function Step4_Review() {
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <StepIndicator current={4} total={4} />
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
-        <button
-          onClick={() => navigate('/schedule/new/recalculate', { state: { reviewStations: stations } })}
-          className="rounded-xl bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-800 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600"
-        >
-          חישוב זמנים מחדש
-        </button>
-      </div>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
 
       {/* Schedule name */}
       <div className="mb-4">
@@ -734,8 +735,8 @@ export default function Step4_Review() {
               station={st}
               onRename={handleRename}
               onDurationChange={handleDurationChange}
-              onRemove={handleRemove}
               onAdd={handleAdd}
+              onEndTimeChange={handleEndTimeChange}
             />
           ))}
         </div>

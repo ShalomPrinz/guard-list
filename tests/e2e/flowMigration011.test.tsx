@@ -209,12 +209,12 @@ describe('Migration 011 — member in "לא משובצים" shown in Step4_Revie
     renderApp()
     await navigateToStep3(user)
 
-    // Remove first participant
+    // Remove Alice (first participant) via Step3's remove button
     const removeButtons = screen.getAllByLabelText('הסר')
     await user.click(removeButtons[0])
 
     await waitFor(() => {
-      // 2 remain in station (2 "הסר" buttons — only station rows have ✕)
+      // Only 2 remain in station
       expect(screen.getAllByLabelText('הסר').length).toBe(2)
     })
 
@@ -222,9 +222,9 @@ describe('Migration 011 — member in "לא משובצים" shown in Step4_Revie
     await user.click(screen.getByText('הבא →'))
     expect(screen.getByText('סקירה ועריכה')).toBeTruthy()
 
-    // Only 2 participants in Step4_Review (2 remove buttons)
+    // Only 2 participants remain — each has one drag handle in Step4_Review
     await waitFor(() => {
-      expect(screen.getAllByLabelText('הסר').length).toBe(2)
+      expect(screen.getAllByLabelText('גרור לסידור מחדש').length).toBe(2)
     })
   })
 })

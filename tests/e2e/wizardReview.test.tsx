@@ -122,24 +122,6 @@ describe('Step4_Review — add participant', () => {
   })
 })
 
-describe('Step4_Review — remove participant', () => {
-  it('removes a participant from the station', async () => {
-    const user = userEvent.setup()
-    upsertGroup(makeGroup())
-    renderApp()
-    await navigateToStep4(user)
-
-    // Initially 3 participants. Remove buttons have aria-label "הסר"
-    const removeButtons = screen.getAllByLabelText('הסר')
-    expect(removeButtons.length).toBe(3)
-    await user.click(removeButtons[0])
-
-    await waitFor(() => {
-      expect(screen.getAllByLabelText('הסר').length).toBe(2)
-    })
-  })
-})
-
 describe('Step4_Review — schedule creation', () => {
   it('creates a schedule and saves it to localStorage', async () => {
     const user = userEvent.setup()
@@ -169,20 +151,26 @@ describe('Step4_Review — schedule creation', () => {
     })
   })
 
-  it('shows error when station has no participants', async () => {
+})
+
+describe('Step4_Review — editable station end time', () => {
+  it('shows an end time input field for each station', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep4(user)
 
-    // Remove all participants
-    const removeButtons = screen.getAllByLabelText('הסר')
-    for (const btn of removeButtons) {
-      await user.click(btn)
-    }
+    // The station header should have an end time input (type="time")
+    const timeInputs = document.querySelectorAll('input[type="time"]')
+    expect(timeInputs.length).toBeGreaterThanOrEqual(1)
+  })
 
-    await user.click(screen.getByText('צור לוח שמירה ✓'))
+  it('shows "סיום:" label next to the station end time field', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
 
-    expect(screen.getByText('יש להוסיף לפחות משתתף אחד')).toBeTruthy()
+    expect(screen.getByText('סיום:')).toBeTruthy()
   })
 })
