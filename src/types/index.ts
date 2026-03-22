@@ -4,6 +4,7 @@ export interface Member {
   id: string;
   name: string;
   availability: 'base' | 'home';
+  role?: 'commander' | 'warrior'; // optional — storage helper defaults to 'warrior' on read
 }
 
 export interface Group {

@@ -31,6 +31,7 @@ import { buildContinueRoundQueue, buildContinueRoundStations } from '../logic/co
 import type { Member, Schedule, WizardSession, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
+import AvailabilityToggle from '../components/AvailabilityToggle'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ interface ParticipantItem {
   name: string
   locked: boolean
   skipped: boolean
-  availability?: 'base' | 'home'
+  availability: 'base' | 'home'
 }
 
 interface StationState {
@@ -67,7 +68,7 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
     stations = session.stations.map(ws => ({
       stationConfigId: ws.config.id,
       stationName: ws.config.name,
-      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
+      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID(), availability: 'base' as const })),
     }))
   } else if (session.mode === 'continue' && previousSchedule) {
     // Continue round: smart ordering algorithm
@@ -77,7 +78,7 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
     stations = wizardStations.map(ws => ({
       stationConfigId: ws.config.id,
       stationName: ws.config.name,
-      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID() })),
+      participants: ws.participants.map(p => ({ ...p, id: crypto.randomUUID(), availability: 'base' as const })),
     }))
   } else {
     // First visit: distribute base members across stations
@@ -92,7 +93,7 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
       return {
         stationConfigId: ws.config.id,
         stationName: ws.config.name,
-        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false })),
+        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false, availability: 'base' as const })),
       }
     })
   }
@@ -109,12 +110,12 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
 function SortableRow({
   item,
   onToggleLock,
-  onToggleSkip,
+  onToggleAvailability,
   onRemove,
 }: {
   item: ParticipantItem
   onToggleLock: () => void
-  onToggleSkip: () => void
+  onToggleAvailability: (status: 'base' | 'home') => void
   onRemove: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -124,11 +125,11 @@ function SortableRow({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined, boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.18)' : undefined }}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${isDragging ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/30 dark:ring-blue-500' : item.skipped ? 'bg-gray-100/50 dark:bg-gray-700/50' : 'bg-gray-100 dark:bg-gray-700'}`}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 ${isDragging ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/30 dark:ring-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`}
     >
       <DragHandle attributes={attributes} listeners={listeners} />
 
-      <span className={`min-w-0 flex-1 truncate text-sm ${item.skipped ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
+      <span className="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-gray-100">
         {item.name}
       </span>
 
@@ -139,12 +140,7 @@ function SortableRow({
         {item.locked ? '🔒' : '🔓'}
       </button>
 
-      <button
-        onClick={onToggleSkip}
-        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.skipped ? 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300' : 'text-gray-400 active:text-gray-600 dark:text-gray-500 dark:active:text-gray-300'}`}
-      >
-        {item.skipped ? 'מדולג' : 'דלג'}
-      </button>
+      <AvailabilityToggle status={item.availability} onChange={onToggleAvailability} />
 
       <button onClick={onRemove} className="shrink-0 text-gray-400 active:text-red-500 dark:text-gray-600 dark:active:text-red-400" aria-label="הסר">
         ✕
@@ -155,7 +151,13 @@ function SortableRow({
 
 // ─── Unassigned row ───────────────────────────────────────────────────────────
 
-function UnassignedRow({ item }: { item: ParticipantItem }) {
+function UnassignedRow({
+  item,
+  onToggleAvailability,
+}: {
+  item: ParticipantItem
+  onToggleAvailability: (status: 'base' | 'home') => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
 
@@ -173,11 +175,7 @@ function UnassignedRow({ item }: { item: ParticipantItem }) {
         {item.name}
       </span>
 
-      {isHome && (
-        <span className="shrink-0 rounded-lg bg-gray-200 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-          בית
-        </span>
-      )}
+      <AvailabilityToggle status={item.availability} onChange={onToggleAvailability} />
     </div>
   )
 }
@@ -328,7 +326,7 @@ export default function Step3_Order() {
         const toIdx = (dst as { stationIdx: number }).stationIdx
         const targetParts = [...newStations[toIdx].participants]
         const dstPos = targetParts.findIndex(p => p.id === oId)
-        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, skipped: false }
+        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, skipped: false, availability: 'base' }
         if (dstPos >= 0) targetParts.splice(dstPos, 0, movedItem)
         else targetParts.push(movedItem)
         newStations = newStations.map((s, i) => i === toIdx ? { ...s, participants: targetParts } : s)
@@ -464,6 +462,30 @@ export default function Step3_Order() {
     })
   }
 
+  // Toggle availability for a participant currently in a station.
+  // Base → Home: move to unassigned as 'home'.
+  function toggleAvailabilityInStation(si: number, id: string) {
+    setOrderState(prev => {
+      const station = prev.stations[si]
+      const item = station.participants.find(p => p.id === id)
+      if (!item) return prev
+      return {
+        stations: prev.stations.map((s, i) =>
+          i === si ? { ...s, participants: s.participants.filter(p => p.id !== id) } : s
+        ),
+        unassigned: [...prev.unassigned, { ...item, availability: 'home' }],
+      }
+    })
+  }
+
+  // Toggle availability for a participant in the unassigned section (session-only).
+  function toggleAvailabilityInUnassigned(id: string, newStatus: 'base' | 'home') {
+    setOrderState(prev => ({
+      ...prev,
+      unassigned: prev.unassigned.map(p => p.id === id ? { ...p, availability: newStatus } : p),
+    }))
+  }
+
   // ── Next ──────────────────────────────────────────────────────────────────
 
   function handleNext() {
@@ -529,7 +551,10 @@ export default function Step3_Order() {
                         key={item.id}
                         item={item}
                         onToggleLock={() => patchParticipant(si, item.id, { locked: !item.locked })}
-                        onToggleSkip={() => patchParticipant(si, item.id, { skipped: !item.skipped })}
+                        onToggleAvailability={(newStatus) => {
+                          if (newStatus === 'home') toggleAvailabilityInStation(si, item.id)
+                          // Base is the default for station items; no-op if toggling to 'base'
+                        }}
                         onRemove={() => removeFromStation(si, item.id)}
                       />
                     ))}
@@ -549,7 +574,11 @@ export default function Step3_Order() {
                     <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-600">גרור לוחם לכאן להוצאה מהרשימה</p>
                   )}
                   {unassigned.map(item => (
-                    <UnassignedRow key={item.id} item={item} />
+                    <UnassignedRow
+                      key={item.id}
+                      item={item}
+                      onToggleAvailability={(newStatus) => toggleAvailabilityInUnassigned(item.id, newStatus)}
+                    />
                   ))}
                 </div>
               </DroppableZone>

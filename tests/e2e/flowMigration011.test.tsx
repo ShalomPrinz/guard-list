@@ -155,18 +155,16 @@ describe('Migration 011 — remove from station to "לא משובצים"', () =>
     expect(screen.getByText('לא משובצים')).toBeTruthy()
 
     // Remove Alice from the station using the ✕ remove button in the station
-    // Station participant rows have skip buttons (דלג), unassigned rows don't
-    // So the "הסר" remove buttons in the station are the ones within the station card
+    // Only station rows have "הסר" (✕) buttons; unassigned rows do not
     const removeButtons = screen.getAllByLabelText('הסר')
     expect(removeButtons.length).toBeGreaterThanOrEqual(1)
     await user.click(removeButtons[0])
 
     // Now one more member should be in "לא משובצים"
-    // Previously: Charlie (1). After remove: Charlie + one of Alice/Bob (2)
+    // Previously: Charlie (1 unassigned). After remove: Charlie + one of Alice/Bob (2 unassigned)
+    // Only 1 station participant remains → only 1 "הסר" button in station section
     await waitFor(() => {
-      const skipButtons = screen.queryAllByText('דלג')
-      // Only 1 station participant remains (Alice or Bob, whichever wasn't removed)
-      expect(skipButtons.length).toBe(1)
+      expect(screen.getAllByLabelText('הסר').length).toBe(1)
     })
   })
 
@@ -216,8 +214,8 @@ describe('Migration 011 — member in "לא משובצים" shown in Step4_Revie
     await user.click(removeButtons[0])
 
     await waitFor(() => {
-      // 2 remain in station
-      expect(screen.getAllByText('דלג').length).toBe(2)
+      // 2 remain in station (2 "הסר" buttons — only station rows have ✕)
+      expect(screen.getAllByLabelText('הסר').length).toBe(2)
     })
 
     // Navigate to step 4

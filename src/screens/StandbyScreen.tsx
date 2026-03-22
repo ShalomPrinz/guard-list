@@ -2,10 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroups } from '../storage/groups'
 import type { Group, Member } from '../types'
+import AvailabilityToggle from '../components/AvailabilityToggle'
 
-export function formatStandbyText(title: string, selectedNames: string[]): string {
-  const lines = selectedNames.map((name, i) => `${i + 1}. ${name}`)
-  return [title, '', ...lines].join('\n')
+export function formatStandbyText(title: string, selectedNames: string[], commanderName?: string): string {
+  const parts: string[] = [title, '']
+  if (commanderName) {
+    parts.push(`מפקד: ${commanderName}`, '')
+  }
+  parts.push(...selectedNames.map((name, i) => `${i + 1}. ${name}`))
+  return parts.join('\n')
 }
 
 export default function StandbyScreen() {
@@ -14,16 +19,32 @@ export default function StandbyScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>(() => getGroups()[0]?.id ?? '')
   const [title, setTitle] = useState('כיתת כוננות')
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set())
+  const [selectedCommanderId, setSelectedCommanderId] = useState<string | null>(null)
+  // Session-only availability overrides — does NOT modify saved group in localStorage
+  const [localAvailabilityById, setLocalAvailabilityById] = useState<Record<string, 'base' | 'home'>>({})
   const [copied, setCopied] = useState(false)
 
   const group = groups.find(g => g.id === selectedGroupId)
-  const baseMembers = group?.members.filter(m => m.availability === 'base') ?? []
-  const allMembers: Member[] = [...(group?.members ?? [])]
 
-  // Initialize selected names when group changes
+  function getMemberAvailability(member: Member): 'base' | 'home' {
+    return localAvailabilityById[member.id] ?? member.availability
+  }
+
+  const allMembers: Member[] = [...(group?.members ?? [])]
+  const commanders = allMembers.filter(m => (m.role ?? 'warrior') === 'commander')
+  const warriors = allMembers.filter(m => (m.role ?? 'warrior') === 'warrior')
+  const baseWarriors = warriors.filter(m => getMemberAvailability(m) === 'base')
+
+  // Initialize selected names and reset overrides when group changes
   useEffect(() => {
-    setSelectedNames(new Set(baseMembers.map(m => m.name)))
-  }, [selectedGroupId])
+    setLocalAvailabilityById({})
+    setSelectedCommanderId(null)
+    const currentGroup = groups.find(g => g.id === selectedGroupId)
+    const baseWarriorNames = (currentGroup?.members ?? [])
+      .filter(m => (m.role ?? 'warrior') === 'warrior' && m.availability === 'base')
+      .map(m => m.name)
+    setSelectedNames(new Set(baseWarriorNames))
+  }, [selectedGroupId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleMember(name: string) {
     setSelectedNames(prev => {
@@ -35,21 +56,44 @@ export default function StandbyScreen() {
   }
 
   function selectAll() {
-    setSelectedNames(new Set(baseMembers.map(m => m.name)))
+    setSelectedNames(new Set(baseWarriors.map(m => m.name)))
   }
 
   function deselectAll() {
     setSelectedNames(new Set())
   }
 
-  const allSelected = baseMembers.length > 0 && baseMembers.every(m => selectedNames.has(m.name))
+  function handleLocalAvailabilityToggle(memberId: string, newStatus: 'base' | 'home') {
+    setLocalAvailabilityById(prev => ({ ...prev, [memberId]: newStatus }))
+    const member = allMembers.find(m => m.id === memberId)
+    if (!member) return
+    if (newStatus === 'home') {
+      // Deselect warrior checkbox
+      setSelectedNames(prev => {
+        const next = new Set(prev)
+        next.delete(member.name)
+        return next
+      })
+      // Deselect commander if they become home
+      if (selectedCommanderId === memberId) {
+        setSelectedCommanderId(null)
+      }
+    }
+  }
 
-  // Ordered list of selected members (same order as on screen = group member order, base first)
-  const orderedSelected = allMembers
-    .filter(m => m.availability === 'base' && selectedNames.has(m.name))
+  const allWarriorsSelected = baseWarriors.length > 0 && baseWarriors.every(m => selectedNames.has(m.name))
+
+  // Ordered list of selected warriors (group member order)
+  const orderedSelectedWarriors = allMembers
+    .filter(m => (m.role ?? 'warrior') === 'warrior' && getMemberAvailability(m) === 'base' && selectedNames.has(m.name))
     .map(m => m.name)
 
-  const whatsappText = formatStandbyText(title, orderedSelected)
+  const commanderName = selectedCommanderId
+    ? allMembers.find(m => m.id === selectedCommanderId)?.name
+    : undefined
+
+  const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName)
+  const hasOutput = orderedSelectedWarriors.length > 0 || !!commanderName
 
   async function handleCopy() {
     try {
@@ -105,76 +149,116 @@ export default function StandbyScreen() {
         />
       </div>
 
-      {/* Select all / Deselect all */}
-      {baseMembers.length > 0 && (
-        <div className="mb-3 flex justify-end">
-          <button
-            onClick={allSelected ? deselectAll : selectAll}
-            className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
-          >
-            {allSelected ? 'בטל הכל' : 'בחר הכל'}
-          </button>
+      {/* Commander section — shown only when group has commanders */}
+      {commanders.length > 0 && (
+        <div className="mb-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">מפקד</h3>
+          <div className="flex flex-col gap-2">
+            {commanders.map(member => {
+              const effectiveAvailability = getMemberAvailability(member)
+              const isBase = effectiveAvailability === 'base'
+              return (
+                <div
+                  key={member.id}
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+                    isBase ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 opacity-50 dark:bg-gray-850'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="commander-select"
+                    checked={selectedCommanderId === member.id}
+                    onChange={() => isBase && setSelectedCommanderId(member.id)}
+                    disabled={!isBase}
+                    className="h-5 w-5 accent-blue-600"
+                    aria-label={member.name}
+                  />
+                  <span className={`flex-1 text-sm ${isBase ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {member.name}
+                  </span>
+                  <AvailabilityToggle
+                    status={effectiveAvailability}
+                    onChange={(s) => handleLocalAvailabilityToggle(member.id, s)}
+                  />
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* Member list */}
-      <div className="mb-6 flex flex-col gap-2">
-        {allMembers.map(member => {
-          const isBase = member.availability === 'base'
-          return (
-            <div
-              key={member.id}
-              className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
-                isBase
-                  ? 'bg-white dark:bg-gray-800'
-                  : 'bg-gray-50 opacity-50 dark:bg-gray-850'
-              }`}
-            >
-              {isBase ? (
-                <input
-                  type="checkbox"
-                  checked={selectedNames.has(member.name)}
-                  onChange={() => toggleMember(member.name)}
-                  className="h-5 w-5 rounded accent-blue-600"
-                  aria-label={member.name}
-                />
-              ) : (
-                <div className="h-5 w-5 shrink-0" aria-hidden />
-              )}
-              <span
-                className={`flex-1 text-sm ${
-                  isBase
-                    ? 'text-gray-900 dark:text-gray-100'
-                    : 'text-gray-400 dark:text-gray-500'
-                }`}
-              >
-                {member.name}
-              </span>
-              <span
-                className={`text-xs ${
-                  isBase
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : 'text-gray-300 dark:text-gray-600'
-                }`}
-              >
-                {isBase ? 'בסיס' : 'בית'}
-              </span>
-            </div>
-          )
-        })}
-
-        {allMembers.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
-            אין חברים בקבוצה
-          </p>
+      {/* Warriors section */}
+      <div className="mb-4">
+        {commanders.length > 0 && (
+          <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">לוחמים</h3>
         )}
+
+        {/* Select all / Deselect all */}
+        {baseWarriors.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button
+              onClick={allWarriorsSelected ? deselectAll : selectAll}
+              className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600"
+            >
+              {allWarriorsSelected ? 'בטל הכל' : 'בחר הכל'}
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {warriors.map(member => {
+            const effectiveAvailability = getMemberAvailability(member)
+            const isBase = effectiveAvailability === 'base'
+            return (
+              <div
+                key={member.id}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+                  isBase
+                    ? 'bg-white dark:bg-gray-800'
+                    : 'bg-gray-50 opacity-50 dark:bg-gray-850'
+                }`}
+              >
+                {isBase ? (
+                  <input
+                    type="checkbox"
+                    checked={selectedNames.has(member.name)}
+                    onChange={() => toggleMember(member.name)}
+                    className="h-5 w-5 rounded accent-blue-600"
+                    aria-label={member.name}
+                  />
+                ) : (
+                  <div className="h-5 w-5 shrink-0" aria-hidden />
+                )}
+                <span
+                  className={`flex-1 text-sm ${
+                    isBase
+                      ? 'text-gray-900 dark:text-gray-100'
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`}
+                >
+                  {member.name}
+                </span>
+                <AvailabilityToggle
+                  status={effectiveAvailability}
+                  onChange={(s) => handleLocalAvailabilityToggle(member.id, s)}
+                />
+              </div>
+            )
+          })}
+
+          {warriors.length === 0 && commanders.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
+              אין חברים בקבוצה
+            </p>
+          )}
+        </div>
       </div>
 
       {/* WhatsApp buttons */}
       <div className="mb-3 flex gap-3">
         <button
           onClick={handleCopy}
-          disabled={orderedSelected.length === 0}
+          disabled={!hasOutput}
           className={`flex-1 rounded-2xl py-3 text-sm font-semibold transition-colors disabled:opacity-40 ${
             copied
               ? 'bg-green-700 text-white'
@@ -185,7 +269,7 @@ export default function StandbyScreen() {
         </button>
         <button
           onClick={handleWhatsApp}
-          disabled={orderedSelected.length === 0}
+          disabled={!hasOutput}
           className="flex-1 rounded-2xl bg-green-600 py-3 text-sm font-semibold text-white active:bg-green-700 disabled:opacity-40"
         >
           📤 שלח בווטסאפ

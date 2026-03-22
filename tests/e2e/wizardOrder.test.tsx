@@ -107,32 +107,48 @@ describe('Step3_Order — lock toggle', () => {
   })
 })
 
-describe('Step3_Order — skip toggle', () => {
-  it('marks a participant as skipped', async () => {
+describe('Step3_Order — availability toggle', () => {
+  it('toggling Base → Home in station moves participant to לא משובצים', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep3(user)
 
-    const skipButtons = screen.getAllByText('דלג')
-    await user.click(skipButtons[0])
+    // 3 station participants shown by 3 "הסר" buttons
+    expect(screen.getAllByLabelText('הסר').length).toBe(3)
 
-    expect(screen.getAllByText('מדולג').length).toBeGreaterThanOrEqual(1)
+    // Click first "בסיס" toggle to move participant to unassigned
+    const baseButtons = screen.getAllByText('בסיס')
+    await user.click(baseButtons[0])
+
+    await waitFor(() => {
+      // Now 2 station participants remain
+      expect(screen.getAllByLabelText('הסר').length).toBe(2)
+    })
   })
 
-  it('can re-include a skipped participant', async () => {
+  it('toggling Home → Base in לא משובצים keeps participant in לא משובצים', async () => {
     const user = userEvent.setup()
-    upsertGroup(makeGroup())
+    upsertGroup(makeGroup({
+      members: [
+        { id: 'm1', name: 'Alice', availability: 'base' },
+        { id: 'm2', name: 'Bob', availability: 'home' },
+      ],
+    }))
     renderApp()
     await navigateToStep3(user)
 
-    const skipButtons = screen.getAllByText('דלג')
-    await user.click(skipButtons[0])
-    // Now click "מדולג" to re-include
-    await user.click(screen.getAllByText('מדולג')[0])
+    // Bob is in unassigned with 'בית' toggle
+    expect(screen.getByText('בית')).toBeTruthy()
+    await user.click(screen.getByText('בית'))
 
-    // Should be back to "דלג" with 3 buttons
-    expect(screen.getAllByText('דלג').length).toBe(3)
+    // Bob stays in unassigned (no new הסר button added)
+    await waitFor(() => {
+      // Still only 1 station participant (Alice)
+      expect(screen.getAllByLabelText('הסר').length).toBe(1)
+      // Bob now shows 'בסיס' in unassigned
+      expect(screen.getAllByText('בסיס').length).toBeGreaterThanOrEqual(1)
+    })
   })
 })
 
@@ -143,14 +159,14 @@ describe('Step3_Order — remove participant', () => {
     renderApp()
     await navigateToStep3(user)
 
-    // Count participants before remove
-    expect(screen.getAllByText('דלג').length).toBe(3)
+    // 3 station participants (3 "הסר" buttons — only station rows have ✕)
+    expect(screen.getAllByLabelText('הסר').length).toBe(3)
 
     const removeButtons = screen.getAllByLabelText('הסר')
     await user.click(removeButtons[0])
 
     await waitFor(() => {
-      expect(screen.getAllByText('דלג').length).toBe(2)
+      expect(screen.getAllByLabelText('הסר').length).toBe(2)
     })
   })
 })
@@ -164,8 +180,8 @@ describe('Step3_Order — shuffle', () => {
 
     await user.click(screen.getByText('ערבב'))
 
-    // All participants should still be present
-    expect(screen.getAllByText('דלג').length).toBe(3)
+    // All 3 participants should still be in station (3 "הסר" buttons)
+    expect(screen.getAllByLabelText('הסר').length).toBe(3)
   })
 })
 

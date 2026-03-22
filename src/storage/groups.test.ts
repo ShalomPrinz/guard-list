@@ -14,8 +14,8 @@ function makeGroup(overrides: Partial<Group> = {}): Group {
     id: 'g1',
     name: 'Test Group',
     members: [
-      { id: 'm1', name: 'Alice', availability: 'base' },
-      { id: 'm2', name: 'Bob', availability: 'home' },
+      { id: 'm1', name: 'Alice', availability: 'base', role: 'warrior' },
+      { id: 'm2', name: 'Bob', availability: 'home', role: 'warrior' },
     ],
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
