@@ -381,8 +381,8 @@ export default function Step4_Review() {
   }
 
   const sensors = useSensors(
-    useSensor(TouchSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
-    useSensor(PointerSensor, { activationConstraint: { delay: 1000, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 

@@ -53,13 +53,13 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 ## Drag & Drop
 
 - All drag-and-drop uses `@dnd-kit/core`.
-- All sensor configs must use the 1000ms hold threshold with 5px tolerance:
+- All sensor configs must use the 300ms hold threshold with 5px tolerance:
   ```ts
   useSensor(TouchSensor, {
-    activationConstraint: { delay: 1000, tolerance: 5 },
+    activationConstraint: { delay: 300, tolerance: 5 },
   });
   useSensor(PointerSensor, {
-    activationConstraint: { delay: 1000, tolerance: 5 },
+    activationConstraint: { delay: 300, tolerance: 5 },
   });
   ```
 - Apply this config to every drag instance in the app. Never use a different sensor config.

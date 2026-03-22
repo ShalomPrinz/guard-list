@@ -68,7 +68,7 @@ Never mock it per-file. Never remove this mock from the setup file.
 
 **What happened:** The default `@dnd-kit` sensor configuration activates drag immediately on touch, with no delay. On mobile, normal downward scrolling through a list triggered accidental participant reorders constantly.
 
-**Rule:** All `@dnd-kit` sensor configurations in this app must use the 1000ms/5px activation constraint (see CONVENTIONS.md). Never instantiate a sensor without this constraint. This applies to every `useSensor` call in every component — Step3_Order, Step4_Review, and any future drag-and-drop surface.
+**Rule:** All `@dnd-kit` sensor configurations in this app must use the 300ms/5px activation constraint (see CONVENTIONS.md). Never instantiate a sensor without this constraint. This applies to every `useSensor` call in every component — Step3_Order, Step4_Review, and any future drag-and-drop surface.
 
 ---
 
