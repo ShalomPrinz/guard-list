@@ -34,7 +34,8 @@ import { getGroupById } from '../storage/groups'
 import { pickRandomCitation, formatAuthorName } from '../logic/citations'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
-import type { Schedule, ScheduleStation, ScheduledParticipant, Citation } from '../types'
+import TimePicker from '../components/TimePicker'
+import type { Schedule, ScheduleStation, ScheduledParticipant, Citation, RoundingAlgorithm } from '../types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ interface ReviewStation {
   items: ReviewItem[]
   startTime: string
   startDate: string
+  roundingAlgorithm: RoundingAlgorithm
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
     s => s.participants.filter(p => !p.skipped).length,
   )
 
-  const durations = calcStationDurations({
+  const globalDurations = calcStationDurations({
     startTime: session.timeConfig.startTime,
     endTime: session.timeConfig.endTime,
     fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
@@ -88,7 +90,24 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
   })
 
   return session.stations.map((ws, si) => {
-    const durationMinutes = durations[si]?.roundedDurationMinutes ?? 60
+    const stationRounding = ws.roundingAlgorithm ?? session.timeConfig.roundingAlgorithm
+
+    // If station has a per-station rounding override and end time is set, recalculate independently
+    let durationMinutes: number
+    if (ws.roundingAlgorithm && (session.timeConfig.endTime || session.timeConfig.fixedDurationMinutes)) {
+      const count = participantCounts[si] ?? 0
+      const stationDurations = calcStationDurations({
+        startTime: ws.startTime,
+        endTime: session.timeConfig.endTime,
+        fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+        roundingAlgorithm: stationRounding,
+        unevenMode: session.timeConfig.unevenMode,
+        stationParticipantCounts: [count],
+      })
+      durationMinutes = stationDurations[0]?.roundedDurationMinutes ?? 60
+    } else {
+      durationMinutes = globalDurations[si]?.roundedDurationMinutes ?? 60
+    }
 
     const partsWithDuration = ws.participants
       .filter(p => !p.skipped)
@@ -113,6 +132,7 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
       })),
       startTime: stStartTime,
       startDate: stStartDate,
+      roundingAlgorithm: stationRounding,
     }
   })
 }
@@ -231,44 +251,123 @@ function DroppableZone({ id, children }: { id: string; children: React.ReactNode
 
 // ─── Station card ─────────────────────────────────────────────────────────────
 
+const ROUNDING_OPTIONS: { value: RoundingAlgorithm; label: string }[] = [
+  { value: 'round-up-10', label: "עיגול מעלה ל-10 דק׳" },
+  { value: 'round-up-5', label: "עיגול מעלה ל-5 דק׳" },
+  { value: 'round-nearest', label: 'עיגול לדקה הקרובה' },
+]
+
 function ReviewStationCard({
   station,
   onRename,
   onDurationChange,
   onAdd,
-  onEndTimeChange,
+  onTimingConfigChange,
 }: {
   station: ReviewStation
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, stationId: string, minutes: number) => void
   onAdd: (stationId: string, name: string) => void
-  onEndTimeChange: (stationId: string, endTime: string) => void
+  onTimingConfigChange: (stationId: string, config: { startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm }) => void
 }) {
   const [addName, setAddName] = useState('')
+  const [timingModalOpen, setTimingModalOpen] = useState(false)
 
   const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
 
-  function commitEndTime(val: string) {
-    if (val && val.length === 5) onEndTimeChange(station.stationConfigId, val)
+  const [draftStartTime, setDraftStartTime] = useState(station.startTime)
+  const [draftEndTime, setDraftEndTime] = useState(computedEndTime)
+  const [draftRounding, setDraftRounding] = useState<RoundingAlgorithm>(station.roundingAlgorithm)
+
+  function openTimingModal() {
+    setDraftStartTime(station.startTime)
+    setDraftEndTime(station.items[station.items.length - 1]?.endTime ?? computedEndTime)
+    setDraftRounding(station.roundingAlgorithm)
+    setTimingModalOpen(true)
+  }
+
+  function handleSaveTiming() {
+    onTimingConfigChange(station.stationConfigId, {
+      startTime: draftStartTime,
+      endTime: draftEndTime,
+      roundingAlgorithm: draftRounding,
+    })
+    setTimingModalOpen(false)
   }
 
   return (
     <div className="rounded-2xl bg-white p-4 dark:bg-gray-800 overflow-visible">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{station.stationName}</p>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs text-gray-400 dark:text-gray-500">סיום:</span>
-          <input
-            key={computedEndTime}
-            type="time"
-            defaultValue={computedEndTime}
-            onBlur={e => commitEndTime(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') commitEndTime((e.target as HTMLInputElement).value) }}
-            className="rounded-lg bg-gray-100 px-2 py-1 text-xs text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
-            aria-label={`שעת סיום עמדה ${station.stationName}`}
-          />
-        </div>
+        <button
+          onClick={openTimingModal}
+          className="rounded-lg bg-gray-100 p-2 text-gray-500 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:active:bg-gray-600"
+          aria-label={`הגדרות תזמון עמדה ${station.stationName}`}
+        >
+          ⚙️
+        </button>
       </div>
+
+      {timingModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 dark:bg-black/60"
+          onClick={e => { if (e.target === e.currentTarget) setTimingModalOpen(false) }}
+        >
+          <div className="w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900">
+            <h2 className="mb-5 text-base font-bold text-gray-900 dark:text-gray-100">
+              הגדרות תזמון — {station.stationName}
+            </h2>
+
+            {/* Start time */}
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת התחלה:</label>
+              <TimePicker value={draftStartTime} onChange={setDraftStartTime} />
+            </div>
+
+            {/* End time */}
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת סיום:</label>
+              <TimePicker value={draftEndTime} onChange={setDraftEndTime} />
+            </div>
+
+            {/* Rounding */}
+            <div className="mb-6">
+              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">עיגול משמרת:</label>
+              <div className="flex flex-col gap-2">
+                {ROUNDING_OPTIONS.map(opt => (
+                  <label key={opt.value} className="flex items-center gap-3 min-h-[44px] cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`rounding-${station.stationConfigId}`}
+                      value={opt.value}
+                      checked={draftRounding === opt.value}
+                      onChange={() => setDraftRounding(opt.value)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    <span className="text-sm text-gray-800 dark:text-gray-200">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTimingModalOpen(false)}
+                className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleSaveTiming}
+                className="flex-1 rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
+              >
+                שמור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <SortableContext items={station.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
         <DroppableZone id={station.stationConfigId}>
@@ -315,7 +414,7 @@ function ReviewStationCard({
 export default function Step4_Review() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { session, updateSession } = useWizard()
+  const { session, updateSession, updateStations } = useWizard()
 
   const [stations, setStations] = useState<ReviewStation[]>(() => {
     if (!session) return []
@@ -426,24 +525,39 @@ export default function Step4_Review() {
     }))
   }
 
-  function handleEndTimeChange(stationId: string, endTime: string) {
+  function handleTimingConfigChange(stationId: string, config: {
+    startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm
+  }) {
     setStations(prev => prev.map(st => {
       if (st.stationConfigId !== stationId) return st
+      const resolvedRounding = config.roundingAlgorithm ?? st.roundingAlgorithm
+      const newStartTime = config.startTime ?? st.startTime
       const parts = st.items.map(it => ({ name: it.name, locked: it.locked }))
-      if (parts.length === 0) return st
-      const algo = session!.timeConfig.roundingAlgorithm ?? 'round-up-10'
-      const recalculated = recalculateStation(parts, st.startTime, st.startDate, endTime, algo)
-      const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
-        id: st.items[j]?.id ?? `${stationId}-recalc-${j}`,
-        name: sp.name,
-        durationMinutes: sp.durationMinutes,
-        startTime: sp.startTime,
-        endTime: sp.endTime,
-        date: sp.date,
-        locked: sp.locked,
-      }))
-      return { ...st, items: newItems }
+      if (parts.length === 0) return { ...st, roundingAlgorithm: resolvedRounding, startTime: newStartTime }
+
+      if (config.endTime) {
+        const recalculated = recalculateStation(parts, newStartTime, st.startDate, config.endTime, resolvedRounding)
+        const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
+          id: st.items[j]?.id ?? `${stationId}-recalc-${j}`,
+          name: sp.name,
+          durationMinutes: sp.durationMinutes,
+          startTime: sp.startTime,
+          endTime: sp.endTime,
+          date: sp.date,
+          locked: sp.locked,
+        }))
+        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding }
+      }
+
+      return { ...st, items: recomputeTimes(st.items, newStartTime, st.startDate), startTime: newStartTime, roundingAlgorithm: resolvedRounding }
     }))
+
+    if (config.roundingAlgorithm && session) {
+      const updated = session.stations.map(ws =>
+        ws.config.id === stationId ? { ...ws, roundingAlgorithm: config.roundingAlgorithm } : ws
+      )
+      updateStations(updated)
+    }
   }
 
   function handleAdd(stationId: string, name: string) {
@@ -726,7 +840,7 @@ export default function Step4_Review() {
               onRename={handleRename}
               onDurationChange={handleDurationChange}
               onAdd={handleAdd}
-              onEndTimeChange={handleEndTimeChange}
+              onTimingConfigChange={handleTimingConfigChange}
             />
           ))}
         </div>

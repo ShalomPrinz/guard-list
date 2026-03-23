@@ -153,24 +153,45 @@ describe('Step4_Review — schedule creation', () => {
 
 })
 
-describe('Step4_Review — editable station end time', () => {
-  it('shows an end time input field for each station', async () => {
+describe('Step4_Review — timing config modal', () => {
+  it('shows a gear button for each station', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep4(user)
 
-    // The station header should have an end time input (type="time")
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    expect(timeInputs.length).toBeGreaterThanOrEqual(1)
+    // Each station should have a gear button for timing config
+    const gearButtons = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })
+    expect(gearButtons.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows "סיום:" label next to the station end time field', async () => {
+  it('opens timing modal when gear button is clicked', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep4(user)
 
-    expect(screen.getByText('סיום:')).toBeTruthy()
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+
+    expect(screen.getByText(/הגדרות תזמון —/)).toBeTruthy()
+    expect(screen.getByText('שעת התחלה:')).toBeTruthy()
+    expect(screen.getByText('שעת סיום:')).toBeTruthy()
+    expect(screen.getByText('עיגול משמרת:')).toBeTruthy()
+  })
+
+  it('closes timing modal on ביטול', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
+
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+
+    const cancelButton = screen.getByRole('button', { name: 'ביטול' })
+    await user.click(cancelButton)
+
+    expect(screen.queryByText(/הגדרות תזמון —/)).toBeNull()
   })
 })

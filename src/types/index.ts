@@ -112,6 +112,7 @@ export interface WizardStation {
   participants: WizardParticipant[];  // ordered list; empty until Step 3
   startTime: string;   // "HH:MM" — set by Step1 (default) or ContinueRound (per-station actual end)
   startDate: string;   // "YYYY-MM-DD" — updated by Step2 when user changes the global start time
+  roundingAlgorithm?: RoundingAlgorithm; // per-station override; absent means use global default
 }
 
 export interface WizardSession {
