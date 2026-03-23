@@ -34,7 +34,7 @@ export default function Step1_Stations() {
   const savedConfigs = getStationsConfig()
 
   const isContinueMode = session?.mode === 'continue'
-  // IDs of stations that were pre-filled from the previous round (they already have startTimeOverride)
+  // IDs of stations that were pre-filled from the previous round (they already have startTime set)
   const sessionStationIds = new Set(session?.stations.map(s => s.config.id) ?? [])
   // Previous round schedule — needed for inherit-end-time option
   const parentSchedule = isContinueMode && session?.parentScheduleId
@@ -151,24 +151,32 @@ export default function Step1_Stations() {
         ? session!.stations.find(s => s.config.id === f.id)
         : undefined
 
-      let startTimeOverride: string | undefined
-      let startDateOverride: string | undefined
+      const today = new Date().toISOString().split('T')[0]
+      let startTime: string
+      let startDate: string
 
       if (existingSessionStation) {
-        startTimeOverride = existingSessionStation.startTimeOverride
-        startDateOverride = existingSessionStation.startDateOverride
+        startTime = existingSessionStation.startTime
+        startDate = existingSessionStation.startDate
       } else if (isContinueMode) {
         const sel = newStationTimes[f.id]
         if (!sel || sel.type === 'custom') {
           // Default: use the global continuation start time
-          startTimeOverride = sel?.time || session!.timeConfig.startTime
-          startDateOverride = session!.date
+          startTime = sel?.time || session!.timeConfig.startTime
+          startDate = session!.date
         } else if (sel.type === 'inherit' && parentSchedule) {
           const prevSt = parentSchedule.stations.find(s => s.stationConfigId === sel.stationConfigId)
           const lastP = prevSt?.participants[prevSt.participants.length - 1]
-          startTimeOverride = lastP?.endTime
-          startDateOverride = lastP?.date
+          startTime = lastP?.endTime ?? session!.timeConfig.startTime
+          startDate = lastP?.date ?? session!.date
+        } else {
+          startTime = session!.timeConfig.startTime
+          startDate = session!.date
         }
+      } else {
+        // New schedule: use the current session defaults (Step2 will overwrite if user changes them)
+        startTime = session?.timeConfig.startTime ?? DEFAULT_TIME_CONFIG.startTime
+        startDate = session?.date ?? today
       }
 
       return {
@@ -178,8 +186,8 @@ export default function Step1_Stations() {
           type: 'time-based',
         },
         participants: [],
-        ...(startTimeOverride ? { startTimeOverride } : {}),
-        ...(startDateOverride ? { startDateOverride } : {}),
+        startTime,
+        startDate,
       }
     })
 

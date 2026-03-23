@@ -94,8 +94,8 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
       .filter(p => !p.skipped)
       .map(p => ({ name: p.name, durationMinutes, locked: p.locked }))
 
-    const stStartTime = ws.startTimeOverride ?? session.timeConfig.startTime
-    const stStartDate = ws.startDateOverride ?? session.date
+    const stStartTime = ws.startTime
+    const stStartDate = ws.startDate
 
     const scheduled = buildStationSchedule(partsWithDuration, stStartTime, stStartDate)
 

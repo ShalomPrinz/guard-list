@@ -27,7 +27,7 @@ function formatDuration(minutes: number): string {
 
 export default function Step2_Time() {
   const navigate = useNavigate()
-  const { session, updateTimeConfig, updateSession } = useWizard()
+  const { session, updateTimeConfig, updateSession, updateStations } = useWizard()
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
@@ -139,6 +139,13 @@ export default function Step2_Time() {
   function handleNext() {
     const err = validate()
     if (err) { setError(err); return }
+
+    // If the user changed the global start time or date, propagate to all stations.
+    // This preserves per-station start times (e.g. continue-round "actual" mode) when
+    // the user hasn't touched the field, while correctly overriding them when they have.
+    if (startTime !== tc.startTime || startDate !== session!.date) {
+      updateStations(session!.stations.map(s => ({ ...s, startTime, startDate })))
+    }
 
     updateSession({ date: startDate })
     updateTimeConfig({

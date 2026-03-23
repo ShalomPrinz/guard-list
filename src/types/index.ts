@@ -110,10 +110,8 @@ export interface WizardParticipant {
 export interface WizardStation {
   config: StationConfig;
   participants: WizardParticipant[];  // ordered list; empty until Step 3
-  /** Continue-round only: overrides the global timeConfig.startTime for this station. */
-  startTimeOverride?: string;         // "HH:MM"
-  /** Continue-round only: overrides session.date for this station. */
-  startDateOverride?: string;         // "YYYY-MM-DD"
+  startTime: string;   // "HH:MM" — set by Step1 (default) or ContinueRound (per-station actual end)
+  startDate: string;   // "YYYY-MM-DD" — updated by Step2 when user changes the global start time
 }
 
 export interface WizardSession {

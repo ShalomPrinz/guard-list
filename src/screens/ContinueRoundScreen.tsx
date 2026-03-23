@@ -77,14 +77,14 @@ export default function ContinueRoundScreen() {
     // Build wizard stations with pre-filled configs (empty participants — filled in Step3)
     const wizardStations = schedule.stations.map(st => {
       const end = stationActualEnd(st)
-      const startTimeOverride = useActual ? (end?.time ?? plannedEndTime) : plannedEndTime
-      const startDateOverride = useActual ? (end?.date ?? plannedEndDate) : plannedEndDate
+      const startTime = useActual ? (end?.time ?? plannedEndTime) : plannedEndTime
+      const startDate = useActual ? (end?.date ?? plannedEndDate) : plannedEndDate
 
       return {
         config: { id: st.stationConfigId, name: st.stationName, type: 'time-based' as const },
         participants: [],
-        startTimeOverride,
-        startDateOverride,
+        startTime,
+        startDate,
       }
     })
 

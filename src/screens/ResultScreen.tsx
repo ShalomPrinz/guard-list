@@ -19,6 +19,8 @@ function buildSessionFromSchedule(schedule: Schedule): WizardSession {
     stations: schedule.stations.map(st => ({
       config: { id: st.stationConfigId, name: st.stationName, type: 'time-based' as const },
       participants: st.participants.map(p => ({ name: p.name, locked: p.locked, skipped: false })),
+      startTime: st.participants[0]?.startTime ?? startTime,
+      startDate: st.participants[0]?.date ?? schedule.date,
     })),
     timeConfig: { ...DEFAULT_TIME_CONFIG, startTime, fixedDurationMinutes, unevenMode: schedule.unevenDistributionMode },
     scheduleName: schedule.name,

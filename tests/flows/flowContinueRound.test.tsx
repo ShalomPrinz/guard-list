@@ -203,3 +203,48 @@ describe('Continuation schedule — parentScheduleId', () => {
     })
   })
 })
+
+describe('Continue Round — user start time override (E015)', () => {
+  it('Step4 uses user-entered start time when user edits it in Step2, not the pre-filled value', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    // Schedule where Bob ends at 22:00 — so continuation pre-fills start time as 22:00
+    addSchedule(makeSchedule())
+    renderApp('/schedule/sched1/continue')
+
+    // Start continuation → Step1 (pre-filled stations)
+    await user.click(screen.getByText('התחל סבב →'))
+    expect(screen.getByText('הגדרת עמדות')).toBeTruthy()
+
+    // Step1 → Step2
+    await user.click(screen.getByText('הבא →'))
+    expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
+
+    // Start time is pre-filled as 22:00 — user changes hours to 23, then blurs to commit
+    // getAllByLabelText because end-time mode also renders a second TimePicker for end time
+    const hoursInput = screen.getAllByLabelText('שעות')[0]
+    await user.clear(hoursInput)
+    await user.type(hoursInput, '23')
+    await user.tab()
+
+    // Use fixed-duration mode so no end time is required
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+
+    // Step3 → Step4
+    await user.click(screen.getByText('הבא →'))
+
+    // Create the schedule
+    await user.click(screen.getByText('צור לוח שמירה ✓'))
+
+    await waitFor(() => {
+      const schedules = getSchedules()
+      const continuation = schedules.find(s => s.parentScheduleId === 'sched1')
+      expect(continuation).toBeTruthy()
+      // First participant must start at 23:00 (user-entered), not 22:00 (pre-filled override)
+      const firstParticipant = continuation!.stations[0].participants[0]
+      expect(firstParticipant.startTime).toBe('23:00')
+    })
+  })
+})

@@ -173,7 +173,7 @@ describe('Continue round — new station custom start time', () => {
     })
   })
 
-  it('new station with custom start time gets startTimeOverride set in the session', async () => {
+  it('new station with custom start time gets startTime set in the session', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     addSchedule(makeSchedule())

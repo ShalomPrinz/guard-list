@@ -55,6 +55,8 @@ function makeWizardStation(id: string): WizardStation {
   return {
     config: { id, name: `Station ${id}`, type: 'time-based' },
     participants: [],
+    startTime: '20:00',
+    startDate: '2026-03-16',
   }
 }
 
