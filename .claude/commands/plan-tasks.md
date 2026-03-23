@@ -69,9 +69,6 @@ One sentence. The end state after this prompt is executed.
 - Bullet list of concrete outcomes that must be true when this prompt is complete
 - Always ends with: `tsc --noEmit` passes and `vitest run --coverage` is ≥90% for `src/logic/` and `src/storage/`
 
-**Commit Message Suggestions**
-> Suggest 3 git commit messages for this prompt commit. The messages should describe what work is being planned, not what code changed. Match the commit style defined in `CLAUDE.md`. Print it as a copyable code block — do not run git yourself.
-
 ---
 
 After writing all files, print a summary table:
