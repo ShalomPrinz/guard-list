@@ -1,6 +1,6 @@
-Review everything that happened in this conversation. Then do the following:
-
 Read the current contents of `docs/CONVENTIONS.md` and `docs/ERRORS.md`.
+
+You will be given context about what was just implemented — either from the current conversation or from a prompt file passed as argument. Use that as the scope. Do not review the entire conversation history.
 
 For each file, decide:
 

@@ -7,7 +7,9 @@ When implementation is complete, derive a verification checklist from what you j
 
 Work through each item. Report ✅ or ❌ with one line per item. Fix any ❌ before reporting done.
 
-When all items pass, suggest a git commit message matching the style in `CLAUDE.md`.
+When all items pass, update project memory by following the instructions in `@.claude/commands/update-docs.md`. The scope is limited to what you just implemented in this prompt — do not review the entire conversation history.
+
+Finally, suggest a git commit message matching the style in `CLAUDE.md`.
 Print it as a copyable code block — do not run git yourself. The format to print is:
 ```
 git commit -m "<commit_message>"
