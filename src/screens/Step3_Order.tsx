@@ -226,16 +226,6 @@ export default function Step3_Order() {
   )
   // Snapshot saved on drag start — restored on cancel or release-over-nothing
   const [snapshot, setSnapshot] = useState<OrderState | null>(null)
-  const [isDragActive, setIsDragActive] = useState(false)
-
-  // Lock body touch-action during drag so the scroll container cannot intercept
-  // touch events while a drag gesture is in progress (critical on mobile Safari).
-  useEffect(() => {
-    if (!isDragActive) return
-    const prev = document.body.style.touchAction
-    document.body.style.touchAction = 'none'
-    return () => { document.body.style.touchAction = prev }
-  }, [isDragActive])
 
   // ── Sensors (300ms hold to activate drag) ────────────────────────────────
 
@@ -269,7 +259,6 @@ export default function Step3_Order() {
   }
 
   function onDragStart() {
-    setIsDragActive(true)
     // Snapshot full state so we can restore it on cancel / drop-over-nothing
     setSnapshot(orderState)
   }
@@ -338,7 +327,6 @@ export default function Step3_Order() {
 
   // onDragEnd: finalize same-container sort; restore snapshot on cancel (over = null).
   function onDragEnd({ active, over }: DragEndEvent) {
-    setIsDragActive(false)
     setSnapshot(null)
 
     if (!over) {
@@ -386,7 +374,6 @@ export default function Step3_Order() {
 
   // onDragCancel: fired on keyboard Escape — restore snapshot
   function onDragCancel() {
-    setIsDragActive(false)
     if (snapshot) setOrderState(snapshot)
     setSnapshot(null)
   }
@@ -506,7 +493,7 @@ export default function Step3_Order() {
   const { stations, unassigned } = orderState
 
   return (
-    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg touch-pan-y px-4 py-6">
       <StepIndicator current={3} total={4} />
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">סדר שומרים</h1>

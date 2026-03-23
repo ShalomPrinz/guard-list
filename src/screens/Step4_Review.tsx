@@ -386,16 +386,8 @@ export default function Step4_Review() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const [isDragActive, setIsDragActive] = useState(false)
   // Snapshot of stations at drag-start — used to restore on cancel or to detect cross-station moves in onDragEnd.
   const stationsSnapshotRef = useRef<ReviewStation[] | null>(null)
-
-  useEffect(() => {
-    if (!isDragActive) return
-    const prev = document.body.style.touchAction
-    document.body.style.touchAction = 'none'
-    return () => { document.body.style.touchAction = prev }
-  }, [isDragActive])
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
@@ -511,7 +503,6 @@ export default function Step4_Review() {
   // onDragEnd: finalize same-station sort or accept cross-station move already done by onDragOver.
   // Recalculates durations for all stations after any reorder (counts may have changed).
   function handleDragEnd(event: DragEndEvent) {
-    setIsDragActive(false)
     const { active, over } = event
 
     const snap = stationsSnapshotRef.current
@@ -576,7 +567,6 @@ export default function Step4_Review() {
   }
 
   function handleDragCancel() {
-    setIsDragActive(false)
     if (stationsSnapshotRef.current) setStations(stationsSnapshotRef.current)
     stationsSnapshotRef.current = null
   }
@@ -703,7 +693,7 @@ export default function Step4_Review() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
+    <div className="animate-fadein mx-auto max-w-lg touch-pan-y px-4 py-6">
       <StepIndicator current={4} total={4} />
       <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">סקירה ועריכה</h1>
 
@@ -723,7 +713,7 @@ export default function Step4_Review() {
         sensors={sensors}
         collisionDetection={dragCollisionDetection}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-        onDragStart={() => { setIsDragActive(true); stationsSnapshotRef.current = stations }}
+        onDragStart={() => { stationsSnapshotRef.current = stations }}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
