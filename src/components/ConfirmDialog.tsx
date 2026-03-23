@@ -1,3 +1,5 @@
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
+
 interface Props {
   message: string
   onConfirm: () => void
@@ -5,6 +7,7 @@ interface Props {
 }
 
 export default function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
+  useBodyScrollLock(true)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div role="dialog" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">

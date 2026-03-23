@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import type { Group, Member } from '../types'
 import { upsertGroup } from '../storage/groups'
 import { parseNames } from '../logic/parseNames'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 interface Props {
   onCreated: (group: Group) => void
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function CreateGroupModal({ onCreated, onCancel }: Props) {
+  useBodyScrollLock(true)
   const [groupName, setGroupName] = useState('')
   const [namesText, setNamesText] = useState('')
   const [error, setError] = useState('')
@@ -59,7 +61,17 @@ export default function CreateGroupModal({ onCreated, onCancel }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
-      <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-xl dark:bg-gray-800 sm:rounded-2xl">
+      <div
+        className="relative w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-xl dark:bg-gray-800 sm:rounded-2xl max-h-[90vh] overflow-y-auto"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
+        <button
+          onClick={onCancel}
+          className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
+          aria-label="סגור"
+        >
+          ×
+        </button>
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">קבוצה חדשה</h2>
 
         {/* Group name */}

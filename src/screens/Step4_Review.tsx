@@ -35,6 +35,7 @@ import { pickRandomCitation, formatAuthorName } from '../logic/citations'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
 import TimePicker from '../components/TimePicker'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import type { Schedule, ScheduleStation, ScheduledParticipant, Citation, RoundingAlgorithm } from '../types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -272,6 +273,7 @@ function ReviewStationCard({
 }) {
   const [addName, setAddName] = useState('')
   const [timingModalOpen, setTimingModalOpen] = useState(false)
+  useBodyScrollLock(timingModalOpen)
 
   const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
 
@@ -313,7 +315,17 @@ function ReviewStationCard({
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 dark:bg-black/60"
           onClick={e => { if (e.target === e.currentTarget) setTimingModalOpen(false) }}
         >
-          <div className="w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900">
+          <div
+            className="relative w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900 max-h-[90vh] overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
+            <button
+              onClick={() => setTimingModalOpen(false)}
+              className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
+              aria-label="סגור"
+            >
+              ×
+            </button>
             <h2 className="mb-5 text-base font-bold text-gray-900 dark:text-gray-100">
               הגדרות תזמון — {station.stationName}
             </h2>

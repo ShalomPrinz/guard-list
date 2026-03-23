@@ -5,6 +5,7 @@ import { getGroupById } from '../storage/groups'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
 import { formatDate } from '../logic/formatting'
 import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import type { WizardSession, Schedule } from '../types'
 
 function buildSessionFromSchedule(schedule: Schedule): WizardSession {
@@ -42,6 +43,7 @@ export default function ResultScreen() {
   const [editingName, setEditingName] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showUniteModal, setShowUniteModal] = useState(false)
+  useBodyScrollLock(showUniteModal)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
@@ -182,7 +184,17 @@ export default function ResultScreen() {
       {/* Modal — continued round union target selection */}
       {showUniteModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-gray-800">
+          <div
+            className="relative w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-gray-800 max-h-[90vh] overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
+            <button
+              onClick={() => setShowUniteModal(false)}
+              className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
+              aria-label="סגור"
+            >
+              ×
+            </button>
             <h2 className="mb-4 text-center text-base font-semibold text-gray-900 dark:text-gray-100">בחר רשימה לאיחוד</h2>
             <button
               onClick={() => {

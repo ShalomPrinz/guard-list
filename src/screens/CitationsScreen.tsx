@@ -5,6 +5,7 @@ import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink
 import { getGroups } from '../storage/groups'
 import { formatAuthorName } from '../logic/citations'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 import type { Citation, Member } from '../types'
 
 interface EditState {
@@ -23,6 +24,7 @@ export default function CitationsScreen() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  useBodyScrollLock(editing !== null)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
@@ -208,7 +210,17 @@ export default function CitationsScreen() {
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 dark:bg-black/60"
           onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}
         >
-          <div className="w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900">
+          <div
+            className="relative w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900 max-h-[90vh] overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
+            <button
+              onClick={() => setEditing(null)}
+              className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
+              aria-label="סגור"
+            >
+              ×
+            </button>
             <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-gray-100">
               {editing.id === null ? 'ציטוט חדש' : 'עריכת ציטוט'}
             </h2>

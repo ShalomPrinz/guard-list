@@ -4,6 +4,7 @@ import { getGroupById, upsertGroup } from '../storage/groups'
 import type { Group, Member } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AvailabilityToggle from '../components/AvailabilityToggle'
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function GroupEditScreen() {
   const { groupId } = useParams<{ groupId: string }>()
@@ -17,6 +18,7 @@ export default function GroupEditScreen() {
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<Member | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const [showCommanderModal, setShowCommanderModal] = useState(false)
+  useBodyScrollLock(showCommanderModal)
   const editInputRef = useRef<HTMLInputElement>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstMount = useRef(true)
@@ -271,7 +273,17 @@ export default function GroupEditScreen() {
       {/* Commander selection modal */}
       {showCommanderModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
-          <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-xl dark:bg-gray-800 sm:rounded-2xl">
+          <div
+            className="relative w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-xl dark:bg-gray-800 sm:rounded-2xl max-h-[90vh] overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
+            <button
+              onClick={() => setShowCommanderModal(false)}
+              className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
+              aria-label="סגור"
+            >
+              ×
+            </button>
             <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">בחר מפקדים</h2>
             <ul className="mb-4 flex flex-col gap-2">
               {group.members.map(m => (
