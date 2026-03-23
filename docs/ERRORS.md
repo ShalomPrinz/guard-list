@@ -1,87 +1,177 @@
 # Errors Log
 
-A record of mistakes Claude Code made that required a follow-up migration to fix. Read this before starting any migration. If your planned implementation resembles any pattern described here, stop and reconsider.
+Every mistake that happened in this project. Read before starting any given task. If your implementation resembles any pattern here, stop and reconsider.
 
 ---
 
-## E001 — Date Format Regression (fixed in Migration 008.1)
+## E001 — Date Format Regression
 
-**What happened:** Migration 007 introduced `formatDate()` returning DD/MM/YYYY and applied it to display sites. Despite this, dates rendered in MM/DD/YYYY format in Step2_Time and other screens because native `<input type="date">` elements display in the browser's locale format, which bypasses `formatDate()` entirely.
+**What went wrong:** `formatDate()` returning DD/MM/YYYY was introduced, but dates still rendered in MM/DD/YYYY because native `<input type="date">` displays in the browser's locale format, bypassing `formatDate()` entirely. The fix applied `formatDate()` to display sites but left the input's value attribute as the date source in some places.
 
-**Rule:** Never render a date to the user via a native `<input type="date">` value attribute or `.toLocaleDateString()`. Always render date text through `formatDate()` from `src/logic/formatting.ts` as a visible label. The input element is only for the picker interaction.
+**Root cause:** Assuming that setting a date input's value controls its display format. It does not — the browser renders it in locale format regardless.
 
----
-
-## E002 — Read-Only Mode Survived Multiple Migrations (fixed in Migration 008)
-
-**What happened:** Migration 004 explicitly removed read-only mode from ResultScreen. It re-appeared in later navigation paths — specifically when opening a past schedule from HomeScreen history — because the history navigation code path set a `viewOnly` or `isReadOnly` flag that was never cleaned up.
-
-**Rule:** There is no read-only mode anywhere in this app. ResultScreen is always editable. Never introduce an `isReadOnly`, `viewOnly`, `readOnly`, or equivalent boolean prop or state for ResultScreen. If you find yourself writing one, stop — it contradicts a core requirement.
+**Rule:** Never render a date to the user via a native input value or `.toLocaleDateString()`. Always render date text through `formatDate()` as a visible label. The `<input type="date">` is only for the picker interaction.
 
 ---
 
-## E003 — `window.scrollTo` Not Implemented in Test Environment (fixed in Migration 009.1)
+## E002 — Read-Only Mode Survived Multiple Sessions
 
-**What happened:** Migration 004 added `window.scrollTo({ top: 0, behavior: 'instant' })` to all screen mounts. The jsdom test environment does not implement `window.scrollTo`, producing "Not implemented: window.scrollTo" errors across the entire CI log for every test file that mounts a screen.
+**What went wrong:** Read-only mode was removed from ResultScreen long ago and must not return. It re-appeared in the history navigation path because that code path set a `viewOnly` flag that was never cleaned up. Required a second fix in a later session.
 
-**Rule:** `window.scrollTo` must be mocked globally in the test setup file (`src/test/setup.ts`):
+**Root cause:** Read-only mode was removed from one entry path but not all entry paths. The flag existed in multiple places.
+
+**Rule:** There is no read-only mode anywhere in this app. Never introduce `isReadOnly`, `viewOnly`, `readOnly`, or any equivalent boolean for ResultScreen. If you find yourself writing one, stop.
+
+---
+
+## E003 — window.scrollTo Not Implemented in Tests
+
+**What went wrong:** `window.scrollTo()` added to all screen mounts as an early core requirement. jsdom does not implement it, producing "Not implemented: window.scrollTo" noise across the entire CI log for every test that mounts a screen.
+
+**Root cause:** jsdom missing implementation, no global mock in place.
+
+**Rule:** Mock `window.scrollTo` globally in the test setup file:
 ```ts
 window.scrollTo = vi.fn();
 ```
-Never mock it per-file. Never remove this mock from the setup file.
+Never mock it per-file. Never remove this from the setup file.
 
 ---
 
-## E004 — Unused Variable Broke Vercel Build (fixed in Migration 009.1)
+## E004 — Unused Variable Broke Vercel Build
 
-**What happened:** A variable `user` was declared but never read in `tests/e2e/flowMigration008.test.tsx`. TypeScript (`tsc --noEmit`) flagged it as error TS6133. Because Vercel runs `npm run build` which includes type checking, the deployment failed with exit code 2.
+**What went wrong:** A variable `user` was declared but never read in `tests/e2e/flowMigration008.test.tsx`. TypeScript flagged it as TS6133. Vercel runs `npm run build` which includes type checking, causing deployment to fail with exit code 2.
 
-**Rule:** Run `tsc --noEmit` across the full project including `tests/` before declaring any migration done. Prefix intentionally unused variables with `_`. The CI workflow now runs `tsc --noEmit` as a dedicated step before `vitest` — do not remove it.
+**Root cause:** Tests were not type-checked before pushing. `tsc --noEmit` was not run across `tests/`.
 
----
-
-## E005 — End Date Did Not Update Reactively (fixed in Migration 008.1)
-
-**What happened:** Migration 007 added an auto-calculated end date field to Step2_Time that computed on mount only. Changing the start time or end time after mount did not update the end date. The calculation was not inside a `useEffect` with the correct dependencies.
-
-**Rule:** Any derived value that depends on form fields must be computed inside a `useEffect` whose dependency array includes all relevant fields. For end date: depends on both start time and end time. For per-station duration preview: depends on start time, end time, participant count, and rounding mode.
+**Rule:** Run `tsc --noEmit` across the full project including `tests/` before every prompt run is declared done. Prefix intentionally unused variables with `_`. CI workflow now runs `tsc --noEmit` as a dedicated step — never remove it.
 
 ---
 
-## E006 — Quote/Author Lost on Back Navigation (fixed in Migration 008)
+## E005 — End Date Not Reactive
 
-**What happened:** Step4_Review has quote and author input fields. These were not included in the wizard session context, so navigating Back from ResultScreen to Step4_Review rendered the fields empty even if the user had filled them in.
+**What went wrong:** Auto-calculated end date in Step2_Time computed only on mount. Changing start or end time after mount did not update it. The calculation was not inside a `useEffect` with correct dependencies.
 
-**Rule:** Every user-entered field in every wizard step must be part of wizard session state in context. Nothing that the user typed should be lost on Back navigation. When adding a new input field to any wizard step, always add the corresponding field to the wizard context type and persist it on every change.
+**Root cause:** Derived values computed once at mount instead of reactively.
 
----
-
-## E007 — Headcount Station Type Partially Removed (fixed in Migration 007)
-
-**What happened:** The headcount station type was removed from the UI in Migration 007 but remnants remained in `src/storage/types.ts` (`headcountRequired`, `headcountParticipants`) and in conditional branches in logic files checking `stationType === "headcount"`. These caused type inconsistencies and dead code paths.
-
-**Rule:** When removing a feature, search the entire codebase for all references — types, logic, components, tests — and remove every one. Use `grep -r "headcount"` to verify zero occurrences remain before declaring the migration done.
+**Rule:** Any value derived from form fields must live in a `useEffect` whose dependency array includes all relevant fields. For end date: depends on both start time and end time. For duration preview: depends on start time, end time, participant count, and rounding mode. Apply the `userOverrodeX` flag pattern to avoid overwriting user-entered values.
 
 ---
 
-## E008 — Drag Triggered by Scroll (fixed in Migration 011)
+## E006 — Quote/Author Lost on Back Navigation
 
-**What happened:** The default `@dnd-kit` sensor configuration activates drag immediately on touch, with no delay. On mobile, normal downward scrolling through a list triggered accidental participant reorders constantly.
+**What went wrong:** Quote and author fields in Step4_Review were not included in wizard session context. Navigating Back from ResultScreen then forward again rendered the fields empty.
 
-**Rule:** All `@dnd-kit` sensor configurations in this app must use the 300ms/5px activation constraint (see CONVENTIONS.md). Never instantiate a sensor without this constraint. This applies to every `useSensor` call in every component — Step3_Order, Step4_Review, and any future drag-and-drop surface.
+**Root cause:** New input fields added to a wizard step without adding them to wizard context.
 
----
-
-## E009 — Continue Round Ignored Station Structure (fixed in Migration 012)
-
-**What happened:** The "Continue Round" feature re-entered the wizard after Step1_Stations, skipping station configuration entirely. This meant station changes were not possible between rounds and the station structure was silently assumed to be identical to the previous round.
-
-**Rule:** Continue Round always enters the wizard at Step1_Stations with pre-filled values from the previous round. The user must always be able to adjust station configuration before proceeding. Never skip Step1_Stations in any wizard entry path.
+**Rule:** Every user-entered field in every wizard step must be part of wizard session state in context. When adding any new input to a wizard step, always add the corresponding field to the wizard context type and persist it on every change.
 
 ---
 
-## E010 — Time Input Shown in Wrong Order on Desktop (fixed in Migration 008.2)
+## E007 — Headcount Feature Partially Removed
 
-**What happened:** The custom desktop `TimePicker` component rendered MM to the left of HH — reversed from the expected HH:MM format. This was a rendering order bug in the two-spinner layout.
+**What went wrong:** Headcount station type was removed from the UI but `headcountRequired` and `headcountParticipants` remained in `src/storage/types.ts` and conditional branches remained in logic files.
 
-**Rule:** Time always displays and is entered as HH (left) : MM (right). When building or modifying `TimePicker`, verify the rendered order visually. HH input must have a lower DOM position / flex order than MM input.
+**Root cause:** Incomplete removal — UI was cleaned but types and logic were not.
+
+**Rule:** When removing a feature, grep the entire codebase for every reference — types, logic, components, tests. Use `grep -r "headcount"` and verify zero occurrences before declaring done. Same rule applies to any future feature removal.
+
+---
+
+## E008 — Drag Triggered by Normal Scrolling
+
+**What went wrong:** Default `@dnd-kit` sensor activates drag immediately on touch. Normal scrolling through Step3_Order triggered accidental reorders constantly on mobile.
+
+**Root cause:** No activation delay on touch sensor.
+
+**Rule:** All `@dnd-kit` sensor configs must use `{ delay: 300, tolerance: 5 }`. Never instantiate a sensor without this constraint. Apply to every `useSensor` call in the entire app.
+
+---
+
+## E009 — Continue Round Skipped Step1_Stations
+
+**What went wrong:** "Continue Round" re-entered the wizard after Step1_Stations, skipping station configuration. Station changes were impossible between rounds.
+
+**Root cause:** Continuation wizard entered at the wrong step.
+
+**Rule:** Continue Round always enters at Step1_Stations with pre-filled values. Never skip Step1_Stations in any wizard entry path.
+
+---
+
+## E010 — Desktop TimePicker Rendered MM Before HH
+
+**What went wrong:** The custom desktop TimePicker rendered MM to the left of HH — reversed from the expected HH:MM format.
+
+**Root cause:** Rendering order bug in the two-spinner layout.
+
+**Rule:** Time always displays as HH (left) : MM (right). When building or modifying TimePicker, verify rendered order visually. HH input must have lower DOM position or flex order than MM input.
+
+---
+
+## E011 — DragOverlay Invisible During Cross-Container Drag on Mobile
+
+**What went wrong:** DragOverlay was mounted inside a station card with `overflow: hidden`, clipping it on mobile when dragged outside the card boundary. Desktop was unaffected because overflow clipping behaves differently.
+
+**Root cause:** DragOverlay mounted inside a scrollable or overflow-clipped container.
+
+**Rule:** DragOverlay is always mounted at the root layout level in `Layout.tsx`. Never inside any station card, list, scrollable container, or any element that could clip its children.
+
+---
+
+## E012 — Dragged Item Jumped on Activation
+
+**What went wrong:** When drag activated after the 300ms hold, the dragged item visually jumped far from its original position before following the finger. Caused by stale droppable measurements.
+
+**Root cause:** `@dnd-kit` measured droppable positions only on mount, not continuously. After page scroll, measurements were stale and the overlay rendered with incorrect offset.
+
+**Rule:** All `DndContext` instances must include `measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}`. Never omit this prop.
+
+---
+
+## E013 — Scroll Stuck in Step3_Order
+
+**What went wrong:** Normal downward page scrolling in Step3_Order got stuck because `touch-action: none` was applied too broadly — on list containers rather than only on drag handles — causing the browser to suppress scroll events during the 300ms hold window.
+
+**Root cause:** `touch-none` applied to the wrong element.
+
+**Rule:** `touch-action: none` (`touch-none`) applies exclusively to the `DragHandle` component. Never to list containers, station cards, or the page. The scrollable page container must have `touch-action: pan-y` to always allow vertical scroll.
+
+---
+
+## E014 — Multi-Station Recalculation Lost Previous Station State
+
+**What went wrong:** RecalculateScreen held recalculation state only for the currently selected station. Switching stations discarded the previous station's custom end time. "שמירת השינויים" applied only the last station's configuration.
+
+**Root cause:** Transient per-session state in a separate screen is fragile for multi-entity editing.
+
+**Rule:** When multiple entities (stations) need independent editable state, that state belongs inline in the parent screen (Step4_Review), not in a separate screen's local state. End time editing now lives directly in Step4_Review as an editable field per station header.
+
+---
+
+## E015 — Continue Round Start Time Ignored User Input
+
+**What went wrong:** In continue round mode, Step2_Time pre-fills start time from the previous round's end time. If the user manually changed it, Step4_Review still used the pre-filled value when generating participant times, ignoring the user's input.
+
+**Root cause:** No override flag to distinguish user-entered values from programmatically pre-filled defaults.
+
+**Rule:** Any field pre-filled programmatically must have a `userOverrodeX` boolean flag in wizard session state. Set to true when the user manually edits the field. Schedule generation always prefers the user's value when the flag is true. This is a project-wide convention — user input always wins over pre-filled defaults.
+
+---
+
+## E016 — Time Sorting Broke on Midnight-Crossing Schedules
+
+**What went wrong:** UniteScreen sorted participants by HH:MM string. A participant starting at 23:00 on day 1 sorted after one starting at 00:20 on day 2 because "00" < "23" lexicographically.
+
+**Root cause:** Sorting by time string without considering the date component.
+
+**Rule:** Always sort by full datetime — combine `date` (YYYY-MM-DD) and `startTime` (HH:MM) into a comparable value before sorting. Never sort by time string alone anywhere in the app.
+
+---
+
+## E017 — Continue Round Auto-Shuffled Without User Action
+
+**What went wrong:** Participants appeared in a different order in continued rounds without the user pressing the shuffle button. The ordering algorithm used randomization as a tiebreaker, producing non-deterministic results across runs.
+
+**Root cause:** Randomization in a function that should be deterministic.
+
+**Rule:** The continue round ordering algorithm must be fully deterministic. Use alphabetical by name as the tiebreaker — never `Math.random()` in any ordering function. Shuffling happens only when the user explicitly presses the shuffle button. Run the ordering function 10 times with the same input in tests and assert identical output every time.

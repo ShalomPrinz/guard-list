@@ -11,19 +11,40 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 - **Drag & Drop:** `@dnd-kit/core` (mobile touch support required)
 - **No backend** — fully client-side, all data in localStorage
 
-## Key Architectural Rules
+## Architecture
 
-- All localStorage access goes through typed helpers in `src/storage/` — never directly from components
-- All scheduling math lives in pure functions in `src/logic/` — no side effects, no React
-- Participant **name** is the unique key for statistics tracking across rounds
-- Schedules are immutable once saved — history is never retroactively modified
-- One-time renames in Step 4 do NOT propagate to the saved group
+- **Framework:** React + TypeScript (Vite)
+- **Styling:** Tailwind CSS with dark mode (`class` strategy)
+- **Routing:** React Router DOM (flat screen-per-file structure)
+- **State:** React Context for active wizard session; localStorage for all persistence
+- **Drag & Drop:** `@dnd-kit/core` (mobile touch support required)
+- **Persistence:** localStorage as source of truth; Upstash Redis (via Vercel Edge Function at `api/kv.ts`) as silent background backup
+- **Identity:** Username stored in localStorage indefinitely via `src/storage/userStorage.ts`; scopes all KV keys
+- **No backend** — fully client-side except for the single Edge Function that proxies KV writes
+
+### KV Database
+
+- All KV (Upstash Redis) access goes through `src/storage/cloudStorage.ts` — never imported directly by components or logic
+- KV is a fire-and-forget backup layer only — localStorage is always the source of truth. KV failure is always silent
+- All KV keys are scoped by username: `{username}:{namespace}:{id}` — helpers add the prefix automatically, callers never include it
+- `syncFromCloud()` runs once on app startup and only fills gaps — it never overwrites existing localStorage data
+- Wizard session state, UniteScreen state, and standby selections are intentionally ephemeral — they are never written to KV
 
 ## Docs
 
 @docs/business-logic.md
 @docs/CONVENTIONS.md
 @docs/ERRORS.md
+
+## Keeping Project Memory Fresh
+
+After completing any non-trivial piece of work, run:
+
+> /update-docs
+
+This prompts Claude Code to review the session and decide whether `docs/CONVENTIONS.md` or `docs/ERRORS.md` need new entries. It outputs only the additions — never rewrites the whole file.
+
+Run it before ending any session where you: added a new component pattern, fixed a bug that took more than one attempt, or were told to never do something again.
 
 ## Requirements
 
