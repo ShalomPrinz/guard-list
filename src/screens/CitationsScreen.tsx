@@ -205,7 +205,7 @@ export default function CitationsScreen() {
       {/* Edit / Add modal */}
       {editing !== null && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 dark:bg-black/60"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 dark:bg-black/60"
           onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}
         >
           <div className="w-full max-w-lg rounded-t-3xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900">
