@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 015 — Unite Lists for All Guard Lists.
+ * E2E tests for Unite Lists for All Guard Lists.
  *
  * Covers:
  * - "איחוד רשימות" button appears on every ResultScreen (continued AND non-continued)

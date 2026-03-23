@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 006:
+ * E2E tests for welcome screen, dark mode toggle, and header icon:
  * - Welcome state when no groups exist
  * - Dark/light mode toggle in Header
  */

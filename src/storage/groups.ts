@@ -8,7 +8,7 @@ export function getGroups(storage: Storage = window.localStorage): Group[] {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw) as Group[]
-    // Migration: apply default role: 'warrior' for any member missing the field
+    // Backfill: apply default role: 'warrior' for any member missing the field
     return parsed.map(g => ({
       ...g,
       members: g.members.map(m => ({ ...m, role: m.role ?? 'warrior' })),

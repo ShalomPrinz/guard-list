@@ -40,7 +40,7 @@ Never mock it per-file. Never remove this from the setup file.
 
 ## E004 — Unused Variable Broke Vercel Build
 
-**What went wrong:** A variable `user` was declared but never read in `tests/e2e/flowMigration008.test.tsx`. TypeScript flagged it as TS6133. Vercel runs `npm run build` which includes type checking, causing deployment to fail with exit code 2.
+**What went wrong:** A variable `user` was declared but never read in `tests/e2e/flowReviewHomeScreen.test.tsx`. TypeScript flagged it as TS6133. Vercel runs `npm run build` which includes type checking, causing deployment to fail with exit code 2.
 
 **Root cause:** Tests were not type-checked before pushing. `tsc --noEmit` was not run across `tests/`.
 

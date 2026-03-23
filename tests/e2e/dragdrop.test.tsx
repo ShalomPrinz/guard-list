@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 011.1 / 013 — Drag & Drop regression guards.
+ * E2E tests for Drag & Drop regression guards.
  * Covers:
  * - Drag handle has select-none (user-select: none) applied
  * - Drag handle has touch-none (touch-action: none) applied
@@ -141,7 +141,7 @@ describe('DragHandle — Step4_Review', () => {
 
 describe('No DragOverlay (position-jump regression guard)', () => {
   /**
-   * REGRESSION GUARD: DragOverlay was removed in Migration 013 because it has a two-render
+   * REGRESSION GUARD: DragOverlay is not used because it has a two-render
    * timing bug in RTL documents — usesDragOverlay flips from false→true after the overlay
    * measures itself, causing the scroll-delta correction to change mid-drag and producing a
    * visible position jump on the Hebrew (RTL) layout.

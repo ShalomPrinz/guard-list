@@ -1,5 +1,5 @@
 /**
- * E2E tests for the global Header (Migration 005).
+ * E2E tests for the global Header.
  *
  * Verifies:
  * - Header with app name renders on HomeScreen, each wizard step,

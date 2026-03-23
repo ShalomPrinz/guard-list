@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 013 issues — new station start time selection in continue mode.
+ * E2E tests for new station start time selection in continue mode.
  *
  * Covers:
  * - A new station added in Step1 during continue mode does NOT auto-inherit any start time

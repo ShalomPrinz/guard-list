@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 013 — Continue Round ordering algorithm.
+ * E2E tests for Continue Round ordering algorithm.
  * Tests the pure functions in src/logic/continueRound.ts.
  *
  * Covers:

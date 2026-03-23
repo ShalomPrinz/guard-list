@@ -49,7 +49,6 @@ Run it before ending any session where you: added a new component pattern, fixed
 ## Requirements
 
 - Every iteration, follow @TESTING.md rules.
-- Run `vitest run --coverage` after every implementation step and every migration. Coverage must stay at or above 90% for `src/logic/` and `src/storage/` before moving on.
 - When fixing an issue, write a dedicated test specifically for the broken feature that had the issue, to prevent any regression.
 - Use `python3` for bash commands
 - All UI text must be in hebrew.
@@ -64,7 +63,7 @@ Run it before ending any session where you: added a new component pattern, fixed
 | Dev server                         | `npm run dev`                                |
 | Production build                   | `npm run build`                              |
 
-**After every migration, run these two in order before declaring done:**
+**At the end of every prompt run which introduced any code change, run these two in order before declaring done:**
 
 1. `npx tsc --noEmit` — zero errors required
 2. `npx vitest run --coverage` — ≥90% coverage required for `src/logic/` and `src/storage/`

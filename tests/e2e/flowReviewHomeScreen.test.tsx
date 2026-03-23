@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 008 — Review/HomeScreen fixes.
+ * E2E tests for Review/HomeScreen fixes.
  * Covers: quote persistence, default name, clickable cards, text corrections, back from history.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'

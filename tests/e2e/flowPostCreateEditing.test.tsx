@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 004 features:
+ * E2E tests for scroll-to-top, post-create editing, and swap recalculation:
  *
  * 1. Post-create state preservation — participant names survive the
  *    ResultScreen → Step4 back navigation.

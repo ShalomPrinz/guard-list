@@ -1,5 +1,5 @@
 /**
- * E2E tests for Migration 011 — Show All Warriors in Order Screen & Drag Hold Threshold.
+ * E2E tests for Show All Warriors in Order Screen & Drag Hold Threshold.
  * Covers:
  * - "בית" members appear in "לא משובצים" section on Step3_Order mount
  * - Removing a station member sends them to "לא משובצים"
@@ -94,7 +94,7 @@ afterEach(() => {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('Migration 011 — לא משובצים section visibility', () => {
+describe('לא משובצים section visibility', () => {
   it('shows "לא משובצים" section when there are "בית" members', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroupWithHomeMembers())
@@ -110,14 +110,14 @@ describe('Migration 011 — לא משובצים section visibility', () => {
     renderApp()
     await navigateToStep3(user)
 
-    // "לא משובצים" section is always rendered (Migration 012 — never conditionally removed)
+    // "לא משובצים" section is always rendered — never conditionally removed
     expect(screen.getByText('לא משובצים')).toBeTruthy()
     // Placeholder text shown when section is empty
     expect(screen.getByText('גרור לוחם לכאן להוצאה מהרשימה')).toBeTruthy()
   })
 })
 
-describe('Migration 011 — "בית" members in "לא משובצים"', () => {
+describe('"בית" members in "לא משובצים"', () => {
   it('shows "בית" member in "לא משובצים" section with "בית" badge', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroupWithHomeMembers())
@@ -143,7 +143,7 @@ describe('Migration 011 — "בית" members in "לא משובצים"', () => {
   })
 })
 
-describe('Migration 011 — remove from station to "לא משובצים"', () => {
+describe('remove from station to "לא משובצים"', () => {
   it('removing a member from a station sends them to "לא משובצים"', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroupWithHomeMembers())
@@ -174,7 +174,7 @@ describe('Migration 011 — remove from station to "לא משובצים"', () =>
     renderApp()
     await navigateToStep3(user)
 
-    // "לא משובצים" section is always rendered (Migration 012)
+    // "לא משובצים" section is always rendered
     expect(screen.getByText('לא משובצים')).toBeTruthy()
     // Initially shows placeholder since all are assigned
     expect(screen.getByText('גרור לוחם לכאן להוצאה מהרשימה')).toBeTruthy()
@@ -191,7 +191,7 @@ describe('Migration 011 — remove from station to "לא משובצים"', () =>
   })
 })
 
-describe('Migration 011 — member in "לא משובצים" shown in Step4_Review after re-assignment', () => {
+describe('member in "לא משובצים" shown in Step4_Review after re-assignment', () => {
   it('base members assigned to station show correct shift times in Step4_Review', async () => {
     const user = userEvent.setup()
     // All base members distributed to station — verify times are shown correctly

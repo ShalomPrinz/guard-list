@@ -1,5 +1,5 @@
 /**
- * E2E tests for Citation Management (Migration 014).
+ * E2E tests for Citation Management.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
