@@ -6,11 +6,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import StandbyScreen, { formatStandbyText } from '../../src/screens/StandbyScreen'
-import HomeScreen from '../../src/screens/HomeScreen'
-import { createLocalStorageMock } from '../../src/tests/localStorageMock'
-import { upsertGroup } from '../../src/storage/groups'
-import type { Group } from '../../src/types'
+import StandbyScreen, { formatStandbyText } from '@/screens/StandbyScreen'
+import HomeScreen from '@/screens/HomeScreen'
+import { createLocalStorageMock } from '@/tests/localStorageMock'
+import { upsertGroup } from '@/storage/groups'
+import type { Group } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

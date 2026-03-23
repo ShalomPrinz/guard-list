@@ -7,11 +7,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import GroupEditScreen from '../../src/screens/GroupEditScreen'
-import StandbyScreen, { formatStandbyText } from '../../src/screens/StandbyScreen'
-import { createLocalStorageMock } from '../../src/tests/localStorageMock'
-import { upsertGroup, getGroupById } from '../../src/storage/groups'
-import type { Group } from '../../src/types'
+import GroupEditScreen from '@/screens/GroupEditScreen'
+import StandbyScreen, { formatStandbyText } from '@/screens/StandbyScreen'
+import { createLocalStorageMock } from '@/tests/localStorageMock'
+import { upsertGroup, getGroupById } from '@/storage/groups'
+import type { Group } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

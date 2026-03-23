@@ -5,11 +5,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { WizardProvider } from '../../src/context/WizardContext'
-import Step1_Stations from '../../src/screens/Step1_Stations'
-import { createLocalStorageMock } from '../../src/tests/localStorageMock'
-import { upsertGroup } from '../../src/storage/groups'
-import type { Group } from '../../src/types'
+import { WizardProvider } from '@/context/WizardContext'
+import Step1_Stations from '@/screens/Step1_Stations'
+import { createLocalStorageMock } from '@/tests/localStorageMock'
+import { upsertGroup } from '@/storage/groups'
+import type { Group } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

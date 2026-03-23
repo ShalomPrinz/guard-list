@@ -21,7 +21,11 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - All scheduling and calculation logic in `src/logic/` as pure functions with no React imports. No exceptions.
 - All localStorage access through typed helpers in `src/storage/`. Never call `localStorage.getItem` / `setItem` directly from a component or screen.
 - Test files for logic: co-located as `src/logic/foo.test.ts` next to `src/logic/foo.ts`.
-- E2E tests: flat in `tests/e2e/`. No subfolders.
+- Tests in `tests/` organized into three subfolders:
+  - `wizard/` — individual wizard step tests (Step1–Step4 in isolation)
+  - `flows/` — end-to-end schedule creation flows and navigation flows
+  - `features/` — isolated feature/screen tests (group management, drag-drop, citations, etc.)
+- Path alias `@` maps to `src/`. Use `@/` for all imports from `src/` in test files. Never use `../../src/` or deeper relative paths.
 
 ---
 

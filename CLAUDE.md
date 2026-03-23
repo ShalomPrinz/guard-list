@@ -59,7 +59,7 @@ Run it before ending any session where you: added a new component pattern, fixed
 | ---------------------------------- | -------------------------------------------- |
 | Type check (must pass before done) | `npx tsc --noEmit`                           |
 | Run all tests with coverage        | `npx vitest run --coverage`                  |
-| Run a single test file             | `npx vitest run tests/e2e/fileName.test.tsx` |
+| Run a single test file             | `npx vitest run tests/test-folder/fileName.test.tsx` |
 | Dev server                         | `npm run dev`                                |
 | Production build                   | `npm run build`                              |
 

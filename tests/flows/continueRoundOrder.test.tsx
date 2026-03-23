@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest'
 import {
   buildContinueRoundQueue,
   buildContinueRoundStations,
-} from '../../src/logic/continueRound'
-import type { Schedule, WizardStation } from '../../src/types'
+} from '@/logic/continueRound'
+import type { Schedule, WizardStation } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

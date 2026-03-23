@@ -17,7 +17,7 @@ Requirements:
 # E2E Tests
 
 Focus: Testing full wizard flows and localStorage persistence without a real browser session.
-Location: `/tests/e2e/`
+Location: `/tests/subfolder/`
 Tool: Vitest + `@testing-library/react` + `localStorageMock`
 
 Approach:
