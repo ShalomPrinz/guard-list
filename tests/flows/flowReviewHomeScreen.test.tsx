@@ -147,7 +147,8 @@ describe('Step4_Review — quote and author persistence', () => {
     await waitFor(() => {
       const schedules = getSchedules()
       expect(schedules[0].quote).toBe('ציטוט לדוגמה')
-      expect(schedules[0].quoteAuthor).toBe('מחבר לדוגמה')
+      // author auto-formatted on blur: "מחבר לדוגמה" → "מ. לדוגמה"
+      expect(schedules[0].quoteAuthor).toBe('מ. לדוגמה')
     })
   })
 
@@ -166,7 +167,66 @@ describe('Step4_Review — quote and author persistence', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('ציטוט לדוגמה')).toBeTruthy()
     })
-    expect(screen.getByDisplayValue('מחבר לדוגמה')).toBeTruthy()
+    // auto-formatted on blur before create: "מחבר לדוגמה" → "מ. לדוגמה"
+    expect(screen.getByDisplayValue('מ. לדוגמה')).toBeTruthy()
+  })
+
+  it('auto-formats author name on blur when autoFormatAuthor is on', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderWizardApp()
+
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByText('הבא →'))
+
+    await user.type(screen.getByPlaceholderText('הוסף ציטוט...'), 'ציטוט')
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('שם המחבר...')).toBeTruthy()
+    })
+
+    const authorInput = screen.getByPlaceholderText('שם המחבר...')
+    await user.type(authorInput, 'יוסי ישראלי')
+    // blur the field
+    await user.tab()
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('י. ישראלי')).toBeTruthy()
+    })
+  })
+
+  it('does not auto-format author when autoFormatAuthor toggle is off', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderWizardApp()
+
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    await user.click(screen.getByText('הבא →'))
+    await user.click(screen.getByText('הבא →'))
+
+    await user.type(screen.getByPlaceholderText('הוסף ציטוט...'), 'ציטוט')
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('שם המחבר...')).toBeTruthy()
+    })
+
+    // autoFormatAuthor toggle is the first switch in the DOM (appears in the author label row)
+    const switches = screen.getAllByRole('switch')
+    const autoFormatToggle = switches[0]
+    await user.click(autoFormatToggle)
+
+    const authorInput = screen.getByPlaceholderText('שם המחבר...')
+    await user.type(authorInput, 'יוסי ישראלי')
+    await user.tab()
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('יוסי ישראלי')).toBeTruthy()
+    })
   })
 })
 

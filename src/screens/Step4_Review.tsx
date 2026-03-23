@@ -468,7 +468,8 @@ export default function Step4_Review() {
     return link && link !== 'skip' ? link : ''
   })
   // Manual mode: save citation to the DB collection
-  const [saveToCollection, setSaveToCollection] = useState(false)
+  const [saveToCollection, setSaveToCollection] = useState(session?.saveToCollection ?? true)
+  const [autoFormatAuthor, setAutoFormatAuthor] = useState(session?.autoFormatAuthor ?? true)
   const [manualLinkedMemberId, setManualLinkedMemberId] = useState('')
 
   function setCitationMode(mode: 'random' | 'collection' | 'manual') {
@@ -965,10 +966,39 @@ export default function Step4_Review() {
             {quote.trim() && (
               <>
                 <div className="mt-3">
-                  <label className="mb-1 block text-sm text-gray-500 dark:text-gray-400">מחבר הציטוט</label>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="text-sm text-gray-500 dark:text-gray-400">מחבר הציטוט</label>
+                    <div className="flex min-h-[44px] items-center gap-2">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">עיצוב אוטומטי של שם</span>
+                      <button
+                        role="switch"
+                        aria-checked={autoFormatAuthor}
+                        onClick={() => {
+                          const next = !autoFormatAuthor
+                          setAutoFormatAuthor(next)
+                          updateSession({ autoFormatAuthor: next })
+                        }}
+                        className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+                          autoFormatAuthor ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                            autoFormatAuthor ? 'left-0.5 translate-x-5' : 'left-0.5 translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
                   <input
                     value={quoteAuthor}
                     onChange={e => setQuoteAuthor(e.target.value)}
+                    onBlur={() => {
+                      if (!autoFormatAuthor) return
+                      const formatted = formatAuthorName(quoteAuthor)
+                      setQuoteAuthor(formatted)
+                      updateSession({ quoteAuthor: formatted })
+                    }}
                     placeholder="שם המחבר..."
                     className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
                   />
@@ -1000,7 +1030,11 @@ export default function Step4_Review() {
                   <button
                     role="switch"
                     aria-checked={saveToCollection}
-                    onClick={() => setSaveToCollection(v => !v)}
+                    onClick={() => {
+                      const next = !saveToCollection
+                      setSaveToCollection(next)
+                      updateSession({ saveToCollection: next })
+                    }}
                     className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
                       saveToCollection ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                     }`}

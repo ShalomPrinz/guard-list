@@ -131,4 +131,6 @@ export interface WizardSession {
   quoteAuthor?: string;
   citationMode?: 'random' | 'collection' | 'manual';
   citationId?: string; // ID of the DB citation selected (random or collection modes)
+  autoFormatAuthor?: boolean; // default true — auto-format author name on blur in manual mode
+  saveToCollection?: boolean; // default true — save manual citation to collection on create
 }
