@@ -57,6 +57,8 @@ interface ReviewStation {
   startTime: string
   startDate: string
   roundingAlgorithm: RoundingAlgorithm
+  /** Set when the user manually edits end time for this station in the timing modal. */
+  endTimeOverride?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -556,7 +558,7 @@ export default function Step4_Review() {
           date: sp.date,
           locked: sp.locked,
         }))
-        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding }
+        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding, endTimeOverride: config.endTime }
       }
 
       return { ...st, items: recomputeTimes(st.items, newStartTime, st.startDate), startTime: newStartTime, roundingAlgorithm: resolvedRounding }
@@ -672,7 +674,9 @@ export default function Step4_Review() {
       )
     }
 
-    // Recalculate durations for all stations (participant counts may have changed)
+    // Recalculate durations for all stations (participant counts may have changed).
+    // Stations that have a user-edited end time override keep their custom timing via
+    // recalculateStation; only stations without an override use the global session config.
     const counts = reordered.map(s => s.items.length)
     const durations = calcStationDurations({
       startTime: session.timeConfig.startTime,
@@ -684,6 +688,21 @@ export default function Step4_Review() {
     })
 
     setStations(reordered.map((st, idx) => {
+      if (st.endTimeOverride && st.items.length > 0) {
+        // Station has a user-set end time — preserve it by recalculating from that end time.
+        const parts = st.items.map(it => ({ name: it.name, locked: it.locked }))
+        const recalculated = recalculateStation(parts, st.startTime, st.startDate, st.endTimeOverride, st.roundingAlgorithm)
+        const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
+          id: st.items[j]?.id ?? `${st.stationConfigId}-drag-${j}`,
+          name: sp.name,
+          durationMinutes: sp.durationMinutes,
+          startTime: sp.startTime,
+          endTime: sp.endTime,
+          date: sp.date,
+          locked: sp.locked,
+        }))
+        return { ...st, items: newItems }
+      }
       const dur = durations[idx]?.roundedDurationMinutes ?? 60
       const newItems = st.items.map(it => ({ ...it, durationMinutes: dur }))
       return { ...st, items: recomputeTimes(newItems, st.startTime, st.startDate) }
