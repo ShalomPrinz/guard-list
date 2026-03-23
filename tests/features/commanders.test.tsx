@@ -79,17 +79,17 @@ afterEach(() => {
 describe('formatStandbyText — commander line', () => {
   it('includes commander line when commanderName is provided', () => {
     const text = formatStandbyText('כיתת כוננות', ['Alice', 'Bob'], 'Commander Name')
-    expect(text).toBe('כיתת כוננות\n\nמפקד: Commander Name\n\n1. Alice\n2. Bob')
+    expect(text).toBe('*כיתת כוננות*\n\nמפקד: Commander Name\n\n1. Alice\n2. Bob')
   })
 
   it('omits commander line when no commanderName provided', () => {
     const text = formatStandbyText('כיתת כוננות', ['Alice', 'Bob'])
-    expect(text).toBe('כיתת כוננות\n\n1. Alice\n2. Bob')
+    expect(text).toBe('*כיתת כוננות*\n\n1. Alice\n2. Bob')
   })
 
   it('includes only commander line with no warriors', () => {
     const text = formatStandbyText('כיתת כוננות', [], 'Commander')
-    expect(text).toBe('כיתת כוננות\n\nמפקד: Commander\n')
+    expect(text).toBe('*כיתת כוננות*\n\nמפקד: Commander\n')
   })
 })
 
@@ -307,7 +307,7 @@ describe('StandbyScreen — commander selection', () => {
 
     await user.click(screen.getByText('📋 העתק לווטסאפ'))
 
-    expect(clipboardText).toBe('כיתת כוננות\n\nמפקד: Commander Alice\n\n1. Warrior Bob')
+    expect(clipboardText).toBe('*כיתת כוננות* - החל מהשעה 22:00\n\nמפקד: Commander Alice\n\n1. Warrior Bob')
   })
 })
 

@@ -54,19 +54,40 @@ afterEach(() => {
 // ─── formatStandbyText unit tests ─────────────────────────────────────────────
 
 describe('formatStandbyText', () => {
-  it('formats a numbered list with title', () => {
+  it('wraps title in bold markdown asterisks', () => {
     const text = formatStandbyText('כיתת כוננות', ['Alice', 'Bob', 'Charlie'])
-    expect(text).toBe('כיתת כוננות\n\n1. Alice\n2. Bob\n3. Charlie')
+    expect(text).toBe('*כיתת כוננות*\n\n1. Alice\n2. Bob\n3. Charlie')
   })
 
-  it('returns only title and empty line when no names selected', () => {
+  it('returns only bold title and empty line when no names selected', () => {
     const text = formatStandbyText('כיתת כוננות', [])
-    expect(text).toBe('כיתת כוננות\n')
+    expect(text).toBe('*כיתת כוננות*\n')
   })
 
-  it('uses custom title', () => {
+  it('uses custom title in bold', () => {
     const text = formatStandbyText('כוננות לילה', ['David'])
-    expect(text).toBe('כוננות לילה\n\n1. David')
+    expect(text).toBe('*כוננות לילה*\n\n1. David')
+  })
+
+  it('appends note after dash when provided (time mode)', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], undefined, 'החל מהשעה 22:00')
+    expect(text).toBe('*כיתת כוננות* - החל מהשעה 22:00\n\n1. Alice')
+  })
+
+  it('appends freetext note after dash', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], undefined, 'הכנה לאימון')
+    expect(text).toBe('*כיתת כוננות* - הכנה לאימון\n\n1. Alice')
+  })
+
+  it('no dash when note is undefined', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], undefined, undefined)
+    expect(text).toContain('*כיתת כוננות*')
+    expect(text).not.toContain(' - ')
+  })
+
+  it('includes commander line before warriors', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], 'Bob', 'החל מהשעה 20:00')
+    expect(text).toBe('*כיתת כוננות* - החל מהשעה 20:00\n\nמפקד: Bob\n\n1. Alice')
   })
 })
 
@@ -191,7 +212,7 @@ describe('StandbyScreen — select all / deselect all', () => {
 // ─── WhatsApp text format ─────────────────────────────────────────────────────
 
 describe('StandbyScreen — WhatsApp output format', () => {
-  it('produces a correctly numbered list with the default title', async () => {
+  it('produces a bold title with default note (time mode 22:00)', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
 
@@ -204,10 +225,10 @@ describe('StandbyScreen — WhatsApp output format', () => {
     renderStandby()
 
     await user.click(screen.getByText('📋 העתק לווטסאפ'))
-    expect(clipboardText).toBe('כיתת כוננות\n\n1. Alice\n2. Bob')
+    expect(clipboardText).toBe('*כיתת כוננות* - החל מהשעה 22:00\n\n1. Alice\n2. Bob')
   })
 
-  it('uses the custom title from the input field', async () => {
+  it('uses the custom title in bold from the input field', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
 
@@ -224,7 +245,7 @@ describe('StandbyScreen — WhatsApp output format', () => {
     await user.type(titleInput, 'כוננות לילה')
 
     await user.click(screen.getByText('📋 העתק לווטסאפ'))
-    expect(clipboardText.startsWith('כוננות לילה')).toBe(true)
+    expect(clipboardText.startsWith('*כוננות לילה*')).toBe(true)
   })
 })
 
@@ -274,6 +295,104 @@ describe('StandbyScreen — multiple groups', () => {
     renderStandby()
 
     expect(screen.queryByRole('combobox')).toBeNull()
+  })
+})
+
+// ─── Note feature ─────────────────────────────────────────────────────────────
+
+describe('StandbyScreen — note section', () => {
+  it('renders note section with "הוסף הערה" checkbox checked by default', () => {
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    const noteCheckbox = screen.getByRole('checkbox', { name: 'הוסף הערה' })
+    expect((noteCheckbox as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('shows mode buttons when note is enabled', () => {
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    expect(screen.getByText('שעת התחלה')).toBeTruthy()
+    expect(screen.getByText('טקסט חופשי')).toBeTruthy()
+  })
+
+  it('disabling note removes dash from clipboard output', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    // Disable note
+    await user.click(screen.getByRole('checkbox', { name: 'הוסף הערה' }))
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).toBe('*כיתת כוננות*\n\n1. Alice\n2. Bob')
+    expect(clipboardText).not.toContain(' - ')
+  })
+
+  it('time mode appends "החל מהשעה 22:00" by default', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).toContain('החל מהשעה 22:00')
+  })
+
+  it('switching to freetext mode and typing produces freetext note', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    // Switch to freetext mode
+    await user.click(screen.getByText('טקסט חופשי'))
+
+    // Type note text
+    const textInput = screen.getByPlaceholderText('הזן טקסט חופשי...')
+    await user.type(textInput, 'בדיקה')
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).toContain('*כיתת כוננות* - בדיקה')
+  })
+
+  it('freetext mode with empty input produces no note (no dash)', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    // Switch to freetext mode (leave empty)
+    await user.click(screen.getByText('טקסט חופשי'))
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).not.toContain(' - ')
   })
 })
 

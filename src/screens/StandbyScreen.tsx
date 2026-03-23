@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { getGroups } from '../storage/groups'
 import type { Group, Member } from '../types'
 import AvailabilityToggle from '../components/AvailabilityToggle'
+import TimePicker from '../components/TimePicker'
 
-export function formatStandbyText(title: string, selectedNames: string[], commanderName?: string): string {
-  const parts: string[] = [title, '']
+export function formatStandbyText(
+  title: string,
+  selectedNames: string[],
+  commanderName?: string,
+  note?: string,
+): string {
+  const boldTitle = `*${title}*`
+  const titleLine = note ? `${boldTitle} - ${note}` : boldTitle
+  const parts: string[] = [titleLine, '']
   if (commanderName) {
     parts.push(`מפקד: ${commanderName}`, '')
   }
@@ -23,6 +31,12 @@ export default function StandbyScreen() {
   // Session-only availability overrides — does NOT modify saved group in localStorage
   const [localAvailabilityById, setLocalAvailabilityById] = useState<Record<string, 'base' | 'home'>>({})
   const [copied, setCopied] = useState(false)
+
+  // Note state — session-only
+  const [noteEnabled, setNoteEnabled] = useState(true)
+  const [noteMode, setNoteMode] = useState<'time' | 'freetext'>('time')
+  const [noteTime, setNoteTime] = useState('22:00')
+  const [noteText, setNoteText] = useState('')
 
   const group = groups.find(g => g.id === selectedGroupId)
 
@@ -92,7 +106,13 @@ export default function StandbyScreen() {
     ? allMembers.find(m => m.id === selectedCommanderId)?.name
     : undefined
 
-  const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName)
+  function computeNote(): string | undefined {
+    if (!noteEnabled) return undefined
+    if (noteMode === 'time') return `החל מהשעה ${noteTime}`
+    return noteText || undefined
+  }
+
+  const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName, computeNote())
   const hasOutput = orderedSelectedWarriors.length > 0 || !!commanderName
 
   async function handleCopy() {
@@ -147,6 +167,64 @@ export default function StandbyScreen() {
           onChange={e => setTitle(e.target.value)}
           className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
+      </div>
+
+      {/* Note section */}
+      <div className="mb-4 rounded-2xl bg-gray-50 px-4 py-3 dark:bg-gray-800/60">
+        {/* Enable toggle */}
+        <label className="flex min-h-[44px] cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={noteEnabled}
+            onChange={e => setNoteEnabled(e.target.checked)}
+            className="h-5 w-5 rounded accent-blue-600"
+          />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">הוסף הערה</span>
+        </label>
+
+        {noteEnabled && (
+          <div className="mt-3 flex flex-col gap-3">
+            {/* Mode selector */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setNoteMode('time')}
+                className={`min-h-[44px] flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  noteMode === 'time'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600'
+                }`}
+              >
+                שעת התחלה
+              </button>
+              <button
+                onClick={() => setNoteMode('freetext')}
+                className={`min-h-[44px] flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  noteMode === 'freetext'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:active:bg-gray-600'
+                }`}
+              >
+                טקסט חופשי
+              </button>
+            </div>
+
+            {/* Time picker */}
+            {noteMode === 'time' && (
+              <TimePicker value={noteTime} onChange={setNoteTime} />
+            )}
+
+            {/* Free text input */}
+            {noteMode === 'freetext' && (
+              <input
+                type="text"
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                placeholder="הזן טקסט חופשי..."
+                className="min-h-[44px] w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Commander section — shown only when group has commanders */}
