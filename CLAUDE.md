@@ -58,3 +58,23 @@ Run it before ending any session where you: added a new component pattern, fixed
 
 1. `npx tsc --noEmit` — zero errors required
 2. `npx vitest run --coverage` — ≥90% coverage required for `src/logic/` and `src/storage/`
+
+## Commit Style
+
+When suggesting commit messages, match this style exactly:
+
+- add plan-tasks command to ease generating informative prompts with claude code
+- add update-docs to claude commands to keep CONVENTIONS and ERRORS up-to-date
+- refactor test/ folder into 3 different test subfolders organized by test purpose grouping
+- update project most used md files
+- change hold to drag threshold to 300ms
+- refactor: replace RecalculateScreen with inline end time editing per station in Step4_Review
+- use availability toggle inside wizard, and split commanders from warriors
+- show informative loading state while registering new user
+- update sync-history.md to summarize what fixed instead of what's broken
+- introduce a username-based identity layer that scopes all KV keys per user
+- connect app to vercel KV database (redis by upstash)
+- unite lists is available for all lists
+- introduce citations collection and management to be used in guard lists
+
+Rules inferred from the examples above apply.
