@@ -101,9 +101,9 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 - All modal surfaces use `fixed inset-0 z-50` as the backdrop.
 - Body scroll lock: use `useBodyScrollLock` from `src/hooks/useBodyScrollLock.ts`. For standalone component modals (mounted only when open), call `useBodyScrollLock(true)`. For inline modals in screen files, call `useBodyScrollLock(isOpen)` unconditionally at the top of the screen component.
-- Bottom-sheet modal panels must have `max-h-[90vh]` and `overflow-y-auto` on the inner panel div.
-- Safe-area top padding: use `style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}` on the inner panel (not the backdrop). Do not use a Tailwind class for this — Tailwind cannot express CSS env() variables.
-- Close button: add `×` button to every bottom-sheet modal panel (not `ConfirmDialog` — it already has cancel+confirm). Position `absolute top-4 left-4` (RTL: left-4 = visual top-right). The panel must have `relative` in its className.
+- Modal backdrop uses `flex items-start justify-center pt-4` to place the panel near the top of the screen — never `items-end`, which hides content when scroll is locked on mobile.
+- Modal panels use `rounded-2xl` and must have `max-h-[90vh]` and `overflow-y-auto` on the inner panel div.
+- Close button: add `×` button to every modal panel (not `ConfirmDialog` — it already has cancel+confirm). Style: `absolute top-3 left-3 h-10 w-10 text-xl font-bold` (RTL: left-3 = visual top-right). The panel must have `relative` in its className.
 - `UsernameGate.tsx` uses `fixed inset-0` for full-screen loading — it is NOT a modal and must never receive modal treatment.
 
 ---
