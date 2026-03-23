@@ -5,9 +5,7 @@ export default function Layout() {
   return (
     <>
       <Header />
-      <main className="pt-14">
-        <Outlet />
-      </main>
+      <Outlet />
     </>
   )
 }
