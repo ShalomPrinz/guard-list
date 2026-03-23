@@ -4,7 +4,6 @@ import { getGroupById, upsertGroup } from '../storage/groups'
 import type { Group, Member } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AvailabilityToggle from '../components/AvailabilityToggle'
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
 
 export default function GroupEditScreen() {
   const { groupId } = useParams<{ groupId: string }>()
@@ -17,8 +16,6 @@ export default function GroupEditScreen() {
   const [editingValue, setEditingValue] = useState('')
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<Member | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
-  const [showCommanderModal, setShowCommanderModal] = useState(false)
-  useBodyScrollLock(showCommanderModal)
   const editInputRef = useRef<HTMLInputElement>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstMount = useRef(true)
@@ -56,20 +53,6 @@ export default function GroupEditScreen() {
         members: prev.members.map(m =>
           m.id === memberId
             ? { ...m, availability: m.availability === 'base' ? 'home' : 'base' }
-            : m
-        ),
-      }
-    })
-  }
-
-  function toggleRole(memberId: string) {
-    setGroup(prev => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        members: prev.members.map(m =>
-          m.id === memberId
-            ? { ...m, role: (m.role ?? 'warrior') === 'commander' ? 'warrior' : 'commander' }
             : m
         ),
       }
@@ -207,7 +190,7 @@ export default function GroupEditScreen() {
 
       {/* Commander selector button */}
       <button
-        onClick={() => setShowCommanderModal(true)}
+        onClick={() => navigate(`/group/${group.id}/commanders`)}
         className="mb-4 w-full rounded-xl border-2 border-dashed border-blue-300 py-2.5 text-sm font-medium text-blue-600 active:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:active:bg-blue-900/20"
       >
         👑 בחר מפקדים
@@ -270,47 +253,6 @@ export default function GroupEditScreen() {
         />
       )}
 
-      {/* Commander selection modal */}
-      {showCommanderModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-4 bg-black/60">
-          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setShowCommanderModal(false)}
-              className="absolute top-3 left-3 flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
-              aria-label="סגור"
-            >
-              ×
-            </button>
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">בחר מפקדים</h2>
-            <ul className="mb-4 flex flex-col gap-2">
-              {group.members.map(m => (
-                <li
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-700"
-                >
-                  <input
-                    type="checkbox"
-                    checked={(m.role ?? 'warrior') === 'commander'}
-                    onChange={() => toggleRole(m.id)}
-                    className="h-5 w-5 rounded accent-blue-600"
-                    aria-label={m.name}
-                  />
-                  <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{m.name}</span>
-                  <span className={`text-xs ${(m.role ?? 'warrior') === 'commander' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                    {(m.role ?? 'warrior') === 'commander' ? 'מפקד' : 'לוחם'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={() => setShowCommanderModal(false)}
-              className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white active:bg-blue-700"
-            >
-              סגור
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

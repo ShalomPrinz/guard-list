@@ -19,6 +19,7 @@ import StandbyScreen from './screens/StandbyScreen'
 import UniteScreen from './screens/UniteScreen'
 import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
+import CommandersSelectScreen from './screens/CommandersSelectScreen'
 
 export default function App() {
   const [hasUsername, setHasUsername] = useState(() => getUsername() !== null)
@@ -38,6 +39,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<HomeScreen />} />
             <Route path="/group/:groupId/edit" element={<GroupEditScreen />} />
+            <Route path="/group/:groupId/commanders" element={<CommandersSelectScreen />} />
             <Route path="/schedule/new/step1" element={<Step1_Stations />} />
             <Route path="/schedule/new/step2" element={<Step2_Time />} />
             <Route path="/schedule/new/step3" element={<Step3_Order />} />

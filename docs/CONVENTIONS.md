@@ -148,7 +148,8 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 ## Screens & Features
 
 - **HomeScreen:** welcome state when no groups exist. Entire group card is clickable (except "מחיקה" which uses `e.stopPropagation()`). Same for history cards.
-- **GroupEditScreen:** divided into "מפקדים" section (first) and "לוחמים" section (after). "בחר מפקדים" button promotes members to commander role. Availability toggle uses shared `AvailabilityToggle` component.
+- **GroupEditScreen:** divided into "מפקדים" section (first) and "לוחמים" section (after). "בחר מפקדים" button navigates to `CommandersSelectScreen` (`/group/:groupId/commanders`) — no modal. Availability toggle uses shared `AvailabilityToggle` component.
+- **CommandersSelectScreen:** dedicated full screen for toggling member roles. Route `/group/:groupId/commanders`. Loads group via `getGroupById`, calls `upsertGroup` immediately on every checkbox toggle (autosave pattern). Sections: commanders first, warriors after. Back button returns to `/group/:groupId/edit`.
 - **Step3_Order:** availability toggle replaces "דלג". Base→Home moves warrior to "לא משובצים". Home→Base in "לא משובצים" keeps them there. Uses shared `AvailabilityToggle`.
 - **StandbyScreen (כיתת כוננות):** divided into commander section (single-select, role="commander") and warriors section (multi-select). Availability toggle uses `AvailabilityToggle`. Session-only — no persistence. WhatsApp output includes "מפקד: Name" line when a commander is selected.
 - **CitationsScreen:** CRUD for citations DB. Author auto-formatted to initials + family name on blur ("יוסי ישראלי" → "י. ישראלי"). Live preview shown during typing. Single word (family name only) left unformatted.

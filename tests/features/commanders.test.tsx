@@ -8,6 +8,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import GroupEditScreen from '@/screens/GroupEditScreen'
+import CommandersSelectScreen from '@/screens/CommandersSelectScreen'
 import StandbyScreen, { formatStandbyText } from '@/screens/StandbyScreen'
 import { createLocalStorageMock } from '@/tests/localStorageMock'
 import { upsertGroup, getGroupById } from '@/storage/groups'
@@ -35,6 +36,18 @@ function renderGroupEdit(groupId = 'g1') {
       <Routes>
         <Route path="/" element={<div>בית</div>} />
         <Route path="/group/:groupId/edit" element={<GroupEditScreen />} />
+        <Route path="/group/:groupId/commanders" element={<CommandersSelectScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+function renderCommandersSelect(groupId = 'g1') {
+  return render(
+    <MemoryRouter initialEntries={[`/group/${groupId}/commanders`]}>
+      <Routes>
+        <Route path="/group/:groupId/edit" element={<GroupEditScreen />} />
+        <Route path="/group/:groupId/commanders" element={<CommandersSelectScreen />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -89,15 +102,16 @@ describe('GroupEditScreen — בחר מפקדים button', () => {
     expect(screen.getByText('👑 בחר מפקדים')).toBeTruthy()
   })
 
-  it('opens commander modal when button is clicked', async () => {
+  it('navigates to commanders screen when button is clicked', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderGroupEdit()
 
     await user.click(screen.getByText('👑 בחר מפקדים'))
 
+    // CommandersSelectScreen should now be rendered
     expect(screen.getByText('בחר מפקדים')).toBeTruthy()
-    // All members visible in modal
+    // All members visible in the screen
     expect(screen.getAllByText('Alice').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bob').length).toBeGreaterThan(0)
   })
@@ -105,17 +119,11 @@ describe('GroupEditScreen — בחר מפקדים button', () => {
   it('promoting a member to commander persists role: commander to localStorage', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
-    renderGroupEdit()
+    renderCommandersSelect()
 
-    // Open modal
-    await user.click(screen.getByText('👑 בחר מפקדים'))
-
-    // Check Alice's checkbox in the modal
+    // Check Alice's checkbox
     const aliceCheckbox = screen.getByRole('checkbox', { name: 'Alice' })
     await user.click(aliceCheckbox)
-
-    // Close modal
-    await user.click(screen.getByText('סגור'))
 
     // Alice should now be role: commander in localStorage
     await waitFor(() => {
@@ -130,16 +138,12 @@ describe('GroupEditScreen — בחר מפקדים button', () => {
     upsertGroup(makeGroup({
       members: [{ id: 'm1', name: 'Alice', availability: 'base', role: 'commander' }],
     }))
-    renderGroupEdit()
-
-    await user.click(screen.getByText('👑 בחר מפקדים'))
+    renderCommandersSelect()
 
     // Uncheck Alice (she is already a commander)
     const aliceCheckbox = screen.getByRole('checkbox', { name: 'Alice' })
     expect((aliceCheckbox as HTMLInputElement).checked).toBe(true)
     await user.click(aliceCheckbox)
-
-    await user.click(screen.getByText('סגור'))
 
     await waitFor(() => {
       const group = getGroupById('g1')
