@@ -68,7 +68,7 @@ async function runSingleStationWizard(user: ReturnType<typeof userEvent.setup>) 
   await user.click(screen.getByText('הבא →'))                       // step3 → step4
   await user.click(screen.getByText('צור לוח שמירה ✓'))             // step4 → result
   await waitFor(() => {
-    expect(screen.getByText(/🔒/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /🔒/ })).toBeTruthy()
   })
 }
 

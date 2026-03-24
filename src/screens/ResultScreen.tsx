@@ -115,38 +115,13 @@ export default function ResultScreen() {
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{formatDate(schedule.date)}</p>
       </div>
 
-      {/* Schedule per station */}
-      <div className="mb-6 flex flex-col gap-4">
-        {schedule.stations.map(st => (
-          <div key={st.stationConfigId} className="rounded-2xl bg-white p-4 dark:bg-gray-800">
-            <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">📍 {st.stationName}</p>
-
-            {st.participants.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                {st.participants.map((p, i) => (
-                  <div key={i} className="flex items-baseline gap-3">
-                    <span className="w-11 shrink-0 font-mono text-sm text-gray-500 dark:text-gray-400">{p.startTime}</span>
-                    <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{p.durationMinutes}′</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 dark:text-gray-500">אין משתתפים</p>
-            )}
-          </div>
-        ))}
+      {/* WhatsApp preview */}
+      <div className="mb-6">
+        <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">תצוגה מקדימה - כך זה ייראה בווטסאפ</p>
+        <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200" dir="rtl">
+          {whatsappText}
+        </pre>
       </div>
-
-      {/* Quote */}
-      {schedule.quote && (
-        <div className="mb-6 rounded-2xl bg-white p-4 text-center dark:bg-gray-800">
-          <p className="text-sm italic text-gray-700 dark:text-gray-300">"{schedule.quote}"</p>
-          {schedule.quoteAuthor && (
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">— {schedule.quoteAuthor}</p>
-          )}
-        </div>
-      )}
 
       {/* WhatsApp buttons */}
       <div className="mb-3 flex gap-3">

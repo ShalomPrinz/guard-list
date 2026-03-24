@@ -116,10 +116,10 @@ describe('Full single-station schedule creation', () => {
     await runFullWizard(user)
 
     await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeTruthy()
+      expect(screen.getByText(/Alice/)).toBeTruthy()
     })
-    expect(screen.getByText('Bob')).toBeTruthy()
-    expect(screen.getByText('Charlie')).toBeTruthy()
+    expect(screen.getByText(/Bob/)).toBeTruthy()
+    expect(screen.getByText(/Charlie/)).toBeTruthy()
   })
 
   it('records statistics for each participant after creation', async () => {

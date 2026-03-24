@@ -175,3 +175,13 @@ Never mock it per-file. Never remove this from the setup file.
 **Root cause:** Randomization in a function that should be deterministic.
 
 **Rule:** The continue round ordering algorithm must be fully deterministic. Use alphabetical by name as the tiebreaker — never `Math.random()` in any ordering function. Shuffling happens only when the user explicitly presses the shuffle button. Run the ordering function 10 times with the same input in tests and assert identical output every time.
+
+---
+
+## E018 — Duplicate Schedule Preview on ResultScreen
+
+**What went wrong:** When adding a WhatsApp `<pre>` preview block to `ResultScreen`, the existing per-station cards section (`{/* Schedule per station */}`) was left in place. This created two full schedule previews side by side — a structured card view and a plain-text WhatsApp preview — both showing the same data.
+
+**Root cause:** The prompt asked to add a preview without explicitly saying to remove the existing one. The existing station cards were not considered redundant by default.
+
+**Rule:** `ResultScreen` must show schedule data in exactly one place. The WhatsApp `<pre>` preview (via `whatsappText`) is the single source. Never add a second rendering of station/participant data alongside it. When adding a preview block, always check whether an existing equivalent display needs to be removed.

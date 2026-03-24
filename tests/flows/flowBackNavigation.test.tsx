@@ -92,7 +92,7 @@ async function runFullWizard(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByText('צור לוח שמירה ✓'))
   // Wait for result screen
   await waitFor(() => {
-    expect(screen.getByText(/🔒/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /🔒/ })).toBeTruthy()
   })
 }
 

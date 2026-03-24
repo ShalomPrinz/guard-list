@@ -149,7 +149,7 @@ describe('Step4_Review — schedule creation', () => {
 
     await waitFor(() => {
       // Result screen shows the lock emoji and schedule name
-      expect(screen.getByText(/🔒/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: /🔒/ })).toBeTruthy()
     })
   })
 
