@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { setUsername, getOrCreateDeviceId } from '../storage/userStorage'
+import { setUsername, getOrCreateDeviceId, isValidUsername } from '../storage/userStorage'
 import { kvGetRaw, kvSetRaw } from '../storage/cloudStorage'
 import { pushLocalToCloud } from '../storage/syncFromCloud'
 import { getGroups } from '../storage/groups'
@@ -21,7 +21,7 @@ export default function UsernameGate({ onConfirmed }: Props) {
 
   async function handleConfirm() {
     const trimmed = input.trim()
-    if (trimmed.length < 2) {
+    if (!isValidUsername(trimmed)) {
       setValidationError(true)
       return
     }
@@ -128,7 +128,7 @@ export default function UsernameGate({ onConfirmed }: Props) {
         />
         {validationError && (
           <p className="mb-3 text-center text-sm text-red-500 dark:text-red-400">
-            שם משתמש חייב להכיל לפחות 2 תווים
+            שם משתמש חייב להכיל לפחות 2 תווים ולא לכלול את התווים: * ? [ ] ^
           </p>
         )}
         <button
