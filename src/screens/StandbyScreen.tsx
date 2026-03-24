@@ -332,6 +332,16 @@ export default function StandbyScreen() {
         </div>
       </div>
 
+      {/* WhatsApp preview */}
+      {hasOutput && (
+        <div className="mb-4 rounded-2xl bg-gray-100 p-4 dark:bg-gray-800/80">
+          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">תצוגה מקדימה - כך זה ייראה בווטסאפ</p>
+          <pre dir="rtl" className="whitespace-pre-wrap break-words font-sans text-sm text-gray-800 dark:text-gray-200">
+            {whatsappText}
+          </pre>
+        </div>
+      )}
+
       {/* WhatsApp buttons */}
       <div className="mb-3 flex gap-3">
         <button
