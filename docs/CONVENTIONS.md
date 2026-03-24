@@ -31,7 +31,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 ## TypeScript
 
-- All persisted data types defined in `src/storage/types.ts`. Single source of truth for data shape.
+- All persisted data types defined in `src/types/index.ts`. Single source of truth for data shape.
 - Never use `any`. Use `unknown` and narrow if needed.
 - Unused variables must be prefixed with `_` or removed. A declared-but-unused variable breaks the Vercel build via `tsc --noEmit`.
 - Run `tsc --noEmit` across the full project including `tests/` before declaring any prompt run as done.
@@ -45,7 +45,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - `citationAuthorLinks` in localStorage maps `authorString → memberId` for statistics attribution.
 - `Schedule` has `parentScheduleId?: string` when it is a continued round.
 - `ScheduledParticipant` has `note?: string` (optional per-warrior note, never shown in WhatsApp output).
-- All persisted types live in `src/storage/types.ts`. Never define a persisted interface elsewhere.
+- All persisted types live in `src/types/index.ts`. Never define a persisted interface elsewhere.
 
 ---
 
@@ -160,7 +160,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - **StatisticsScreen:** two tabs — "זמני שמירה" (guard time table) and "ציטוטים" (citation counts). Citation tab headers: "?באוסף" and "?שומש". Citation attribution uses `citationAuthorLinks` map, not name string matching.
 - **FallbackScreen:** route `/fallback`. Self-contained — no `Layout` or `Header` wrapper. Uses `fixed inset-0` full-screen, tap-anywhere-to-home. Shown when a wizard step guard fires (no active session). Never use as a general 404 — the `*` catch-all route still redirects to `/`.
 - **ErrorScreen:** self-contained full-screen (`fixed inset-0`), no `Layout` or `Header`. Shows "שגיאה!" in `text-red-500 dark:text-red-400` and a Hebrew apology message. Click-anywhere navigates via `window.location.href = '/'` — never `useNavigate`, because it may render outside Router context. Rendered exclusively by `ErrorBoundary`.
-- **ErrorBoundary:** class component at `src/components/ErrorBoundary.tsx`. Wraps the entire app in `src/main.tsx`, outside `App` (which contains `BrowserRouter`) so it catches router-level errors too. Uses `getDerivedStateFromError` + `componentDidCatch` (logs to console). Currently there are no per-screen error boundaries — one global boundary only.
+- **ErrorBoundary:** class component at `src/components/ErrorBoundary.tsx`. Wraps the entire app in `src/main.tsx`, outside `App` (which contains `BrowserRouter`) so it catches router-level errors too. Uses `getDerivedStateFromError` + `componentDidCatch` (logs to console and fires `kvSet(`errors:${Date.now()}`, AppErrorReport)` as a fire-and-forget KV write). Currently there are no per-screen error boundaries — one global boundary only.
 
 ---
 

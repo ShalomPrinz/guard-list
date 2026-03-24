@@ -63,6 +63,16 @@ export interface Citation {
   usedInListIds: string[]; // schedule ids where this citation was used
 }
 
+// ─── Error Reporting ──────────────────────────────────────────────────────────
+
+export interface AppErrorReport {
+  message: string;
+  stack: string;
+  componentStack: string;
+  url: string;
+  timestamp: string; // ISO string
+}
+
 // ─── Statistics ───────────────────────────────────────────────────────────────
 
 export interface ShiftRecord {

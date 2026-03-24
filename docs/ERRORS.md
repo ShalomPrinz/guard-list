@@ -70,7 +70,7 @@ Never mock it per-file. Never remove this from the setup file.
 
 ## E007 — Headcount Feature Partially Removed
 
-**What went wrong:** Headcount station type was removed from the UI but `headcountRequired` and `headcountParticipants` remained in `src/storage/types.ts` and conditional branches remained in logic files.
+**What went wrong:** Headcount station type was removed from the UI but `headcountRequired` and `headcountParticipants` remained in `src/types/index.ts` and conditional branches remained in logic files.
 
 **Root cause:** Incomplete removal — UI was cleaned but types and logic were not.
 

@@ -9,10 +9,17 @@ import userEvent from '@testing-library/user-event'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import ErrorScreen from '@/screens/ErrorScreen'
 
+vi.mock('@/storage/cloudStorage', () => ({
+  kvSet: vi.fn().mockResolvedValue(undefined),
+}))
+
+import { kvSet } from '@/storage/cloudStorage'
+
 // Suppress console.error for expected error boundary noise
 const originalConsoleError = console.error
 beforeEach(() => {
   console.error = vi.fn()
+  vi.clearAllMocks()
 })
 afterEach(() => {
   console.error = originalConsoleError
@@ -53,6 +60,24 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     )
     expect(console.error).toHaveBeenCalled()
+  })
+
+  it('calls kvSet with an AppErrorReport when a child throws', () => {
+    render(
+      <ErrorBoundary>
+        <ThrowingChild shouldThrow={true} />
+      </ErrorBoundary>,
+    )
+    expect(kvSet).toHaveBeenCalledOnce()
+    const [key, report] = (kvSet as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(key).toMatch(/^errors:\d+$/)
+    expect(report).toMatchObject({
+      message: 'test error',
+      url: expect.any(String),
+      timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    })
+    expect(typeof report.stack).toBe('string')
+    expect(typeof report.componentStack).toBe('string')
   })
 })
 
