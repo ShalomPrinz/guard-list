@@ -24,7 +24,7 @@ import {
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useWizard } from '../context/WizardContext'
-import { buildStationSchedule } from '../logic/generateSchedule'
+import { buildStationSchedule, addDaysToDate } from '../logic/generateSchedule'
 import { parseTimeToMinutes, minutesToTime, calcStationDurations, recalculateStation } from '../logic/scheduling'
 import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
@@ -279,12 +279,12 @@ function ReviewStationCard({
 
   const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
 
-  const startDate = station.startDate
-  const endDate = station.items[station.items.length - 1]?.date ?? station.startDate
-  const crossesMidnight = startDate !== endDate
-
   const [draftStartTime, setDraftStartTime] = useState(station.startTime)
   const [draftEndTime, setDraftEndTime] = useState(computedEndTime)
+
+  const startDate = station.startDate
+  const endDate = draftEndTime < draftStartTime ? addDaysToDate(startDate, 1) : startDate
+  const crossesMidnight = startDate !== endDate
   const [draftRounding, setDraftRounding] = useState<RoundingAlgorithm>(station.roundingAlgorithm)
 
   function openTimingModal() {
