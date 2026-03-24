@@ -211,7 +211,9 @@ export default function Step3_Order() {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
-  if (!session) { navigate('/schedule/new/step1'); return null }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
+  if (!session) return null
 
   const group = getGroupById(session.groupId)
   const allMembers = group?.members ?? []

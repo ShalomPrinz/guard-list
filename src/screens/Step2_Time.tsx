@@ -33,10 +33,9 @@ export default function Step2_Time() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   // Guard: must have a session with stations
-  if (!session) {
-    navigate('/schedule/new/step1')
-    return null
-  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
+  if (!session) return null
 
   // ── Local form state (pre-filled from session if coming back) ─────────────
 

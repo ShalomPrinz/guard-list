@@ -185,3 +185,18 @@ Never mock it per-file. Never remove this from the setup file.
 **Root cause:** The prompt asked to add a preview without explicitly saying to remove the existing one. The existing station cards were not considered redundant by default.
 
 **Rule:** `ResultScreen` must show schedule data in exactly one place. The WhatsApp `<pre>` preview (via `whatsappText`) is the single source. Never add a second rendering of station/participant data alongside it. When adding a preview block, always check whether an existing equivalent display needs to be removed.
+
+---
+
+## E019 — navigate() Called During Render Silently Fails in Tests
+
+**What went wrong:** Wizard step guards in `Step2_Time`, `Step3_Order`, and `Step4_Review` called `navigate('/fallback')` directly in the component render body (not inside a `useEffect`). React Router emits a warning about this and in the jsdom test environment the navigation does not flush — the component returns `null`, the route never changes, and `findByText` on the destination screen times out.
+
+**Root cause:** `navigate()` is a side effect and must not be called during the render phase.
+
+**Rule:** Any navigation triggered by a guard condition must go inside a `useEffect`. Pattern:
+```tsx
+useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
+if (!session) return null
+```
+The synchronous `return null` prevents rendering the guarded content; the `useEffect` handles the actual route transition after commit.

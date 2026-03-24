@@ -116,6 +116,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Re-saving an edited schedule overwrites the existing localStorage entry by `id`. Never creates a duplicate.
 - Clicking the global Header (logo + app name) navigates to HomeScreen and clears wizard session state.
 - `window.scrollTo({ top: 0, behavior: 'instant' })` is called on mount of every screen and wizard step.
+- **Wizard step guards** (`Step2_Time`, `Step3_Order`, `Step4_Review`): if `!session`, call `navigate('/fallback')` inside a `useEffect` and return `null` synchronously. Never call `navigate()` directly in the render body — it does not flush in the test environment and React Router warns against it.
 - **User input always overrides pre-filled defaults.** Any field pre-filled programmatically (e.g. start time in continue round, end date from midnight crossover detection) must have a corresponding `userOverrodeX` boolean flag in wizard session state. When the user manually edits the field, set the flag to true. When generating the schedule, always prefer the user's value if the flag is true. Flags reset only when the wizard session is cleared.
 
 ---
@@ -157,6 +158,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - **ResultScreen:** "איחוד רשימות" button always visible. For continued rounds: offers shortcut to direct parent or list picker. For others: goes directly to list picker sorted newest-first with search.
 - **UniteScreen:** merges two schedules per station sorted by full datetime. Uses earlier schedule's name and citation. Never saved to localStorage.
 - **StatisticsScreen:** two tabs — "זמני שמירה" (guard time table) and "ציטוטים" (citation counts). Citation tab headers: "?באוסף" and "?שומש". Citation attribution uses `citationAuthorLinks` map, not name string matching.
+- **FallbackScreen:** route `/fallback`. Self-contained — no `Layout` or `Header` wrapper. Uses `fixed inset-0` full-screen, tap-anywhere-to-home. Shown when a wizard step guard fires (no active session). Never use as a general 404 — the `*` catch-all route still redirects to `/`.
 
 ---
 

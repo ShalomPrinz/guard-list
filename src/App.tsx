@@ -20,6 +20,7 @@ import UniteScreen from './screens/UniteScreen'
 import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
 import CommandersSelectScreen from './screens/CommandersSelectScreen'
+import FallbackScreen from './screens/FallbackScreen'
 
 export default function App() {
   const [hasUsername, setHasUsername] = useState(() => getUsername() !== null)
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
             <Route path="/standby" element={<StandbyScreen />} />
             <Route path="/citations" element={<CitationsScreen />} />
+            <Route path="/fallback" element={<FallbackScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

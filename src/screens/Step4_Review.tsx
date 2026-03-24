@@ -508,13 +508,8 @@ export default function Step4_Review() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCitation?.id])
 
-  if (!session) {
-    return (
-      <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
-        <p className="text-gray-500 dark:text-gray-400">אין סשן פעיל. <button onClick={() => navigate('/')} className="text-blue-600 underline dark:text-blue-400">חזרה לדף הבית</button></p>
-      </div>
-    )
-  }
+  useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
+  if (!session) return null
 
   const groupMembers = getGroupById(session.groupId)?.members ?? []
 
