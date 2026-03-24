@@ -1,0 +1,25 @@
+import React from 'react'
+import ErrorScreen from '@/screens/ErrorScreen'
+
+interface State {
+  hasError: boolean
+}
+
+export default class ErrorBoundary extends React.Component<React.PropsWithChildren, State> {
+  state: State = { hasError: false }
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, info)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <ErrorScreen />
+    }
+    return this.props.children
+  }
+}

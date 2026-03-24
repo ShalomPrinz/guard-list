@@ -159,6 +159,8 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - **UniteScreen:** merges two schedules per station sorted by full datetime. Uses earlier schedule's name and citation. Never saved to localStorage.
 - **StatisticsScreen:** two tabs — "זמני שמירה" (guard time table) and "ציטוטים" (citation counts). Citation tab headers: "?באוסף" and "?שומש". Citation attribution uses `citationAuthorLinks` map, not name string matching.
 - **FallbackScreen:** route `/fallback`. Self-contained — no `Layout` or `Header` wrapper. Uses `fixed inset-0` full-screen, tap-anywhere-to-home. Shown when a wizard step guard fires (no active session). Never use as a general 404 — the `*` catch-all route still redirects to `/`.
+- **ErrorScreen:** self-contained full-screen (`fixed inset-0`), no `Layout` or `Header`. Shows "שגיאה!" in `text-red-500 dark:text-red-400` and a Hebrew apology message. Click-anywhere navigates via `window.location.href = '/'` — never `useNavigate`, because it may render outside Router context. Rendered exclusively by `ErrorBoundary`.
+- **ErrorBoundary:** class component at `src/components/ErrorBoundary.tsx`. Wraps the entire app in `src/main.tsx`, outside `App` (which contains `BrowserRouter`) so it catches router-level errors too. Uses `getDerivedStateFromError` + `componentDidCatch` (logs to console). Currently there are no per-screen error boundaries — one global boundary only.
 
 ---
 
