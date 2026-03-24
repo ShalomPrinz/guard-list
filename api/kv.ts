@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { Ratelimit } from "@upstash/ratelimit";
 
 export const config = { runtime: "edge" };
 
@@ -7,32 +8,13 @@ const kv = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 });
 
-// SECURITY: In-memory rate limiter keyed by client IP.
-// WARNING: Vercel Edge Functions are stateless across invocations — this Map resets on every
-// cold start and is NOT shared across concurrent instances. It provides a baseline against
-// naive single-source abuse but gives no protection against distributed attacks.
-// Production-grade alternative: Upstash Redis INCR + EXPIRE per IP key (atomic, shared).
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 60; // requests per window
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  // SECURITY: Evict expired entries to prevent unbounded growth in warm instances.
-  if (rateLimitMap.size > 10_000) {
-    for (const [k, v] of rateLimitMap) {
-      if (now > v.resetAt) rateLimitMap.delete(k);
-    }
-  }
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) return true;
-  entry.count++;
-  return false;
-}
+// SECURITY: Sliding-window rate limiter backed by Redis — shared across all Edge Function
+// instances and cold-start resistant. 60 requests per minute per IP.
+const ratelimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(60, "1 m"),
+  prefix: "ratelimit",
+});
 
 // SECURITY: Username must not contain ':' (namespace separator) or Redis glob chars.
 // Allows any Unicode letter/number/space so existing Hebrew usernames remain valid.
@@ -73,7 +55,8 @@ export default async function handler(req: Request): Promise<Response> {
   // SECURITY: Rate limit by client IP to prevent DoS and Upstash quota exhaustion.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (isRateLimited(ip)) {
+  const { success } = await ratelimit.limit(ip);
+  if (!success) {
     return json({ error: "Too many requests" }, 429);
   }
 

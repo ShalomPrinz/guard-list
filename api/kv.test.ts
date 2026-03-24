@@ -9,9 +9,19 @@ const kvMock = vi.hoisted(() => ({
   scan: vi.fn(),
 }))
 
+const ratelimitMock = vi.hoisted(() => ({
+  limit: vi.fn().mockResolvedValue({ success: true }),
+}))
+
 vi.mock('@upstash/redis', () => ({
   Redis: vi.fn().mockImplementation(() => kvMock),
 }))
+
+vi.mock('@upstash/ratelimit', () => {
+  const RatelimitMock = vi.fn().mockImplementation(() => ratelimitMock)
+  RatelimitMock.slidingWindow = vi.fn().mockReturnValue({})
+  return { Ratelimit: RatelimitMock }
+})
 
 // Provide required env vars before handler module evaluates
 process.env.KV_REST_API_URL = 'https://mock.upstash.io'
@@ -63,6 +73,7 @@ describe('api/kv handler', () => {
     kvMock.del.mockResolvedValue(1)
     kvMock.keys.mockResolvedValue([])
     kvMock.scan.mockResolvedValue([0, []])
+    ratelimitMock.limit.mockResolvedValue({ success: true })
   })
 
   // ── method check ──────────────────────────────────────────────────────────
@@ -111,6 +122,23 @@ describe('api/kv handler', () => {
       const res = await handler(
         makeReq({ action: 'get', username: 'alice', key: 'alice:ns:id' }),
       )
+      expect(res.status).toBe(200)
+    })
+  })
+
+  // ── rate limit check ─────────────────────────────────────────────────────
+  describe('rate limit check', () => {
+    it('returns 429 when ratelimit.limit returns success=false', async () => {
+      ratelimitMock.limit.mockResolvedValue({ success: false })
+      const res = await handler(makeReq({ action: 'get', username: 'alice', key: 'alice:ns:id' }))
+      expect(res.status).toBe(429)
+      const body = await res.json() as { error: string }
+      expect(body.error).toBe('Too many requests')
+    })
+
+    it('passes through when ratelimit.limit returns success=true', async () => {
+      ratelimitMock.limit.mockResolvedValue({ success: true })
+      const res = await handler(makeReq({ action: 'get', username: 'alice', key: 'alice:ns:id' }))
       expect(res.status).toBe(200)
     })
   })
