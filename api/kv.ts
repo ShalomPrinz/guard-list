@@ -66,7 +66,7 @@ export default async function handler(req: Request): Promise<Response> {
     process.env.ALLOWED_ORIGIN ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
   const origin = req.headers.get("Origin");
-  if (allowedOrigin && origin && origin !== allowedOrigin) {
+  if (allowedOrigin && origin !== allowedOrigin) {
     return json({ error: "Forbidden" }, 403);
   }
 
@@ -76,6 +76,15 @@ export default async function handler(req: Request): Promise<Response> {
   if (isRateLimited(ip)) {
     return json({ error: "Too many requests" }, 429);
   }
+
+  // SECURITY: Reject non-JSON content types to prevent parser confusion attacks.
+  if (!req.headers.get("content-type")?.includes("application/json")) {
+    return json({ error: "Unsupported Media Type" }, 415);
+  }
+
+  // SECURITY: Reject oversized bodies to prevent memory exhaustion on Edge Function.
+  const contentLength = parseInt(req.headers.get("content-length") ?? "0", 10);
+  if (contentLength > 65_536) return json({ error: "Payload too large" }, 413);
 
   let body: Record<string, unknown>;
   try {
@@ -106,7 +115,7 @@ export default async function handler(req: Request): Promise<Response> {
     // key/prefix starts with the declared username — the client-supplied key is never trusted
     // as authoritative on its own. Note: the username itself is still client-declared (no auth
     // token); this prevents key-injection attacks but not deliberate username impersonation.
-    const username = typeof body.username === "string" ? body.username : "";
+    const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     if (!isValidUsername(username)) {
       return json({ error: "Invalid username" }, 400);
     }
@@ -116,6 +125,7 @@ export default async function handler(req: Request): Promise<Response> {
       const key = body.key as string;
       // SECURITY: Reject any key that escapes the caller's declared username namespace.
       if (!key || !key.startsWith(expectedPrefix)) {
+        console.warn("[kv] namespace violation", { ip, username, key });
         return json({ error: "Key namespace violation" }, 403);
       }
       const value = await kv.get(key);
@@ -125,6 +135,7 @@ export default async function handler(req: Request): Promise<Response> {
       const key = body.key as string;
       // SECURITY: Reject any key that escapes the caller's declared username namespace.
       if (!key || !key.startsWith(expectedPrefix)) {
+        console.warn("[kv] namespace violation", { ip, username, key });
         return json({ error: "Key namespace violation" }, 403);
       }
       await kv.set(key, body.value);
@@ -134,6 +145,7 @@ export default async function handler(req: Request): Promise<Response> {
       const key = body.key as string;
       // SECURITY: Reject any key that escapes the caller's declared username namespace.
       if (!key || !key.startsWith(expectedPrefix)) {
+        console.warn("[kv] namespace violation", { ip, username, key });
         return json({ error: "Key namespace violation" }, 403);
       }
       await kv.del(key);
@@ -143,7 +155,13 @@ export default async function handler(req: Request): Promise<Response> {
       const prefix = body.prefix as string;
       // SECURITY: Reject any prefix that escapes the caller's declared username namespace.
       if (!prefix || !prefix.startsWith(expectedPrefix)) {
+        console.warn("[kv] namespace violation", { ip, username, key: prefix });
         return json({ error: "Key namespace violation" }, 403);
+      }
+      // SECURITY: Reject suffix glob characters to prevent broader-than-intended key scans.
+      const suffix = prefix.slice(expectedPrefix.length);
+      if (suffix && !/^[a-zA-Z0-9_\-/:]+$/.test(suffix)) {
+        return json({ error: "Invalid prefix" }, 400);
       }
       const keys = await kv.keys(prefix + "*");
       return json({ keys });
