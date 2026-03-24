@@ -32,7 +32,7 @@ describe('cloudStorage', () => {
   })
 
   describe('username prefixing', () => {
-    it('kvGet sends key prefixed with username', async () => {
+    it('kvGet sends key prefixed with username and includes username field', async () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ value: null }) })
       vi.stubGlobal('fetch', fetchMock)
 
@@ -40,6 +40,8 @@ describe('cloudStorage', () => {
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
       expect(body.key).toBe('testuser:groups:g1')
+      // SECURITY: username must be sent separately so server can enforce namespace ownership
+      expect(body.username).toBe('testuser')
     })
 
     it('kvSet sends key prefixed with username', async () => {
@@ -171,7 +173,7 @@ describe('cloudStorage', () => {
         '/api/kv',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ action: 'set', key: 'testuser:groups:g1', value: { id: 'g1' } }),
+          body: JSON.stringify({ action: 'set', key: 'testuser:groups:g1', value: { id: 'g1' }, username: 'testuser' }),
         }),
       )
     })
@@ -199,7 +201,7 @@ describe('cloudStorage', () => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/kv',
         expect.objectContaining({
-          body: JSON.stringify({ action: 'del', key: 'testuser:groups:g1' }),
+          body: JSON.stringify({ action: 'del', key: 'testuser:groups:g1', username: 'testuser' }),
         }),
       )
     })
@@ -212,7 +214,7 @@ describe('cloudStorage', () => {
   })
 
   describe('kvGetRaw / kvSetRaw', () => {
-    it('kvGetRaw sends the key without any prefix', async () => {
+    it('kvGetRaw sends rawGet action and the key without any prefix', async () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ value: 'device-token-123' }) })
       vi.stubGlobal('fetch', fetchMock)
 
@@ -220,6 +222,7 @@ describe('cloudStorage', () => {
 
       expect(result).toBe('device-token-123')
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('rawGet') // SECURITY: must use rawGet, not plain 'get'
       expect(body.key).toBe('shalom:device')
     })
 
@@ -232,13 +235,14 @@ describe('cloudStorage', () => {
       expect(result).toBe('abc')
     })
 
-    it('kvSetRaw sends the key without any prefix', async () => {
+    it('kvSetRaw sends rawSet action and the key without any prefix', async () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
       vi.stubGlobal('fetch', fetchMock)
 
       await kvSetRaw('shalom:device', 'device-token-123')
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('rawSet') // SECURITY: must use rawSet, not plain 'set'
       expect(body.key).toBe('shalom:device')
       expect(body.value).toBe('device-token-123')
     })

@@ -35,13 +35,15 @@ async function callKv(body: unknown): Promise<unknown> {
 }
 
 export async function kvGet<T>(key: string): Promise<T | null> {
+  const username = getUsername()
   const prefixed = scopedKey(key)
-  if (!prefixed) {
+  if (!prefixed || !username) {
     console.warn("[kv] get skipped: no username set")
     return null
   }
   try {
-    const data = (await callKv({ action: "get", key: prefixed })) as { value: T | null };
+    // SECURITY: Pass username separately so the server can enforce namespace ownership.
+    const data = (await callKv({ action: "get", key: prefixed, username })) as { value: T | null };
     return data.value;
   } catch (e) {
     console.error("[kv] get failed:", e);
@@ -50,26 +52,30 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown): Promise<void> {
+  const username = getUsername()
   const prefixed = scopedKey(key)
-  if (!prefixed) {
+  if (!prefixed || !username) {
     console.warn("[kv] set skipped: no username set")
     return
   }
   try {
-    await callKv({ action: "set", key: prefixed, value });
+    // SECURITY: Pass username separately so the server can enforce namespace ownership.
+    await callKv({ action: "set", key: prefixed, value, username });
   } catch (e) {
     console.error("[kv] set failed:", e);
   }
 }
 
 export async function kvDel(key: string): Promise<void> {
+  const username = getUsername()
   const prefixed = scopedKey(key)
-  if (!prefixed) {
+  if (!prefixed || !username) {
     console.warn("[kv] del skipped: no username set")
     return
   }
   try {
-    await callKv({ action: "del", key: prefixed });
+    // SECURITY: Pass username separately so the server can enforce namespace ownership.
+    await callKv({ action: "del", key: prefixed, username });
   } catch (e) {
     console.error("[kv] del failed:", e);
   }
@@ -80,7 +86,8 @@ export async function kvDel(key: string): Promise<void> {
  */
 export async function kvGetRaw<T>(key: string): Promise<T | null> {
   try {
-    const data = (await callKv({ action: "get", key })) as { value: T | null }
+    // SECURITY: Use rawGet action which applies a strict key pattern check on the server.
+    const data = (await callKv({ action: "rawGet", key })) as { value: T | null }
     return data.value
   } catch (e) {
     console.error("[kv] raw get failed:", e)
@@ -93,24 +100,27 @@ export async function kvGetRaw<T>(key: string): Promise<T | null> {
  */
 export async function kvSetRaw(key: string, value: unknown): Promise<void> {
   try {
-    await callKv({ action: "set", key, value })
+    // SECURITY: Use rawSet action which applies a strict key pattern check on the server.
+    await callKv({ action: "rawSet", key, value })
   } catch (e) {
     console.error("[kv] raw set failed:", e)
   }
 }
 
 export async function kvList(prefix: string): Promise<string[]> {
+  const username = getUsername()
   const prefixed = scopedKey(prefix)
-  if (!prefixed) {
+  if (!prefixed || !username) {
     console.warn("[kv] list skipped: no username set")
     return []
   }
   try {
-    const data = (await callKv({ action: "list", prefix: prefixed })) as {
+    // SECURITY: Pass username separately so the server can enforce namespace ownership.
+    const data = (await callKv({ action: "list", prefix: prefixed, username })) as {
       keys: string[];
     };
     // Strip the username prefix from returned keys so callers see the original key format
-    const userPrefix = `${getUsername()}:`
+    const userPrefix = `${username}:`
     return data.keys.map(k => k.startsWith(userPrefix) ? k.slice(userPrefix.length) : k);
   } catch (e) {
     console.error("[kv] list failed:", e);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createLocalStorageMock } from '../tests/localStorageMock'
-import { getUsername, setUsername, clearUsername, getOrCreateDeviceId } from './userStorage'
+import { getUsername, setUsername, clearUsername, getOrCreateDeviceId, isValidUsername } from './userStorage'
 
 describe('userStorage', () => {
   beforeEach(() => {
@@ -36,6 +36,47 @@ describe('userStorage', () => {
     setUsername('eve')
     clearUsername()
     expect(getUsername()).toBeNull()
+  })
+})
+
+describe('isValidUsername', () => {
+  it('accepts normal alphanumeric usernames', () => {
+    expect(isValidUsername('alice')).toBe(true)
+    expect(isValidUsername('bob123')).toBe(true)
+    expect(isValidUsername('user-name')).toBe(true)
+  })
+
+  it('accepts Hebrew usernames (existing users must not be locked out)', () => {
+    expect(isValidUsername('שלום')).toBe(true)
+    expect(isValidUsername('יוסי')).toBe(true)
+  })
+
+  it('rejects usernames shorter than 2 characters', () => {
+    expect(isValidUsername('a')).toBe(false)
+    expect(isValidUsername('')).toBe(false)
+  })
+
+  it('rejects usernames longer than 64 characters', () => {
+    expect(isValidUsername('a'.repeat(65))).toBe(false)
+  })
+
+  it('rejects the colon character (KV namespace separator)', () => {
+    // SECURITY: colon in username would break namespace enforcement
+    expect(isValidUsername('user:name')).toBe(false)
+    expect(isValidUsername(':admin')).toBe(false)
+  })
+
+  it('rejects Redis glob characters that could escape key patterns', () => {
+    // SECURITY: these chars could be used to enumerate or escape namespaces
+    expect(isValidUsername('user*')).toBe(false)
+    expect(isValidUsername('user?')).toBe(false)
+    expect(isValidUsername('user[a]')).toBe(false)
+    expect(isValidUsername('user^')).toBe(false)
+  })
+
+  it('setUsername throws for usernames containing invalid characters', () => {
+    expect(() => setUsername('bad:user')).toThrow()
+    expect(() => setUsername('a')).toThrow()
   })
 })
 
