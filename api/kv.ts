@@ -42,8 +42,10 @@ function isValidUsername(username: string): boolean {
   return !/[:*?[\]^]/.test(username);
 }
 
-// SECURITY: Raw-action keys (device registration only) must be ASCII-safe with no glob chars.
-const RAW_KEY_RE = /^[a-zA-Z0-9_:\-.]{1,128}$/;
+// SECURITY: Raw-action keys (device registration only) must start with the literal prefix
+// "device:" followed by safe non-colon characters. This structurally prevents any rawGet/rawSet
+// key from overlapping with user-namespaced keys ({username}:{namespace}:{id}).
+const RAW_KEY_RE = /^device:[a-zA-Z0-9_\-.]{1,128}$/;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

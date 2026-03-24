@@ -218,12 +218,12 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ value: 'device-token-123' }) })
       vi.stubGlobal('fetch', fetchMock)
 
-      const result = await kvGetRaw<string>('shalom:device')
+      const result = await kvGetRaw<string>('device:shalom')
 
       expect(result).toBe('device-token-123')
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
       expect(body.action).toBe('rawGet') // SECURITY: must use rawGet, not plain 'get'
-      expect(body.key).toBe('shalom:device')
+      expect(body.key).toBe('device:shalom')
     })
 
     it('kvGetRaw works even when username is null', async () => {
@@ -239,19 +239,38 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
       vi.stubGlobal('fetch', fetchMock)
 
-      await kvSetRaw('shalom:device', 'device-token-123')
+      await kvSetRaw('device:shalom', 'device-token-123')
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
       expect(body.action).toBe('rawSet') // SECURITY: must use rawSet, not plain 'set'
-      expect(body.key).toBe('shalom:device')
+      expect(body.key).toBe('device:shalom')
       expect(body.value).toBe('device-token-123')
     })
 
-    it('kvGetRaw returns null on error', async () => {
+    it('kvGetRaw returns null on network failure', async () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fail')))
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      const result = await kvGetRaw('shalom:device')
+      const result = await kvGetRaw('device:shalom')
       expect(result).toBeNull()
+    })
+
+    it('kvGetRaw returns null on HTTP error (e.g. server rejects key with 400)', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGetRaw('device:shalom')
+      expect(result).toBeNull()
+    })
+
+    it('kvSetRaw does not throw on HTTP error (e.g. server rejects key with 400)', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      await expect(kvSetRaw('device:shalom', 'token')).resolves.not.toThrow()
+    })
+
+    it('kvSetRaw does not throw on network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      await expect(kvSetRaw('device:shalom', 'token')).resolves.not.toThrow()
     })
   })
 

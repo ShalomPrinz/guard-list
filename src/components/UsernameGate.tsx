@@ -28,7 +28,7 @@ export default function UsernameGate({ onConfirmed }: Props) {
 
     const username = trimmed.toLowerCase()
     const deviceId = getOrCreateDeviceId()
-    const deviceKey = `${username}:device`
+    const deviceKey = `device:${username}`
 
     setStatusMessage('בודק אם שם המשתמש פנוי...')
 
@@ -73,7 +73,7 @@ export default function UsernameGate({ onConfirmed }: Props) {
           <p className="text-xs text-gray-400 dark:text-gray-500">
             כדי לאפשר גישה מהתקן זה, מחק את המפתח{' '}
             <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">
-              {input.trim().toLowerCase()}:device
+              device:{input.trim().toLowerCase()}
             </code>{' '}
             מלוח הבקרה של Upstash / Vercel KV.
           </p>

@@ -173,6 +173,13 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 ---
 
+## KV / Cloud Storage
+
+- All KV access goes through `src/storage/cloudStorage.ts`. Never import Upstash Redis directly from components or logic.
+- Raw KV actions (`rawGet`/`rawSet` in `api/kv.ts`) are restricted to keys matching `device:[a-zA-Z0-9_\-.]{1,128}`. Device keys in `UsernameGate.tsx` are constructed as `` `device:${username}` `` — never `` `${username}:device` ``. This ensures raw-action keys structurally cannot overlap with user-namespaced keys (`{username}:*`).
+
+---
+
 ## Testing
 
 - `localStorageMock` (in-memory Map implementing Storage interface) shared utility for all tests. Never use real `localStorage` in tests.
