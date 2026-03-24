@@ -163,8 +163,14 @@ export default async function handler(req: Request): Promise<Response> {
       if (suffix && !/^[a-zA-Z0-9_\-/:]+$/.test(suffix)) {
         return json({ error: "Invalid prefix" }, 400);
       }
-      const keys = await kv.keys(prefix + "*");
-      return json({ keys });
+      const allKeys: string[] = [];
+      let cursor = 0;
+      do {
+        const [nextCursor, batch] = await kv.scan(cursor, { match: prefix + "*", count: 100 });
+        allKeys.push(...batch);
+        cursor = nextCursor as number;
+      } while (cursor !== 0);
+      return json({ keys: allKeys });
     }
 
     return json({ error: "Unknown action" }, 400);
