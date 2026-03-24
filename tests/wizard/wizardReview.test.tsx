@@ -15,6 +15,8 @@ import ResultScreen from '@/screens/ResultScreen'
 import { createLocalStorageMock } from '@/tests/localStorageMock'
 import { upsertGroup } from '@/storage/groups'
 import { getSchedules } from '@/storage/schedules'
+import { formatDate } from '@/logic/formatting'
+import { addDaysToDate } from '@/logic/generateSchedule'
 import type { Group } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -193,5 +195,46 @@ describe('Step4_Review — timing config modal', () => {
     await user.click(cancelButton)
 
     expect(screen.queryByText(/הגדרות תזמון —/)).toBeNull()
+  })
+
+  it('does not show date labels when schedule stays on the same day', async () => {
+    // Default start 20:00, 3 participants × 60 min → ends at 23:00 (same day)
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
+
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+
+    const today = new Date().toISOString().split('T')[0]
+    expect(screen.queryByText(formatDate(today))).toBeNull()
+  })
+
+  it('shows date labels next to both time pickers when schedule crosses midnight', async () => {
+    // Start 23:00, 3 participants × 60 min → participants at 23:00, 00:00, 01:00 (crosses midnight)
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+
+    // Step 1 → 2
+    await user.click(screen.getByText('הבא →'))
+    // Step 2: fixed duration 60 min, change start time to 23:00
+    await user.click(screen.getByRole('button', { name: 'זמן קבוע לכל לוחם' }))
+    await user.type(screen.getByPlaceholderText('למשל: 90'), '60')
+    const hoursInput = screen.getAllByLabelText('שעות')[0]
+    await user.clear(hoursInput)
+    await user.type(hoursInput, '23')
+    await user.click(screen.getByText('הבא →'))
+    // Step 3 → 4
+    await user.click(screen.getByText('הבא →'))
+
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+
+    const today = new Date().toISOString().split('T')[0]
+    const tomorrow = addDaysToDate(today, 1)
+    expect(screen.getByText(formatDate(today))).toBeTruthy()
+    expect(screen.getByText(formatDate(tomorrow))).toBeTruthy()
   })
 })

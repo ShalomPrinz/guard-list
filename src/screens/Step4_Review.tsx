@@ -32,6 +32,7 @@ import { getCitations, markCitationUsed, upsertCitation } from '../storage/citat
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
 import { getGroupById } from '../storage/groups'
 import { pickRandomCitation, formatAuthorName } from '../logic/citations'
+import { formatDate } from '../logic/formatting'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
 import TimePicker from '../components/TimePicker'
@@ -278,6 +279,10 @@ function ReviewStationCard({
 
   const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
 
+  const startDate = station.startDate
+  const endDate = station.items[station.items.length - 1]?.date ?? station.startDate
+  const crossesMidnight = startDate !== endDate
+
   const [draftStartTime, setDraftStartTime] = useState(station.startTime)
   const [draftEndTime, setDraftEndTime] = useState(computedEndTime)
   const [draftRounding, setDraftRounding] = useState<RoundingAlgorithm>(station.roundingAlgorithm)
@@ -316,13 +321,23 @@ function ReviewStationCard({
             {/* Start time */}
             <div className="mb-4 flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת התחלה:</label>
-              <TimePicker value={draftStartTime} onChange={setDraftStartTime} />
+              <div className="flex items-center gap-2">
+                <TimePicker value={draftStartTime} onChange={setDraftStartTime} />
+                {crossesMidnight && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(startDate)}</span>
+                )}
+              </div>
             </div>
 
             {/* End time */}
             <div className="mb-4 flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת סיום:</label>
-              <TimePicker value={draftEndTime} onChange={setDraftEndTime} />
+              <div className="flex items-center gap-2">
+                <TimePicker value={draftEndTime} onChange={setDraftEndTime} />
+                {crossesMidnight && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(endDate)}</span>
+                )}
+              </div>
             </div>
 
             {/* Rounding */}
