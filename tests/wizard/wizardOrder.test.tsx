@@ -206,3 +206,80 @@ describe('Step3_Order — navigation', () => {
     expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
   })
 })
+
+// ─── End-time mode navigation helper ─────────────────────────────────────────
+
+async function navigateToStep3WithEndTime(
+  user: ReturnType<typeof userEvent.setup>,
+  endHour: string,
+  roundingMode: 'nearest-minute' | 'round-up-10' | 'round-up-5' = 'nearest-minute',
+) {
+  // Step 1 → Step 2
+  await user.click(screen.getByText('הבא →'))
+  expect(screen.getByText('הגדרת זמנים')).toBeTruthy()
+
+  // Stay in end-time mode (default); set end time via the second "שעות" spinner
+  const hourInputs = screen.getAllByRole('textbox', { name: 'שעות' })
+  const endHourInput = hourInputs[1] // index 1 = end time picker
+  await user.click(endHourInput)
+  await user.clear(endHourInput)
+  await user.type(endHourInput, endHour)
+  await user.tab()
+
+  // Select rounding mode if needed
+  if (roundingMode === 'nearest-minute') {
+    await user.click(screen.getByLabelText('עיגול לדקה הקרובה'))
+  }
+
+  await user.click(screen.getByText('הבא →'))
+  expect(screen.getByText('סדר שומרים')).toBeTruthy()
+}
+
+// ─── Duration label tests ─────────────────────────────────────────────────────
+
+describe('Step3_Order — per-warrior duration label', () => {
+  it('shows duration label with correct minutes in fixed-duration mode', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep3(user) // fixed-duration 60 min, 3 participants
+
+    expect(screen.getByText(/זמן שמירה לכל לוחם: 60 דקות/)).toBeTruthy()
+  })
+
+  it('label updates reactively when participant is removed in end-time mode', async () => {
+    // 2 participants, start=20:00, end=22:00 → 120 min / 2 = 60 min each
+    // Remove one → 1 participant → 120 min
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({
+      members: [
+        { id: 'm1', name: 'Alice', availability: 'base' },
+        { id: 'm2', name: 'Bob', availability: 'base' },
+      ],
+    }))
+    renderApp()
+    await navigateToStep3WithEndTime(user, '22')
+
+    expect(screen.getByText(/זמן שמירה לכל לוחם: 60 דקות/)).toBeTruthy()
+
+    // Remove one participant → station count drops to 1
+    const removeButtons = screen.getAllByLabelText('הסר')
+    await user.click(removeButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getByText(/זמן שמירה לכל לוחם: 120 דקות/)).toBeTruthy()
+    })
+  })
+
+  it('shows correct duration label in end-time mode with a single participant', async () => {
+    // 1 participant, 20:00→22:00 (120 min window) → 120 min per warrior
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({
+      members: [{ id: 'm1', name: 'Alice', availability: 'base' }],
+    }))
+    renderApp()
+    await navigateToStep3WithEndTime(user, '22')
+
+    expect(screen.getByText(/זמן שמירה לכל לוחם: 120 דקות/)).toBeTruthy()
+  })
+})

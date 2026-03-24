@@ -28,6 +28,7 @@ import { getScheduleById } from '../storage/schedules'
 import { useWizard } from '../context/WizardContext'
 import { shuffleArray, distributeParticipants } from '../logic'
 import { buildContinueRoundQueue, buildContinueRoundStations } from '../logic/continueRound'
+import { calcStationDurations } from '../logic/scheduling'
 import type { Member, Schedule, WizardSession, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
@@ -492,6 +493,15 @@ export default function Step3_Order() {
 
   const { stations, unassigned } = orderState
 
+  const stationDurations = calcStationDurations({
+    startTime: session.timeConfig.startTime,
+    endTime: session.timeConfig.endTime,
+    fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+    roundingAlgorithm: session.timeConfig.roundingAlgorithm,
+    unevenMode: session.timeConfig.unevenMode,
+    stationParticipantCounts: stations.map(s => s.participants.length),
+  })
+
   return (
     <div className="animate-fadein mx-auto max-w-lg touch-pan-y px-4 py-6">
       <StepIndicator current={3} total={4} />
@@ -526,6 +536,11 @@ export default function Step3_Order() {
                   ערבב
                 </button>
               </div>
+              {stationDurations[si]?.roundedDurationMinutes > 0 && (
+                <p className="mb-2 w-full text-right text-xs text-gray-500 dark:text-gray-400">
+                  זמן שמירה לכל לוחם: {stationDurations[si].roundedDurationMinutes} דקות
+                </p>
+              )}
 
               <SortableContext items={station.participants.map(p => p.id)} strategy={verticalListSortingStrategy}>
                 <DroppableZone id={`droppable-${station.stationConfigId}`}>
