@@ -35,7 +35,7 @@ import { pickRandomCitation, formatAuthorName } from '../logic/citations'
 import StepIndicator from '../components/StepIndicator'
 import DragHandle from '../components/DragHandle'
 import TimePicker from '../components/TimePicker'
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
+import Modal from '../components/Modal'
 import type { Schedule, ScheduleStation, ScheduledParticipant, Citation, RoundingAlgorithm } from '../types'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -275,7 +275,6 @@ function ReviewStationCard({
 }) {
   const [addName, setAddName] = useState('')
   const [timingModalOpen, setTimingModalOpen] = useState(false)
-  useBodyScrollLock(timingModalOpen)
 
   const computedEndTime = station.items[station.items.length - 1]?.endTime ?? ''
 
@@ -313,22 +312,7 @@ function ReviewStationCard({
       </div>
 
       {timingModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-4 bg-black/40 dark:bg-black/60"
-          onClick={e => { if (e.target === e.currentTarget) setTimingModalOpen(false) }}
-        >
-          <div className="relative w-full max-w-lg rounded-2xl bg-white px-6 pb-8 pt-6 dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setTimingModalOpen(false)}
-              className="absolute top-3 left-3 flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
-              aria-label="סגור"
-            >
-              ×
-            </button>
-            <h2 className="mb-5 text-base font-bold text-gray-900 dark:text-gray-100">
-              הגדרות תזמון — {station.stationName}
-            </h2>
-
+        <Modal onClose={() => setTimingModalOpen(false)} title={`הגדרות תזמון — ${station.stationName}`}>
             {/* Start time */}
             <div className="mb-4 flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת התחלה:</label>
@@ -376,8 +360,7 @@ function ReviewStationCard({
                 שמור
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <SortableContext items={station.items.map(i => i.id)} strategy={verticalListSortingStrategy}>

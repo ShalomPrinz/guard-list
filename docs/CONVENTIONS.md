@@ -99,12 +99,12 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 ## Modals
 
-- All modal surfaces use `fixed inset-0 z-50` as the backdrop.
-- Body scroll lock: use `useBodyScrollLock` from `src/hooks/useBodyScrollLock.ts`. For standalone component modals (mounted only when open), call `useBodyScrollLock(true)`. For inline modals in screen files, call `useBodyScrollLock(isOpen)` unconditionally at the top of the screen component.
-- Modal backdrop uses `flex items-start justify-center pt-4` to place the panel near the top of the screen — never `items-end`, which hides content when scroll is locked on mobile.
-- Modal panels use `rounded-2xl` and must have `max-h-[90vh]` and `overflow-y-auto` on the inner panel div.
-- Close button: add `×` button to every modal panel (not `ConfirmDialog` — it already has cancel+confirm). Style: `absolute top-3 left-3 h-10 w-10 text-xl font-bold` (RTL: left-3 = visual top-right). The panel must have `relative` in its className.
+- Use the shared `Modal` component (`src/components/Modal.tsx`) for all sheet-style modals (backdrop + panel + close button). Do not repeat this shell inline.
+- `Modal` props: `onClose: () => void`, `title?: string`, `children: ReactNode`, `maxWidth?: string` (default `max-w-lg`). Render it conditionally: `{isOpen && <Modal onClose={...}>...</Modal>}`.
+- `Modal` handles `useBodyScrollLock` internally — callers must not also call it. The `Modal` component calls `useBodyScrollLock(true)` unconditionally because it is only mounted when open.
+- `ConfirmDialog` is separate (centered positioning, cancel+confirm buttons built-in). Do not use `Modal` as its base.
 - `UsernameGate.tsx` uses `fixed inset-0` for full-screen loading — it is NOT a modal and must never receive modal treatment.
+- All modal surfaces use `fixed inset-0 z-50` as the backdrop. `Modal` uses `flex items-start justify-center pt-4` — never `items-end`.
 
 ---
 
