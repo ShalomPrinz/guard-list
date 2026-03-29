@@ -202,3 +202,13 @@ useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
 if (!session) return null
 ```
 The synchronous `return null` prevents rendering the guarded content; the `useEffect` handles the actual route transition after commit.
+
+---
+
+## E020 — syncFromCloud Test Cleared State It Just Set
+
+**What went wrong:** A test for the "accept notification" block in `syncFromCloud` set `share:status` and then asserted it was set — but the test failed because the subsequent "partner pull" block (block 3) ran in the same `syncFromCloud` call and called `kvCrossReadPartner`, which returned `null` (default mock), causing `clearShareStatus()` to execute and wipe the state the test was trying to assert.
+
+**Root cause:** `syncFromCloud` runs all three share sync blocks sequentially in a single call. A test that validates an earlier block's side effect must also configure mocks for all later blocks, or those later blocks will interfere with the assertion.
+
+**Rule:** When testing any individual block inside `syncFromCloud`, mock all downstream KV calls that later blocks will make — even if the test is only about an earlier block. Specifically: if testing the accept notification block (block 1), mock `kvCrossReadPartner` to return a non-null value (e.g. `{ citations: [], deleteLog: [] }`) so the partner pull block (block 3) does not call `clearShareStatus()`. Failure to do this produces a false negative that is very hard to diagnose.

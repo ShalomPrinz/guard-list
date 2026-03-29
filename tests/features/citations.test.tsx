@@ -14,6 +14,7 @@ import { upsertGroup } from '@/storage/groups'
 import { formatAuthorName, pickRandomCitation } from '@/logic/citations'
 import type { Citation } from '@/types'
 
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeCitation(id: string, overrides: Partial<Citation> = {}): Citation {
@@ -318,6 +319,62 @@ describe('StatisticsScreen tabs', () => {
     await user.click(screen.getByRole('button', { name: 'ציטוטים' }))
 
     expect(screen.queryByText('יוסי ישראלי')).toBeNull()
+  })
+})
+
+// ─── CitationsScreen: share panel ─────────────────────────────────────────────
+
+describe('CitationsScreen share panel', () => {
+  it('shows "שתף אוסף" button when not sharing and no outgoing request', () => {
+    renderCitations()
+    expect(screen.getByText('שתף אוסף')).toBeTruthy()
+  })
+
+  it('shows outgoing request info when outgoing request is set', () => {
+    localStorage.setItem('share:outgoingRequest', JSON.stringify({ toUsername: 'bob', sentAt: Date.now() }))
+    renderCitations()
+    expect(screen.getByText(/בקשת שיתוף נשלחה ל-/)).toBeTruthy()
+    expect(screen.getByText('בטל בקשה')).toBeTruthy()
+  })
+
+  it('shows active sharing info when share status is set', () => {
+    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: Date.now() }))
+    renderCitations()
+    expect(screen.getByText(/שיתוף פעיל עם/)).toBeTruthy()
+    expect(screen.getByText('הפסק שיתוף')).toBeTruthy()
+  })
+
+  it('opens share request modal on "שתף אוסף" click', async () => {
+    const user = userEvent.setup()
+    renderCitations()
+    await user.click(screen.getByText('שתף אוסף'))
+    expect(screen.getByPlaceholderText('שם משתמש...')).toBeTruthy()
+    expect(screen.getByText('שלח בקשה')).toBeTruthy()
+  })
+
+  it('does not show share panel in selection mode', () => {
+    renderCitations('/citations', { selectionMode: true })
+    expect(screen.queryByText('שתף אוסף')).toBeNull()
+  })
+
+  it('clears outgoing request on "בטל בקשה" click', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('share:outgoingRequest', JSON.stringify({ toUsername: 'bob', sentAt: Date.now() }))
+    renderCitations()
+    await user.click(screen.getByText('בטל בקשה'))
+    await waitFor(() => {
+      expect(screen.getByText('שתף אוסף')).toBeTruthy()
+    })
+  })
+
+  it('clears share status on "הפסק שיתוף" click', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: Date.now() }))
+    renderCitations()
+    await user.click(screen.getByText('הפסק שיתוף'))
+    await waitFor(() => {
+      expect(screen.getByText('שתף אוסף')).toBeTruthy()
+    })
   })
 })
 

@@ -1,12 +1,21 @@
-import type { Group, StationConfig, Schedule, Citation, ParticipantStats } from '../types'
-import { kvGet, kvList, kvSet } from './cloudStorage'
+import type { Group, StationConfig, Schedule, Citation, ParticipantStats, CitationShareRequest } from '../types'
+import { kvGet, kvList, kvSet, kvDel, kvCrossReadPartner } from './cloudStorage'
 import { getUsername } from './userStorage'
 import { getGroups, upsertGroup } from './groups'
 import { getStationsConfig, saveStationsConfig } from './stationsConfig'
 import { getSchedules, upsertSchedule } from './schedules'
-import { getCitations, upsertCitation } from './citations'
+import { getCitations, upsertCitation, deleteCitationSilent } from './citations'
 import { getStatistics, saveStatistics } from './statistics'
 import { getTheme, saveTheme } from './theme'
+import {
+  getOutgoingRequest,
+  getShareStatus,
+  setShareStatus,
+  clearOutgoingRequest,
+  getLocalIncomingRequest,
+  setLocalIncomingRequest,
+  clearShareStatus,
+} from './citationShare'
 
 /**
  * Backfills all six KV namespaces into localStorage on app startup.
@@ -98,6 +107,54 @@ export async function syncFromCloud(): Promise<void> {
     if (getTheme() === null) {
       const prefs = await kvGet<{ theme: 'dark' | 'light' }>('prefs:global')
       if (prefs?.theme) saveTheme(prefs.theme)
+    }
+  } catch { /* silent */ }
+
+  // Citation sharing: check for accept notification (our outgoing request was accepted)
+  try {
+    const outgoing = getOutgoingRequest()
+    const currentStatus = getShareStatus()
+    if (outgoing !== null && currentStatus === null) {
+      const notification = await kvGet<{ byUsername: string; at: number }>('share:acceptNotification')
+      if (notification?.byUsername) {
+        setShareStatus({ partnerUsername: notification.byUsername, since: notification.at })
+        clearOutgoingRequest()
+        void kvDel('share:acceptNotification')
+      }
+    }
+  } catch { /* silent */ }
+
+  // Citation sharing: check for incoming request in KV
+  try {
+    if (getLocalIncomingRequest() === null && getShareStatus() === null) {
+      const req = await kvGet<CitationShareRequest>('share:incomingRequest')
+      if (req?.fromUsername) {
+        setLocalIncomingRequest(req)
+      }
+    }
+  } catch { /* silent */ }
+
+  // Citation sharing: sync partner citations (bidirectional pull)
+  try {
+    const status = getShareStatus()
+    if (status !== null) {
+      const result = await kvCrossReadPartner(status.partnerUsername)
+      if (result !== null) {
+        const localIds = new Set(getCitations().map(c => c.id))
+        for (const citation of result.citations) {
+          if (!localIds.has(citation.id)) {
+            upsertCitation(citation)
+          }
+        }
+        for (const deletedId of result.deleteLog) {
+          if (localIds.has(deletedId)) {
+            deleteCitationSilent(deletedId)
+          }
+        }
+      } else {
+        // crossRead returned null → partner stopped sharing or unauthorized → stop on our side too
+        clearShareStatus()
+      }
     }
   } catch { /* silent */ }
 }

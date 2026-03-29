@@ -63,6 +63,18 @@ export interface Citation {
   usedInListIds: string[]; // schedule ids where this citation was used
 }
 
+// ─── Citation Sharing ─────────────────────────────────────────────────────────
+
+export interface CitationShareStatus {
+  partnerUsername: string
+  since: number // ms timestamp
+}
+
+export interface CitationShareRequest {
+  fromUsername: string
+  sentAt: number
+}
+
 // ─── Error Reporting ──────────────────────────────────────────────────────────
 
 export interface AppErrorReport {

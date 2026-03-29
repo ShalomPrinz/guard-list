@@ -3,7 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { WizardProvider } from './context/WizardContext'
 import { syncFromCloud } from './storage/syncFromCloud'
 import { getUsername } from './storage/userStorage'
+import { getLocalIncomingRequest } from './storage/citationShare'
+import { acceptShareRequest, declineShareRequest } from './storage/citationShare'
 import UsernameGate from './components/UsernameGate'
+import IncomingShareRequestModal from './components/IncomingShareRequestModal'
 import Layout from './components/Layout'
 import HomeScreen from './screens/HomeScreen'
 import GroupEditScreen from './screens/GroupEditScreen'
@@ -24,9 +27,16 @@ import FallbackScreen from './screens/FallbackScreen'
 
 export default function App() {
   const [hasUsername, setHasUsername] = useState(() => getUsername() !== null)
+  const [incomingShareRequest, setIncomingShareRequest] = useState(() =>
+    hasUsername ? getLocalIncomingRequest() : null
+  )
 
   useEffect(() => {
-    if (hasUsername) void syncFromCloud()
+    if (hasUsername) {
+      void syncFromCloud().then(() => {
+        setIncomingShareRequest(getLocalIncomingRequest())
+      })
+    }
   }, [hasUsername])
 
   if (!hasUsername) {
@@ -34,6 +44,20 @@ export default function App() {
   }
 
   return (
+    <>
+      {incomingShareRequest && (
+        <IncomingShareRequestModal
+          fromUsername={incomingShareRequest.fromUsername}
+          onAccept={async () => {
+            await acceptShareRequest(incomingShareRequest.fromUsername)
+            setIncomingShareRequest(null)
+          }}
+          onDecline={() => {
+            declineShareRequest()
+            setIncomingShareRequest(null)
+          }}
+        />
+      )}
     <WizardProvider>
       <BrowserRouter>
         <Routes>
@@ -59,5 +83,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </WizardProvider>
+    </>
   )
 }

@@ -171,6 +171,15 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Random citation selection skips citations where `usedInListIds` contains any existing schedule id. If all used, picks least recently used.
 - Citation used in a confirmed schedule: add schedule id to `usedInListIds` and save.
 
+### Citation Sharing
+
+- Citation sharing state is managed exclusively through `src/storage/citationShare.ts`. Never read/write share localStorage keys directly from components or other storage modules.
+- Share status in localStorage key `share:status` (type `CitationShareStatus`). Mirrored to KV as `{username}:share:partner` so the server can enforce consent in `crossRead`.
+- Delete log (`share:deleteLog`) records citation ids deleted while sharing is active. `deleteCitation` in `citations.ts` appends to this log automatically when `getShareStatus()` is non-null. `deleteCitationSilent` bypasses the log — use it only when applying a partner's delete log to avoid re-logging.
+- `acceptShareRequest` and the inner `deleteCitationSilent` call use dynamic imports (`await import('./citations')`) to break a circular dependency (`citations.ts` imports from `citationShare.ts` which imports from `citations.ts`). Static imports of the other direction are fine — only the cycle-closing direction uses dynamic imports.
+- `IncomingShareRequestModal` follows the `UsernameGate` pattern: `fixed inset-0`, full-screen, not an instance of `Modal`. Use this pattern for any full-screen overlay that must block the entire UI but is not a sheet-style modal.
+- `syncFromCloud` runs three share sync blocks in order: (1) accept notification, (2) incoming request, (3) partner pull. Each block is independent and wrapped in its own `try/catch`. If `kvCrossReadPartner` returns `null` in block 3, sharing is stopped locally — the partner revoked consent.
+
 ---
 
 ## KV / Cloud Storage

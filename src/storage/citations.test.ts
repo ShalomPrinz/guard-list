@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createLocalStorageMock } from '../tests/localStorageMock'
-import { getCitations, saveCitations, upsertCitation, deleteCitation, markCitationUsed } from './citations'
+import { getCitations, saveCitations, upsertCitation, deleteCitation, deleteCitationSilent, markCitationUsed } from './citations'
 import type { Citation } from '../types'
 
 function makeCitation(id: string, overrides: Partial<Citation> = {}): Citation {
@@ -58,6 +58,34 @@ describe('deleteCitation', () => {
     upsertCitation(makeCitation('a'), storage)
     deleteCitation('x', storage)
     expect(getCitations(storage)).toHaveLength(1)
+  })
+})
+
+describe('deleteCitation with sharing active', () => {
+  it('appends to delete log when share:status is set in storage', () => {
+    storage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: 1000 }))
+    upsertCitation(makeCitation('a'), storage)
+    deleteCitation('a', storage)
+    const log = JSON.parse(storage.getItem('share:deleteLog') ?? '[]') as string[]
+    expect(log).toContain('a')
+  })
+
+  it('does not append to delete log when not sharing', () => {
+    upsertCitation(makeCitation('a'), storage)
+    deleteCitation('a', storage)
+    expect(storage.getItem('share:deleteLog')).toBeNull()
+  })
+})
+
+describe('deleteCitationSilent', () => {
+  it('removes the citation without touching delete log', () => {
+    upsertCitation(makeCitation('a'), storage)
+    upsertCitation(makeCitation('b'), storage)
+    storage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: 1000 }))
+    deleteCitationSilent('a', storage)
+    expect(getCitations(storage)).toHaveLength(1)
+    expect(getCitations(storage)[0].id).toBe('b')
+    expect(storage.getItem('share:deleteLog')).toBeNull()
   })
 })
 
