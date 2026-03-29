@@ -18,7 +18,7 @@
  * If no username is set, all helpers bail out silently without calling KV.
  */
 
-import type { Citation } from '../types'
+import type { Citation, GuestCitationSubmission } from '../types'
 import { getUsername } from './userStorage'
 
 export const isKvAvailable: boolean = true;
@@ -186,4 +186,32 @@ export async function kvCrossReadPartner(
   } catch {
     return null
   }
+}
+
+/**
+ * Fetch all pending guest citation submissions for the current user.
+ * Scans {username}:guestCitations:* and returns values sorted by submittedAt ascending.
+ * Returns [] on error or when no username is set.
+ */
+export async function kvListGuestCitations(): Promise<GuestCitationSubmission[]> {
+  const username = getUsername()
+  if (!username) return []
+  try {
+    const keys = await kvList('guestCitations:')
+    const results = await Promise.all(
+      keys.map(k => kvGet<GuestCitationSubmission>(k))
+    )
+    return results
+      .filter((s): s is GuestCitationSubmission => s !== null)
+      .sort((a, b) => a.submittedAt - b.submittedAt)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Delete a pending guest citation submission by id. Fire-and-forget.
+ */
+export async function kvDeleteGuestCitation(id: string): Promise<void> {
+  await kvDel(`guestCitations:${id}`)
 }

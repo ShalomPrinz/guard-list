@@ -63,6 +63,13 @@ export interface Citation {
   usedInListIds: string[]; // schedule ids where this citation was used
 }
 
+export interface GuestCitationSubmission {
+  id: string
+  text: string
+  author: string
+  submittedAt: number // ms timestamp
+}
+
 // ─── Citation Sharing ─────────────────────────────────────────────────────────
 
 export interface CitationShareStatus {

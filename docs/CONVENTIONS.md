@@ -42,6 +42,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 - `Member` has: `id`, `name`, `availability: "base" | "home"`, `role: "commander" | "warrior"` (default `"warrior"`).
 - `Citation` has: `id`, `text`, `author` (formatted string), `usedInListIds: string[]`.
+- `GuestCitationSubmission` has: `id`, `text`, `author`, `submittedAt` (ms timestamp). Stored in KV at `{username}:guestCitations:{id}`. Never in localStorage — fetched on demand via `kvListGuestCitations()`.
 - `citationAuthorLinks` in localStorage maps `authorString → memberId` for statistics attribution.
 - `Schedule` has `parentScheduleId?: string` when it is a continued round.
 - `ScheduledParticipant` has `note?: string` (optional per-warrior note, never shown in WhatsApp output).
@@ -193,6 +194,8 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - `kvCrossSet` returns `'ok' | 'already_pending' | 'error'`. The `'already_pending'` case (HTTP 409) means the target already has an open inbound request — callers must handle it. On any other non-ok HTTP status, `kvCrossSet` logs `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'`. This is the only place in `cloudStorage.ts` that reads the raw HTTP status rather than delegating to `callKv`.
 - The internal `callKvRaw` helper in `cloudStorage.ts` exposes the raw `Response` object (not parsed JSON). It exists solely to let `kvCrossSet` inspect the 409 status and read the body on error. Do not use it for any other purpose.
 - The origin check in `api/kv.ts` uses a `Set<string>` populated from `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. If the set is empty (local dev), no restriction applies. Never revert to a single-origin check — `VERCEL_URL` is deployment-scoped and does not match the stable production alias URL.
+- The `guestSubmit` action in `api/kv.ts` intentionally bypasses the origin check (guests arrive from arbitrary share link URLs). It is handled before the origin check block, applies a dedicated rate limiter (`guestRatelimit`, prefix `"ratelimit:guest"`, 20 req/min/IP), and requires no `username` field. Any future action that must be accessible from external URLs must follow this same pattern: handle it early, apply its own rate limiter, and return before reaching the origin check.
+- `kvListGuestCitations()` and `kvDeleteGuestCitation(id)` in `cloudStorage.ts` manage pending guest submissions. Guest citations are never auto-synced via `syncFromCloud` — they are fetched on demand only.
 
 ---
 

@@ -16,6 +16,13 @@ const ratelimit = new Ratelimit({
   prefix: "ratelimit",
 });
 
+// Dedicated rate limiter for guest citation submissions — tighter limit to prevent spam.
+const guestRatelimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(20, "1 m"),
+  prefix: "ratelimit:guest",
+});
+
 // SECURITY: Username must not contain ':' (namespace separator) or Redis glob chars.
 // Allows any Unicode letter/number/space so existing Hebrew usernames remain valid.
 function isValidUsername(username: string): boolean {
@@ -41,26 +48,6 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  // SECURITY: Origin check — reject requests from origins other than known app domains.
-  // Accepts ALLOWED_ORIGIN (custom domain), VERCEL_PROJECT_PRODUCTION_URL (stable alias),
-  // and VERCEL_URL (deployment-specific URL). If none are set, no restriction is applied (local dev).
-  const allowedOrigins = new Set<string>()
-  if (process.env.ALLOWED_ORIGIN) allowedOrigins.add(process.env.ALLOWED_ORIGIN)
-  if (process.env.VERCEL_URL) allowedOrigins.add(`https://${process.env.VERCEL_URL}`)
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) allowedOrigins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
-  const origin = req.headers.get("Origin");
-  if (allowedOrigins.size > 0 && (!origin || !allowedOrigins.has(origin))) {
-    return json({ error: "Forbidden" }, 403);
-  }
-
-  // SECURITY: Rate limit by client IP to prevent DoS and Upstash quota exhaustion.
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const { success } = await ratelimit.limit(ip);
-  if (!success) {
-    return json({ error: "Too many requests" }, 429);
-  }
-
   // SECURITY: Reject non-JSON content types to prevent parser confusion attacks.
   if (!req.headers.get("content-type")?.includes("application/json")) {
     return json({ error: "Unsupported Media Type" }, 415);
@@ -78,6 +65,45 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const { action } = body;
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+  // guestSubmit: bypass origin check — guests visit from any URL (share links).
+  if (action === "guestSubmit") {
+    const { success: guestOk } = await guestRatelimit.limit(ip);
+    if (!guestOk) return json({ error: "Too many requests" }, 429);
+
+    const targetUsername =
+      typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
+    if (!isValidUsername(targetUsername)) return json({ error: "Invalid targetUsername" }, 400);
+
+    const text = typeof body.text === "string" ? body.text : "";
+    if (!text || text.length > 500) return json({ error: "Invalid text" }, 400);
+
+    const author = typeof body.author === "string" ? body.author : "";
+    if (!author || author.length > 120) return json({ error: "Invalid author" }, 400);
+
+    const id = crypto.randomUUID();
+    await kv.set(`${targetUsername}:guestCitations:${id}`, { id, text, author, submittedAt: Date.now() });
+    return json({ ok: true, id });
+  }
+
+  // SECURITY: Origin check — reject requests from origins other than known app domains.
+  // Accepts ALLOWED_ORIGIN (custom domain), VERCEL_PROJECT_PRODUCTION_URL (stable alias),
+  // and VERCEL_URL (deployment-specific URL). If none are set, no restriction is applied (local dev).
+  const allowedOrigins = new Set<string>()
+  if (process.env.ALLOWED_ORIGIN) allowedOrigins.add(process.env.ALLOWED_ORIGIN)
+  if (process.env.VERCEL_URL) allowedOrigins.add(`https://${process.env.VERCEL_URL}`)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) allowedOrigins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+  const origin = req.headers.get("Origin");
+  if (allowedOrigins.size > 0 && (!origin || !allowedOrigins.has(origin))) {
+    return json({ error: "Forbidden" }, 403);
+  }
+
+  // SECURITY: Rate limit by client IP to prevent DoS and Upstash quota exhaustion.
+  const { success } = await ratelimit.limit(ip);
+  if (!success) {
+    return json({ error: "Too many requests" }, 429);
+  }
 
   try {
     // SECURITY: rawGet/rawSet are a restricted escape hatch for device-registration keys only.

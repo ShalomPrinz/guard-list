@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner, kvListGuestCitations, kvDeleteGuestCitation } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -323,10 +323,17 @@ describe('cloudStorage', () => {
       expect(result).toBe('already_pending')
     })
 
-    it('returns error on other HTTP error', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({ error: 'Key not allowed' }) }))
+    it('returns error on other HTTP error and logs console.error with status and body', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve('{"error":"Key not allowed"}'),
+        json: () => Promise.resolve({ error: 'Key not allowed' }),
+      }))
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
       expect(result).toBe('error')
+      expect(spy).toHaveBeenCalledWith('[kv] crossSet failed: HTTP', 403, '{"error":"Key not allowed"}')
     })
 
     it('returns error on network failure', async () => {
@@ -393,6 +400,79 @@ describe('cloudStorage', () => {
 
       expect(result).toBeNull()
       expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('kvListGuestCitations', () => {
+    it('returns submissions sorted by submittedAt ascending', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'א. בן', submittedAt: 2000 }
+      const sub2 = { id: 'id2', text: 'quote2', author: 'ב. גד', submittedAt: 1000 }
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ keys: ['testuser:guestCitations:id1', 'testuser:guestCitations:id2'] }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub1 }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub2 }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitations()
+
+      expect(result).toEqual([sub2, sub1])
+    })
+
+    it('returns empty array when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitations()
+
+      expect(result).toEqual([])
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('filters out null values from kvGet', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'א. בן', submittedAt: 1000 }
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ keys: ['testuser:guestCitations:id1', 'testuser:guestCitations:id2'] }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub1 }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: null }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitations()
+
+      expect(result).toEqual([sub1])
+    })
+
+    it('returns empty array when list returns no keys', async () => {
+      mockFetch({ keys: [] })
+      const result = await kvListGuestCitations()
+      expect(result).toEqual([])
+    })
+
+    it('returns empty array on fetch error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvListGuestCitations()
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('kvDeleteGuestCitation', () => {
+    it('calls kvDel with the correct guest citations key', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await kvDeleteGuestCitation('abc-123')
+
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('del')
+      expect(body.key).toBe('testuser:guestCitations:abc-123')
+    })
+
+    it('does not throw on error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      await expect(kvDeleteGuestCitation('abc-123')).resolves.not.toThrow()
     })
   })
 })
