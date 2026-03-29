@@ -74,9 +74,9 @@ export function clearDeleteLog(storage: Storage = window.localStorage): void {
 export async function sendShareRequest(
   targetUsername: string,
   storage: Storage = window.localStorage,
-): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'error'> {
+): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'already_sharing' | 'error'> {
   if (getOutgoingRequest(storage) !== null) return 'already_have_outgoing'
-  if (getShareStatus(storage) !== null) return 'error'
+  if (getShareStatus(storage) !== null) return 'already_sharing'
 
   const currentUser = getUsername()
   if (!currentUser) return 'error'

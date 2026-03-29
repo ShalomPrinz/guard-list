@@ -142,10 +142,10 @@ describe('citationShare storage', () => {
       expect(result).toBe('already_have_outgoing')
     })
 
-    it('returns error when already sharing', async () => {
+    it('returns already_sharing when already sharing', async () => {
       setShareStatus({ partnerUsername: 'carol', since: 1000 })
       const result = await sendShareRequest('bob')
-      expect(result).toBe('error')
+      expect(result).toBe('already_sharing')
     })
 
     it('returns target_has_pending when crossSet returns already_pending', async () => {

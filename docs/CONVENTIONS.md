@@ -174,6 +174,8 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 ### Citation Sharing
 
 - Citation sharing state is managed exclusively through `src/storage/citationShare.ts`. Never read/write share localStorage keys directly from components or other storage modules.
+- `sendShareRequest` returns `'already_sharing'` (not `'error'`) when `getShareStatus() !== null`. Callers must handle this as a distinct case — `CitationsScreen` shows "כבר משותף עם משתמש אחר" and calls `refreshShareState()` to re-sync UI with localStorage.
+- `CitationsScreen` listens for `window` `storage` events to keep share state in sync when `syncFromCloud` writes to localStorage in the background. Any screen that displays share state must use this pattern.
 - Share status in localStorage key `share:status` (type `CitationShareStatus`). Mirrored to KV as `{username}:share:partner` so the server can enforce consent in `crossRead`.
 - Delete log (`share:deleteLog`) records citation ids deleted while sharing is active. `deleteCitation` in `citations.ts` appends to this log automatically when `getShareStatus()` is non-null. `deleteCitationSilent` bypasses the log — use it only when applying a partner's delete log to avoid re-logging.
 - `acceptShareRequest` and the inner `deleteCitationSilent` call use dynamic imports (`await import('./citations')`) to break a circular dependency (`citations.ts` imports from `citationShare.ts` which imports from `citations.ts`). Static imports of the other direction are fine — only the cycle-closing direction uses dynamic imports.
@@ -188,8 +190,9 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Raw KV actions (`rawGet`/`rawSet` in `api/kv.ts`) are restricted to keys matching `device:[a-zA-Z0-9_\-.]{1,128}`. Device keys in `UsernameGate.tsx` are constructed as `` `device:${username}` `` — never `` `${username}:device` ``. This ensures raw-action keys structurally cannot overlap with user-namespaced keys (`{username}:*`).
 - Cross-user writes use the `crossSet` action in `api/kv.ts`. Only two sub-keys are allowed: `share:incomingRequest` and `share:acceptNotification`. Any other key returns 403. Use `kvCrossSet` from `cloudStorage.ts` — never call `crossSet` directly.
 - Cross-user reads use the `crossRead` action in `api/kv.ts`. Server enforces consent: it checks that `{partnerUsername}:share:partner` equals the caller's username before returning citations. Use `kvCrossReadPartner` from `cloudStorage.ts`.
-- `kvCrossSet` returns `'ok' | 'already_pending' | 'error'`. The `'already_pending'` case (HTTP 409) means the target already has an open inbound request — callers must handle it. This is the only place in cloudStorage.ts that reads the raw HTTP status rather than delegating to `callKv`.
-- The internal `callKvRaw` helper in `cloudStorage.ts` exposes the raw `Response` object (not parsed JSON). It exists solely to let `kvCrossSet` inspect the 409 status. Do not use it for any other purpose.
+- `kvCrossSet` returns `'ok' | 'already_pending' | 'error'`. The `'already_pending'` case (HTTP 409) means the target already has an open inbound request — callers must handle it. On any other non-ok HTTP status, `kvCrossSet` logs `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'`. This is the only place in `cloudStorage.ts` that reads the raw HTTP status rather than delegating to `callKv`.
+- The internal `callKvRaw` helper in `cloudStorage.ts` exposes the raw `Response` object (not parsed JSON). It exists solely to let `kvCrossSet` inspect the 409 status and read the body on error. Do not use it for any other purpose.
+- The origin check in `api/kv.ts` uses a `Set<string>` populated from `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. If the set is empty (local dev), no restriction applies. Never revert to a single-origin check — `VERCEL_URL` is deployment-scoped and does not match the stable production alias URL.
 
 ---
 

@@ -212,3 +212,19 @@ The synchronous `return null` prevents rendering the guarded content; the `useEf
 **Root cause:** `syncFromCloud` runs all three share sync blocks sequentially in a single call. A test that validates an earlier block's side effect must also configure mocks for all later blocks, or those later blocks will interfere with the assertion.
 
 **Rule:** When testing any individual block inside `syncFromCloud`, mock all downstream KV calls that later blocks will make — even if the test is only about an earlier block. Specifically: if testing the accept notification block (block 1), mock `kvCrossReadPartner` to return a non-null value (e.g. `{ citations: [], deleteLog: [] }`) so the partner pull block (block 3) does not call `clearShareStatus()`. Failure to do this produces a false negative that is very hard to diagnose.
+
+---
+
+## E021 — Citation Share Request Always Showed "שגיאה בשליחה"
+
+**What went wrong:** Every attempt to send a citation share request showed the generic error "שגיאה בשליחה" regardless of the actual cause. Three root causes were identified simultaneously:
+
+1. `api/kv.ts` used only `VERCEL_URL` as the allowed origin fallback. `VERCEL_URL` is deployment-scoped and changes with every deploy. When the user visits the stable production alias (e.g. `guard-list.vercel.app`), the Origin header doesn't match and the API returns 403. Because all other KV ops are fire-and-forget, only the user-visible `sendShareRequest` feedback surfaced this.
+
+2. `sendShareRequest` returned `'error'` when `getShareStatus() !== null`. If `syncFromCloud` had written `share:status` after the component mounted, the component's state was stale — the share button was visible but pressing it immediately returned `'error'` without any network call.
+
+3. `kvCrossSet` silently discarded the HTTP status and body on failure, making the actual error invisible.
+
+**Root cause:** Single-origin check doesn't cover the stable alias URL; stale component state masked a local pre-check failure; silent error swallowing in the KV layer.
+
+**Rule:** The origin check in `api/kv.ts` must use a `Set` covering `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. `sendShareRequest` must return `'already_sharing'` (not `'error'`) for the pre-check case so callers can show a meaningful message and call `refreshShareState()`. `kvCrossSet` must log `console.error` with the HTTP status and body before returning `'error'`. Any screen displaying share state must listen for `storage` events to stay in sync with background localStorage writes.

@@ -47,6 +47,12 @@ export default function CitationsScreen() {
     setOutgoingRequest(getOutgoingRequest())
   }
 
+  useEffect(() => {
+    const handler = () => refreshShareState()
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
+  }, [])
+
   async function handleSendShareRequest() {
     const trimmed = shareInput.trim()
     if (!trimmed) return
@@ -62,8 +68,11 @@ export default function CitationsScreen() {
       setShareError('כבר יש בקשה פתוחה')
     } else if (result === 'target_has_pending') {
       setShareError('למשתמש זה כבר יש בקשה ממתינה')
+    } else if (result === 'already_sharing') {
+      setShareError('כבר משותף עם משתמש אחר')
+      refreshShareState()
     } else {
-      setShareError('שגיאה בשליחה')
+      setShareError('שגיאה בשליחה — בדוק את הקונסול לפרטים')
     }
   }
 

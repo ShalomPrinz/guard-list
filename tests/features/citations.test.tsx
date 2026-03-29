@@ -376,6 +376,34 @@ describe('CitationsScreen share panel', () => {
       expect(screen.getByText('שתף אוסף')).toBeTruthy()
     })
   })
+
+  it('shows "כבר משותף עם משתמש אחר" when sendShareRequest returns already_sharing', async () => {
+    // Simulate: component mounts with no share status, but syncFromCloud writes it
+    // after mount (stale state scenario). sendShareRequest reads localStorage directly
+    // and returns 'already_sharing'.
+    const user = userEvent.setup()
+    renderCitations()
+    await user.click(screen.getByText('שתף אוסף'))
+    // Simulate background write to localStorage (e.g. syncFromCloud)
+    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'carol', since: Date.now() }))
+    await user.type(screen.getByPlaceholderText('שם משתמש...'), 'bob')
+    await user.click(screen.getByText('שלח בקשה'))
+    await waitFor(() => {
+      expect(screen.getByText('כבר משותף עם משתמש אחר')).toBeTruthy()
+    })
+  })
+
+  it('updates share panel when storage event fires', async () => {
+    // Simulate: component mounted without share status, then syncFromCloud in another
+    // module writes share:status and fires a storage event.
+    renderCitations()
+    expect(screen.getByText('שתף אוסף')).toBeTruthy()
+    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'dave', since: Date.now() }))
+    window.dispatchEvent(new StorageEvent('storage'))
+    await waitFor(() => {
+      expect(screen.getByText(/שיתוף פעיל עם/)).toBeTruthy()
+    })
+  })
 })
 
 // ─── Citation author linkage storage ──────────────────────────────────────────

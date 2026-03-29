@@ -41,14 +41,15 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  // SECURITY: Origin check — reject requests from origins other than the app domain.
-  // Set ALLOWED_ORIGIN env var to the production URL (e.g. https://yourapp.vercel.app).
-  // Falls back to VERCEL_URL which Vercel injects automatically.
-  const allowedOrigin =
-    process.env.ALLOWED_ORIGIN ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  // SECURITY: Origin check — reject requests from origins other than known app domains.
+  // Accepts ALLOWED_ORIGIN (custom domain), VERCEL_PROJECT_PRODUCTION_URL (stable alias),
+  // and VERCEL_URL (deployment-specific URL). If none are set, no restriction is applied (local dev).
+  const allowedOrigins = new Set<string>()
+  if (process.env.ALLOWED_ORIGIN) allowedOrigins.add(process.env.ALLOWED_ORIGIN)
+  if (process.env.VERCEL_URL) allowedOrigins.add(`https://${process.env.VERCEL_URL}`)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) allowedOrigins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
   const origin = req.headers.get("Origin");
-  if (allowedOrigin && origin !== allowedOrigin) {
+  if (allowedOrigins.size > 0 && (!origin || !allowedOrigins.has(origin))) {
     return json({ error: "Forbidden" }, 403);
   }
 

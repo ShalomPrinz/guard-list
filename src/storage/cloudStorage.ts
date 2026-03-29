@@ -156,7 +156,11 @@ export async function kvCrossSet(
   try {
     const res = await callKvRaw({ action: 'crossSet', username, targetUsername, key, value })
     if (res.status === 409) return 'already_pending'
-    if (!res.ok) return 'error'
+    if (!res.ok) {
+      const body = await res.text()
+      console.error('[kv] crossSet failed: HTTP', res.status, body)
+      return 'error'
+    }
     return 'ok'
   } catch {
     return 'error'
