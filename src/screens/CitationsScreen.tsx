@@ -10,6 +10,7 @@ import {
   sendShareRequest,
 } from '../storage/citationShare'
 import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
+import { getUsername } from '../storage/userStorage'
 import type { CitationShareStatus, GuestCitationSubmission } from '../types'
 import { getGroups } from '../storage/groups'
 import { formatAuthorName } from '../logic/citations'
@@ -43,6 +44,9 @@ export default function CitationsScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
   const [acceptMemberIds, setAcceptMemberIds] = useState<Record<string, string>>({})
 
+  // Guest link copy state
+  const [linkCopied, setLinkCopied] = useState(false)
+
   // Share state
   const [shareStatus, setShareStatus] = useState<CitationShareStatus | null>(() => getShareStatus())
   const [outgoingRequest, setOutgoingRequest] = useState<{ toUsername: string; sentAt: number } | null>(() => getOutgoingRequest())
@@ -50,6 +54,16 @@ export default function CitationsScreen() {
   const [shareInput, setShareInput] = useState('')
   const [shareError, setShareError] = useState<string | null>(null)
   const [shareLoading, setShareLoading] = useState(false)
+
+  function handleCopyGuestLink() {
+    const username = getUsername()
+    if (!username) return
+    const url = `${window.location.origin}/guest/${username}`
+    void navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
 
   function refreshShareState() {
     setShareStatus(getShareStatus())
@@ -279,6 +293,32 @@ export default function CitationsScreen() {
               שתף אוסף
             </button>
           )}
+        </div>
+      )}
+
+      {/* Guest link section (non-selection mode only) */}
+      {!selectionMode && (
+        <div className="mb-4 rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
+          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">קישור לשליחת ציטוטים ממבקרים</p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCopyGuestLink}
+              className="min-h-[44px] flex-1 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+            >
+              {linkCopied ? 'הועתק!' : 'העתק קישור'}
+            </button>
+            <button
+              onClick={() => {
+                const username = getUsername()
+                if (!username) return
+                const url = `${window.location.origin}/guest/${username}`
+                window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank')
+              }}
+              className="min-h-[44px] flex-1 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+            >
+              שתף בוואטסאפ
+            </button>
+          </div>
         </div>
       )}
 

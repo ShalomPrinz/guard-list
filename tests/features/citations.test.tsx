@@ -12,6 +12,7 @@ import { getCitations, upsertCitation, deleteCitation, markCitationUsed } from '
 import { getCitationAuthorLinks, saveCitationAuthorLink, skipCitationAuthorLink } from '@/storage/citationAuthorLinks'
 import { upsertGroup } from '@/storage/groups'
 import { formatAuthorName, pickRandomCitation } from '@/logic/citations'
+import { setUsername } from '@/storage/userStorage'
 import type { Citation, GuestCitationSubmission } from '@/types'
 
 // ─── Cloud storage mocks ──────────────────────────────────────────────────────
@@ -666,6 +667,53 @@ describe('CitationsScreen guest inbox', () => {
     await waitFor(() => {
       // Badge shows count 3
       expect(screen.getByText('3')).toBeTruthy()
+    })
+  })
+})
+
+// ─── CitationsScreen: guest link section ─────────────────────────────────────
+
+describe('CitationsScreen guest link section', () => {
+  beforeEach(() => {
+    setUsername('testuser')
+  })
+
+  it('shows "העתק קישור" and "שתף בוואטסאפ" buttons in normal mode', () => {
+    renderCitations()
+    expect(screen.getByRole('button', { name: 'העתק קישור' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'שתף בוואטסאפ' })).toBeTruthy()
+  })
+
+  it('does not show guest link buttons in selection mode', () => {
+    renderCitations('/citations', { selectionMode: true })
+    expect(screen.queryByRole('button', { name: 'העתק קישור' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'שתף בוואטסאפ' })).toBeNull()
+  })
+
+  it('"העתק קישור" calls clipboard.writeText with correct URL', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    renderCitations()
+
+    await user.click(screen.getByRole('button', { name: 'העתק קישור' }))
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining('/guest/testuser'),
+      )
+    })
+  })
+
+  it('"העתק קישור" shows "הועתק!" immediately after clipboard write', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    renderCitations()
+
+    await user.click(screen.getByRole('button', { name: 'העתק קישור' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'הועתק!' })).toBeTruthy()
     })
   })
 })

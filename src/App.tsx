@@ -24,8 +24,9 @@ import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
 import CommandersSelectScreen from './screens/CommandersSelectScreen'
 import FallbackScreen from './screens/FallbackScreen'
+import GuestCitationsScreen from './screens/GuestCitationsScreen'
 
-export default function App() {
+function AuthenticatedApp() {
   const [hasUsername, setHasUsername] = useState(() => getUsername() !== null)
   const [incomingShareRequest, setIncomingShareRequest] = useState(() =>
     hasUsername ? getLocalIncomingRequest() : null
@@ -75,8 +76,7 @@ export default function App() {
           }}
         />
       )}
-    <WizardProvider>
-      <BrowserRouter>
+      <WizardProvider>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<HomeScreen />} />
@@ -98,8 +98,18 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </WizardProvider>
+      </WizardProvider>
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/guest/:username" element={<GuestCitationsScreen />} />
+        <Route path="*" element={<AuthenticatedApp />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
