@@ -9,9 +9,11 @@ import {
   stopSharing,
   sendShareRequest,
 } from '../storage/citationShare'
-import type { CitationShareStatus } from '../types'
+import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
+import type { CitationShareStatus, GuestCitationSubmission } from '../types'
 import { getGroups } from '../storage/groups'
 import { formatAuthorName } from '../logic/citations'
+import { formatDate } from '../logic/formatting'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
 import type { Citation, Member } from '../types'
@@ -33,6 +35,13 @@ export default function CitationsScreen() {
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  // Guest citations inbox
+  const [pendingGuest, setPendingGuest] = useState<GuestCitationSubmission[] | null>(null)
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [inboxLoading, setInboxLoading] = useState(false)
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [acceptMemberIds, setAcceptMemberIds] = useState<Record<string, string>>({})
 
   // Share state
   const [shareStatus, setShareStatus] = useState<CitationShareStatus | null>(() => getShareStatus())
@@ -138,6 +147,56 @@ export default function CitationsScreen() {
     setCitations(getCitations())
     setAuthorLinks(getCitationAuthorLinks())
     setEditing(null)
+  }
+
+  async function openInbox() {
+    setInboxOpen(true)
+    setInboxLoading(true)
+    setAcceptingId(null)
+    setAcceptMemberIds({})
+    const submissions = await kvListGuestCitations()
+    setPendingGuest(submissions)
+    setInboxLoading(false)
+  }
+
+  function handleReject(submissionId: string) {
+    kvDeleteGuestCitation(submissionId)
+    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submissionId) : prev)
+    if (acceptingId === submissionId) setAcceptingId(null)
+  }
+
+  function handleAcceptOne(submission: GuestCitationSubmission, memberId: string) {
+    const newCitation: Citation = {
+      id: crypto.randomUUID(),
+      text: submission.text,
+      author: submission.author,
+      usedInListIds: [],
+    }
+    upsertCitation(newCitation)
+    if (memberId) saveCitationAuthorLink(submission.author, memberId)
+    kvDeleteGuestCitation(submission.id)
+    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submission.id) : prev)
+    setAcceptingId(null)
+    setCitations(getCitations())
+    setAuthorLinks(getCitationAuthorLinks())
+  }
+
+  function handleAcceptAll() {
+    const list = pendingGuest ?? []
+    for (const submission of list) {
+      const newCitation: Citation = {
+        id: crypto.randomUUID(),
+        text: submission.text,
+        author: submission.author,
+        usedInListIds: [],
+      }
+      upsertCitation(newCitation)
+      kvDeleteGuestCitation(submission.id)
+    }
+    setPendingGuest([])
+    setAcceptingId(null)
+    setCitations(getCitations())
+    setAuthorLinks(getCitationAuthorLinks())
   }
 
   function handleDelete(id: string) {
@@ -286,14 +345,27 @@ export default function CitationsScreen() {
         </ul>
       )}
 
-      {/* Add button (normal mode only) */}
+      {/* Add button and inbox button (normal mode only) */}
       {!selectionMode && (
-        <button
-          onClick={openNew}
-          className="w-full rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
-        >
-          + הוסף ציטוט
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={openNew}
+            className="flex-1 rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
+          >
+            + הוסף ציטוט
+          </button>
+          <button
+            onClick={openInbox}
+            className="relative min-h-[44px] rounded-2xl border border-gray-300 px-4 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+          >
+            ציטוטים ממבקרים
+            {pendingGuest !== null && pendingGuest.length > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                {pendingGuest.length}
+              </span>
+            )}
+          </button>
+        </div>
       )}
 
       {/* Edit / Add modal */}
@@ -373,6 +445,85 @@ export default function CitationsScreen() {
           onConfirm={() => handleDelete(confirmDeleteId)}
           onCancel={() => setConfirmDeleteId(null)}
         />
+      )}
+
+      {/* Guest citations inbox modal */}
+      {inboxOpen && (
+        <Modal onClose={() => setInboxOpen(false)} title="ציטוטים ממבקרים">
+          {inboxLoading ? (
+            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">טוען...</p>
+          ) : pendingGuest === null || pendingGuest.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">אין ציטוטים ממתינים</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pendingGuest.length > 1 && (
+                <button
+                  onClick={handleAcceptAll}
+                  className="min-h-[44px] w-full rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                >
+                  קבל הכל
+                </button>
+              )}
+              {pendingGuest.map(submission => (
+                <div key={submission.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                  <p className="mb-1 text-sm text-gray-900 dark:text-gray-100">{submission.text}</p>
+                  <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">
+                    {submission.author ? `— ${submission.author}` : ''}
+                  </p>
+                  <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
+                    {formatDate(new Date(submission.submittedAt))}
+                  </p>
+
+                  {acceptingId === submission.id ? (
+                    <div className="flex flex-col gap-2">
+                      {allMembers.length > 0 && (
+                        <select
+                          value={acceptMemberIds[submission.id] ?? ''}
+                          onChange={e => setAcceptMemberIds(prev => ({ ...prev, [submission.id]: e.target.value }))}
+                          className="w-full rounded-xl bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
+                        >
+                          <option value="">ללא קישור</option>
+                          {allMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setAcceptingId(null)}
+                          className="min-h-[44px] flex-1 rounded-2xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+                        >
+                          ביטול
+                        </button>
+                        <button
+                          onClick={() => handleAcceptOne(submission, acceptMemberIds[submission.id] ?? '')}
+                          className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                        >
+                          אשר
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReject(submission.id)}
+                        className="min-h-[44px] flex-1 rounded-2xl border border-red-300 text-sm font-medium text-red-600 active:bg-red-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
+                      >
+                        דחה
+                      </button>
+                      <button
+                        onClick={() => setAcceptingId(submission.id)}
+                        className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                      >
+                        קבל
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
       )}
 
       {/* Send share request modal */}

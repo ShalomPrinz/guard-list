@@ -12,7 +12,22 @@ import { getCitations, upsertCitation, deleteCitation, markCitationUsed } from '
 import { getCitationAuthorLinks, saveCitationAuthorLink, skipCitationAuthorLink } from '@/storage/citationAuthorLinks'
 import { upsertGroup } from '@/storage/groups'
 import { formatAuthorName, pickRandomCitation } from '@/logic/citations'
-import type { Citation } from '@/types'
+import type { Citation, GuestCitationSubmission } from '@/types'
+
+// ─── Cloud storage mocks ──────────────────────────────────────────────────────
+
+const mockKvListGuestCitations = vi.fn<() => Promise<GuestCitationSubmission[]>>()
+const mockKvDeleteGuestCitation = vi.fn<(id: string) => Promise<void>>()
+
+vi.mock('@/storage/cloudStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/storage/cloudStorage')>()
+  return {
+    ...actual,
+    kvListGuestCitations: (...args: unknown[]) => mockKvListGuestCitations(...(args as [])),
+    kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
+    syncFromCloud: vi.fn().mockResolvedValue(undefined),
+  }
+})
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,10 +64,13 @@ function renderStatistics() {
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', createLocalStorageMock())
+  mockKvListGuestCitations.mockResolvedValue([])
+  mockKvDeleteGuestCitation.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 // ─── Unit: Author formatting ───────────────────────────────────────────────────
@@ -432,5 +450,222 @@ describe('citationAuthorLinks storage', () => {
     // 'skip' is defined, so the prompt condition (=== undefined) is false
     expect(links['א. כהן']).toBe('skip')
     expect(links['א. כהן'] === undefined).toBe(false)
+  })
+})
+
+// ─── CitationsScreen: guest citations inbox ───────────────────────────────────
+
+function makeSubmission(id: string, overrides: Partial<GuestCitationSubmission> = {}): GuestCitationSubmission {
+  return { id, text: `submission-text-${id}`, author: `מחבר-${id}`, submittedAt: 1700000000000, ...overrides }
+}
+
+describe('CitationsScreen guest inbox', () => {
+  it('shows "ציטוטים ממבקרים" button in normal mode', () => {
+    renderCitations()
+    expect(screen.getByText('ציטוטים ממבקרים')).toBeTruthy()
+  })
+
+  it('does not show inbox button in selection mode', () => {
+    renderCitations('/citations', { selectionMode: true })
+    expect(screen.queryByText('ציטוטים ממבקרים')).toBeNull()
+  })
+
+  it('opens inbox modal and shows loading state', async () => {
+    const user = userEvent.setup()
+    // Keep promise pending to observe loading state
+    let resolve!: (v: GuestCitationSubmission[]) => void
+    mockKvListGuestCitations.mockReturnValue(new Promise(r => { resolve = r }))
+    renderCitations()
+
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    expect(screen.getByText('טוען...')).toBeTruthy()
+    // Clean up
+    resolve([])
+  })
+
+  it('shows "אין ציטוטים ממתינים" when inbox is empty', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([])
+    renderCitations()
+
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => {
+      expect(screen.getByText('אין ציטוטים ממתינים')).toBeTruthy()
+    })
+  })
+
+  it('shows pending submissions in the inbox', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט מהמבקר', author: 'אורח' }),
+    ])
+    renderCitations()
+
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => {
+      expect(screen.getByText('ציטוט מהמבקר')).toBeTruthy()
+      expect(screen.getByText('— אורח')).toBeTruthy()
+    })
+  })
+
+  it('shows "קבל הכל" only when more than one submission', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1'),
+      makeSubmission('s2'),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => {
+      expect(screen.getByText('קבל הכל')).toBeTruthy()
+    })
+  })
+
+  it('does not show "קבל הכל" when only one submission', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => {
+      expect(screen.queryByText('קבל הכל')).toBeNull()
+    })
+  })
+
+  it('reject removes submission from list and calls kvDeleteGuestCitation', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט לדחייה' }),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('ציטוט לדחייה'))
+    await user.click(screen.getByText('דחה'))
+
+    await waitFor(() => {
+      expect(screen.queryByText('ציטוט לדחייה')).toBeNull()
+      expect(screen.getByText('אין ציטוטים ממתינים')).toBeTruthy()
+    })
+    expect(mockKvDeleteGuestCitation).toHaveBeenCalledWith('s1')
+  })
+
+  it('accept shows accept panel with אשר and ביטול buttons', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('קבל'))
+    await user.click(screen.getByText('קבל'))
+
+    expect(screen.getByText('אשר')).toBeTruthy()
+    expect(screen.getByText('ביטול')).toBeTruthy()
+  })
+
+  it('ביטול in accept panel collapses without changes', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1', { text: 'test-text' })])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('קבל'))
+    await user.click(screen.getByText('קבל'))
+    await user.click(screen.getByText('ביטול'))
+
+    // Back to accept/reject buttons, citation still in list
+    await waitFor(() => {
+      expect(screen.getByText('test-text')).toBeTruthy()
+      expect(screen.queryByText('אשר')).toBeNull()
+    })
+    expect(getCitations()).toHaveLength(0)
+  })
+
+  it('אשר saves citation to localStorage and removes from inbox', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט שהתקבל', author: 'מחבר א' }),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('קבל'))
+    await user.click(screen.getByText('קבל'))
+    await user.click(screen.getByText('אשר'))
+
+    await waitFor(() => {
+      const saved = getCitations()
+      expect(saved).toHaveLength(1)
+      expect(saved[0].text).toBe('ציטוט שהתקבל')
+      expect(saved[0].author).toBe('מחבר א')
+      expect(screen.getByText('אין ציטוטים ממתינים')).toBeTruthy()
+    })
+    expect(mockKvDeleteGuestCitation).toHaveBeenCalledWith('s1')
+  })
+
+  it('אשר with member link saves author link', async () => {
+    const user = userEvent.setup()
+    upsertGroup({
+      id: 'g1', name: 'מחלקה', createdAt: new Date().toISOString(),
+      members: [{ id: 'm1', name: 'יוסי ישראלי', availability: 'base' }],
+    })
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט', author: 'מחבר' }),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('קבל'))
+    await user.click(screen.getByText('קבל'))
+
+    // Select a member
+    const select = screen.getByRole('combobox')
+    await user.selectOptions(select, 'm1')
+    await user.click(screen.getByText('אשר'))
+
+    await waitFor(() => {
+      const links = getCitationAuthorLinks()
+      expect(links['מחבר']).toBe('m1')
+    })
+  })
+
+  it('קבל הכל accepts all submissions and clears inbox', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט 1' }),
+      makeSubmission('s2', { text: 'ציטוט 2' }),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => screen.getByText('קבל הכל'))
+    await user.click(screen.getByText('קבל הכל'))
+
+    await waitFor(() => {
+      expect(getCitations()).toHaveLength(2)
+      expect(screen.getByText('אין ציטוטים ממתינים')).toBeTruthy()
+    })
+    expect(mockKvDeleteGuestCitation).toHaveBeenCalledWith('s1')
+    expect(mockKvDeleteGuestCitation).toHaveBeenCalledWith('s2')
+  })
+
+  it('badge count shows pending submissions count', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitations.mockResolvedValue([
+      makeSubmission('s1'),
+      makeSubmission('s2'),
+      makeSubmission('s3'),
+    ])
+    renderCitations()
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
+
+    await waitFor(() => {
+      // Badge shows count 3
+      expect(screen.getByText('3')).toBeTruthy()
+    })
   })
 })
