@@ -9,11 +9,16 @@
  *   {username}:citations:{citationId}                 → Citation
  *   {username}:statistics:{participantName}           → ParticipantStats
  *   {username}:prefs:global                           → { theme: 'dark' | 'light' }
+ *   {username}:share:partner                          → string (partner's username — written by owner)
+ *   {username}:share:incomingRequest                  → { fromUsername: string, sentAt: number } — written via crossSet by requester
+ *   {username}:share:acceptNotification               → { byUsername: string, at: number } — written via crossSet by accepting user
+ *   {username}:share:deleteLog                        → string[] (citation IDs deleted while sharing active)
  *
  * All functions catch all errors silently — they never throw.
  * If no username is set, all helpers bail out silently without calling KV.
  */
 
+import type { Citation } from '../types'
 import { getUsername } from './userStorage'
 
 export const isKvAvailable: boolean = true;
@@ -32,6 +37,14 @@ async function callKv(body: unknown): Promise<unknown> {
   });
   if (!res.ok) throw new Error(`KV HTTP ${res.status}`);
   return res.json();
+}
+
+async function callKvRaw(body: unknown): Promise<Response> {
+  return fetch("/api/kv", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function kvGet<T>(key: string): Promise<T | null> {
@@ -125,5 +138,48 @@ export async function kvList(prefix: string): Promise<string[]> {
   } catch (e) {
     console.error("[kv] list failed:", e);
     return [];
+  }
+}
+
+/**
+ * Write a cross-user key into another user's namespace.
+ * Only allowed sub-keys: 'share:incomingRequest' and 'share:acceptNotification'.
+ * Returns 'already_pending' if the target already has an open incomingRequest.
+ */
+export async function kvCrossSet(
+  targetUsername: string,
+  key: 'share:incomingRequest' | 'share:acceptNotification',
+  value: unknown,
+): Promise<'ok' | 'already_pending' | 'error'> {
+  const username = getUsername()
+  if (!username) return 'error'
+  try {
+    const res = await callKvRaw({ action: 'crossSet', username, targetUsername, key, value })
+    if (res.status === 409) return 'already_pending'
+    if (!res.ok) return 'error'
+    return 'ok'
+  } catch {
+    return 'error'
+  }
+}
+
+/**
+ * Read a partner user's full citations collection.
+ * Only succeeds if the partner has set their share:partner key to the current user's username.
+ * Returns null on any error (including 403 meaning partner stopped sharing).
+ */
+export async function kvCrossReadPartner(
+  partnerUsername: string,
+): Promise<{ citations: Citation[]; deleteLog: string[] } | null> {
+  const username = getUsername()
+  if (!username) return null
+  try {
+    const data = (await callKv({ action: 'crossRead', username, partnerUsername })) as {
+      citations: Citation[];
+      deleteLog: string[];
+    }
+    return data
+  } catch {
+    return null
   }
 }

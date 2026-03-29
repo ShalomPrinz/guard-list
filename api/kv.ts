@@ -156,6 +156,63 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ keys: allKeys });
     }
 
+    if (action === "crossSet") {
+      const targetUsername =
+        typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
+      if (!isValidUsername(targetUsername)) {
+        return json({ error: "Invalid targetUsername" }, 400);
+      }
+      if (username === targetUsername) {
+        return json({ error: "Cannot cross-write to own namespace" }, 400);
+      }
+      const key = body.key as string;
+      // SECURITY: Strict allowlist — only these two sub-keys may be written cross-namespace.
+      const ALLOWED_CROSS_KEYS = ["share:incomingRequest", "share:acceptNotification"] as const;
+      if (!ALLOWED_CROSS_KEYS.includes(key as (typeof ALLOWED_CROSS_KEYS)[number])) {
+        return json({ error: "Key not allowed for cross-write" }, 403);
+      }
+      // Enforce one-open-request-at-a-time rule for incomingRequest key.
+      if (key === "share:incomingRequest") {
+        const existing = await kv.get(`${targetUsername}:share:incomingRequest`);
+        if (existing !== null) {
+          return json({ error: "Target already has a pending request" }, 409);
+        }
+      }
+      await kv.set(`${targetUsername}:${key}`, body.value);
+      return json({ ok: true });
+    }
+
+    if (action === "crossRead") {
+      const partnerUsername =
+        typeof body.partnerUsername === "string" ? body.partnerUsername.trim().toLowerCase() : "";
+      if (!isValidUsername(partnerUsername)) {
+        return json({ error: "Invalid partnerUsername" }, 400);
+      }
+      // SECURITY: Consent check — partner must have set their share:partner key to the caller's username.
+      const partnerConsent = await kv.get(`${partnerUsername}:share:partner`);
+      if (partnerConsent !== username) {
+        return json({ error: "Not authorized" }, 403);
+      }
+      try {
+        // Scan all citations for the partner.
+        const allKeys: string[] = [];
+        let cursor = 0;
+        do {
+          const [nextCursor, batch] = await kv.scan(cursor, {
+            match: `${partnerUsername}:citations:*`,
+            count: 100,
+          });
+          allKeys.push(...batch);
+          cursor = nextCursor as number;
+        } while (cursor !== 0);
+        const citations = await Promise.all(allKeys.map((k) => kv.get(k)));
+        const deleteLog = (await kv.get(`${partnerUsername}:share:deleteLog`)) as string[] | null;
+        return json({ citations: citations.filter(Boolean), deleteLog: deleteLog ?? [] });
+      } catch {
+        return json({ error: "Internal server error" }, 500);
+      }
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (_e) {
     // SECURITY: Return a generic message — never leak internal Upstash error details to the client.

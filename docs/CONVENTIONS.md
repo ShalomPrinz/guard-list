@@ -177,6 +177,10 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 - All KV access goes through `src/storage/cloudStorage.ts`. Never import Upstash Redis directly from components or logic.
 - Raw KV actions (`rawGet`/`rawSet` in `api/kv.ts`) are restricted to keys matching `device:[a-zA-Z0-9_\-.]{1,128}`. Device keys in `UsernameGate.tsx` are constructed as `` `device:${username}` `` — never `` `${username}:device` ``. This ensures raw-action keys structurally cannot overlap with user-namespaced keys (`{username}:*`).
+- Cross-user writes use the `crossSet` action in `api/kv.ts`. Only two sub-keys are allowed: `share:incomingRequest` and `share:acceptNotification`. Any other key returns 403. Use `kvCrossSet` from `cloudStorage.ts` — never call `crossSet` directly.
+- Cross-user reads use the `crossRead` action in `api/kv.ts`. Server enforces consent: it checks that `{partnerUsername}:share:partner` equals the caller's username before returning citations. Use `kvCrossReadPartner` from `cloudStorage.ts`.
+- `kvCrossSet` returns `'ok' | 'already_pending' | 'error'`. The `'already_pending'` case (HTTP 409) means the target already has an open inbound request — callers must handle it. This is the only place in cloudStorage.ts that reads the raw HTTP status rather than delegating to `callKv`.
+- The internal `callKvRaw` helper in `cloudStorage.ts` exposes the raw `Response` object (not parsed JSON). It exists solely to let `kvCrossSet` inspect the 409 status. Do not use it for any other purpose.
 
 ---
 

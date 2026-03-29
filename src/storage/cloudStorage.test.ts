@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -293,6 +293,106 @@ describe('cloudStorage', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const result = await kvList('groups:')
       expect(result).toEqual([])
+    })
+  })
+
+  describe('kvCrossSet', () => {
+    it('returns ok on success', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) }))
+      const result = await kvCrossSet('otheruser', 'share:incomingRequest', { fromUsername: 'testuser', sentAt: 1 })
+      expect(result).toBe('ok')
+    })
+
+    it('sends correct action, username, targetUsername, key, and value', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await kvCrossSet('otheruser', 'share:acceptNotification', { byUsername: 'testuser', at: 123 })
+
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('crossSet')
+      expect(body.username).toBe('testuser')
+      expect(body.targetUsername).toBe('otheruser')
+      expect(body.key).toBe('share:acceptNotification')
+      expect(body.value).toEqual({ byUsername: 'testuser', at: 123 })
+    })
+
+    it('returns already_pending on HTTP 409', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({ error: 'Target already has a pending request' }) }))
+      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      expect(result).toBe('already_pending')
+    })
+
+    it('returns error on other HTTP error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({ error: 'Key not allowed' }) }))
+      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      expect(result).toBe('error')
+    })
+
+    it('returns error on network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      expect(result).toBe('error')
+    })
+
+    it('returns error when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+
+      expect(result).toBe('error')
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('kvCrossReadPartner', () => {
+    it('returns citations and deleteLog on success', async () => {
+      const payload = {
+        citations: [{ id: 'c1', text: 'quote', author: 'א. בן', usedInListIds: [] }],
+        deleteLog: ['c2'],
+      }
+      mockFetch(payload)
+      const result = await kvCrossReadPartner('partneruser')
+      expect(result).toEqual(payload)
+    })
+
+    it('sends correct action, username, and partnerUsername', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ citations: [], deleteLog: [] }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await kvCrossReadPartner('partneruser')
+
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('crossRead')
+      expect(body.username).toBe('testuser')
+      expect(body.partnerUsername).toBe('partneruser')
+    })
+
+    it('returns null on HTTP 403 (partner stopped sharing)', async () => {
+      mockFetch({ error: 'Not authorized' }, false)
+      const result = await kvCrossReadPartner('partneruser')
+      expect(result).toBeNull()
+    })
+
+    it('returns null on network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      const result = await kvCrossReadPartner('partneruser')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvCrossReadPartner('partneruser')
+
+      expect(result).toBeNull()
+      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 })
