@@ -64,28 +64,10 @@ export default function UniteScreen() {
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">רשימה מאוחדת</p>
       </div>
 
-      {/* Schedule per station */}
-      <div className="mb-6 flex flex-col gap-4">
-        {unified.stations.map(st => (
-          <div key={st.stationName} className="rounded-2xl bg-white p-4 dark:bg-gray-800">
-            <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">📍 {st.stationName}</p>
-
-            {st.participants.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                {st.participants.map((p, i) => (
-                  <div key={i} className="flex items-baseline gap-3">
-                    <span className="w-11 shrink-0 font-mono text-sm text-gray-500 dark:text-gray-400">{p.startTime}</span>
-                    <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{p.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{p.durationMinutes}′</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 dark:text-gray-500">אין משתתפים</p>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* WhatsApp preview */}
+      <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 mb-6" dir="rtl">
+        {whatsappText}
+      </pre>
 
       {/* Quote */}
       {unified.quote && (

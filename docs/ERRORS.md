@@ -178,13 +178,15 @@ Never mock it per-file. Never remove this from the setup file.
 
 ---
 
-## E018 — Duplicate Schedule Preview on ResultScreen
+## E018 — Duplicate Schedule Preview on ResultScreen / UniteScreen
 
-**What went wrong:** When adding a WhatsApp `<pre>` preview block to `ResultScreen`, the existing per-station cards section (`{/* Schedule per station */}`) was left in place. This created two full schedule previews side by side — a structured card view and a plain-text WhatsApp preview — both showing the same data.
+**What went wrong:** When adding a WhatsApp `<pre>` preview block to `ResultScreen`, the existing per-station cards section (`{/* Schedule per station */}`) was left in place. This created two full schedule previews side by side — a structured card view and a plain-text WhatsApp preview — both showing the same data. The same mistake was later caught in `UniteScreen`.
 
 **Root cause:** The prompt asked to add a preview without explicitly saying to remove the existing one. The existing station cards were not considered redundant by default.
 
-**Rule:** `ResultScreen` must show schedule data in exactly one place. The WhatsApp `<pre>` preview (via `whatsappText`) is the single source. Never add a second rendering of station/participant data alongside it. When adding a preview block, always check whether an existing equivalent display needs to be removed.
+**Rule:** Both `ResultScreen` and `UniteScreen` must show schedule data in exactly one place — the `<pre>` WhatsApp preview block (via `whatsappText`). Never add a second rendering of station/participant data alongside it. When adding a preview block, always check whether an existing equivalent display needs to be removed.
+
+**Testing implication:** Because participant names and station names are embedded inside the `<pre>` text block (not as isolated DOM nodes), `getByText('Alice')` will fail (no exact match) and `getByText(/Alice/)` will find multiple ancestor elements. Always query `<pre>` content directly: `document.querySelector('pre')?.textContent`. For the schedule title (which appears in both `<h1>` and `<pre>`), use `getByRole('heading', { name: /.../ })` to target only the heading.
 
 ---
 

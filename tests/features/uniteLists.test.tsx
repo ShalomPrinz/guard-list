@@ -355,10 +355,12 @@ describe('UniteScreen — merge logic with two selected schedules', () => {
     upsertSchedule(childSchedule)
     renderUniteScreen('child1', 'parent1')
 
-    expect(screen.getByText('Alice')).toBeTruthy()
-    expect(screen.getByText('Bob')).toBeTruthy()
-    expect(screen.getByText('Charlie')).toBeTruthy()
-    expect(screen.getByText('Dave')).toBeTruthy()
+    // Participants now appear inside the <pre> WhatsApp preview block
+    const preText = document.querySelector('pre')?.textContent ?? ''
+    expect(preText).toContain('Alice')
+    expect(preText).toContain('Bob')
+    expect(preText).toContain('Charlie')
+    expect(preText).toContain('Dave')
   })
 
   it('uses title from earlier schedule (by createdAt)', () => {
@@ -367,8 +369,9 @@ describe('UniteScreen — merge logic with two selected schedules', () => {
     // current = child, target = parent — but earlier is parent
     renderUniteScreen('child1', 'parent1')
 
-    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
-    expect(screen.queryByText(/סבב שני/)).toBeNull()
+    // Title appears in both <h1> and <pre>; use heading role to target <h1> specifically
+    expect(screen.getByRole('heading', { name: /סבב ראשון/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /סבב שני/ })).toBeNull()
   })
 
   it('uses title from earlier schedule regardless of selection order', () => {
@@ -377,8 +380,8 @@ describe('UniteScreen — merge logic with two selected schedules', () => {
     // current = parent, target = child — but earlier is still parent
     renderUniteScreen('parent1', 'child1')
 
-    expect(screen.getByText(/סבב ראשון/)).toBeTruthy()
-    expect(screen.queryByText(/סבב שני/)).toBeNull()
+    expect(screen.getByRole('heading', { name: /סבב ראשון/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /סבב שני/ })).toBeNull()
   })
 
   it('uses quote from earlier schedule', () => {
@@ -386,8 +389,10 @@ describe('UniteScreen — merge logic with two selected schedules', () => {
     upsertSchedule(childSchedule)
     renderUniteScreen('child1', 'parent1')
 
-    expect(screen.getByText(/"ציטוט מהאבא"/)).toBeTruthy()
-    expect(screen.queryByText(/"ציטוט מהבן"/)).toBeNull()
+    // Quote appears in both <pre> (WhatsApp text) and the styled quote card
+    const preText = document.querySelector('pre')?.textContent ?? ''
+    expect(preText).toContain('ציטוט מהאבא')
+    expect(preText).not.toContain('ציטוט מהבן')
   })
 
   it('works with two non-parent-child schedules', () => {
@@ -395,10 +400,11 @@ describe('UniteScreen — merge logic with two selected schedules', () => {
     upsertSchedule(olderSchedule)
     renderUniteScreen('standalone1', 'older1')
 
-    expect(screen.getByText('Alice')).toBeTruthy()
-    expect(screen.getByText('Eve')).toBeTruthy()
+    const preText = document.querySelector('pre')?.textContent ?? ''
+    expect(preText).toContain('Alice')
+    expect(preText).toContain('Eve')
     // Earlier is olderSchedule
-    expect(screen.getByText(/סבב ישן/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /סבב ישן/ })).toBeTruthy()
   })
 })
 
@@ -462,7 +468,9 @@ describe('UniteScreen — station merging (existing coverage)', () => {
     upsertSchedule(childSchedule)
     renderUniteScreen('child1', 'parent1')
 
-    expect(screen.getByText(/עמדה ב/)).toBeTruthy()
-    expect(screen.getByText('Eve')).toBeTruthy()
+    // Station name and participant appear inside the <pre> WhatsApp preview block
+    const preText = document.querySelector('pre')?.textContent ?? ''
+    expect(preText).toContain('עמדה ב')
+    expect(preText).toContain('Eve')
   })
 })
