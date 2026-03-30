@@ -87,15 +87,17 @@ export default function CitationsScreen() {
       setShowShareModal(false)
       setShareInput('')
       refreshShareState()
+    } else if (result === 'own_namespace') {
+      setShareError('לא ניתן לשתף אוסף עם עצמך')
     } else if (result === 'already_have_outgoing') {
-      setShareError('כבר יש בקשה פתוחה')
+      setShareError('כבר יש בקשת שיתוף פתוחה')
     } else if (result === 'target_has_pending') {
       setShareError('למשתמש זה כבר יש בקשה ממתינה')
     } else if (result === 'already_sharing') {
-      setShareError('כבר משותף עם משתמש אחר')
+      setShareError('כבר משותף עם משתמש זה')
       refreshShareState()
     } else {
-      setShareError('שגיאה בשליחה — בדוק את הקונסול לפרטים')
+      setShareError('שגיאה בשליחה — נסה שוב')
     }
   }
 

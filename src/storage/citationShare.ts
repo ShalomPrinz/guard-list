@@ -74,7 +74,7 @@ export function clearDeleteLog(storage: Storage = window.localStorage): void {
 export async function sendShareRequest(
   targetUsername: string,
   storage: Storage = window.localStorage,
-): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'already_sharing' | 'error'> {
+): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'already_sharing' | 'own_namespace' | 'error'> {
   if (getOutgoingRequest(storage) !== null) return 'already_have_outgoing'
   if (getShareStatus(storage) !== null) return 'already_sharing'
 
@@ -82,6 +82,7 @@ export async function sendShareRequest(
   if (!currentUser) return 'error'
 
   const normalized = targetUsername.toLowerCase()
+  if (normalized === currentUser.toLowerCase()) return 'own_namespace'
   const result = await kvCrossSet(normalized, 'share:incomingRequest', {
     fromUsername: currentUser,
     sentAt: Date.now(),

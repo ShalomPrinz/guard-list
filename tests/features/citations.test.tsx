@@ -396,7 +396,7 @@ describe('CitationsScreen share panel', () => {
     })
   })
 
-  it('shows "כבר משותף עם משתמש אחר" when sendShareRequest returns already_sharing', async () => {
+  it('shows "כבר משותף עם משתמש זה" when sendShareRequest returns already_sharing', async () => {
     // Simulate: component mounts with no share status, but syncFromCloud writes it
     // after mount (stale state scenario). sendShareRequest reads localStorage directly
     // and returns 'already_sharing'.
@@ -408,7 +408,19 @@ describe('CitationsScreen share panel', () => {
     await user.type(screen.getByPlaceholderText('שם משתמש...'), 'bob')
     await user.click(screen.getByText('שלח בקשה'))
     await waitFor(() => {
-      expect(screen.getByText('כבר משותף עם משתמש אחר')).toBeTruthy()
+      expect(screen.getByText('כבר משותף עם משתמש זה')).toBeTruthy()
+    })
+  })
+
+  it('shows "לא ניתן לשתף אוסף עם עצמך" when user tries to share with themselves', async () => {
+    setUsername('alice')
+    const user = userEvent.setup()
+    renderCitations()
+    await user.click(screen.getByText('שתף אוסף'))
+    await user.type(screen.getByPlaceholderText('שם משתמש...'), 'alice')
+    await user.click(screen.getByText('שלח בקשה'))
+    await waitFor(() => {
+      expect(screen.getByText('לא ניתן לשתף אוסף עם עצמך')).toBeTruthy()
     })
   })
 
