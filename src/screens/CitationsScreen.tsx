@@ -305,9 +305,9 @@ export default function CitationsScreen() {
           <div className="flex gap-2">
             <button
               onClick={handleCopyGuestLink}
-              className="min-h-[44px] flex-1 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+              className={`min-h-[44px] flex-1 rounded-2xl py-3 text-sm font-semibold transition-colors ${linkCopied ? 'bg-green-700 text-white' : 'bg-gray-200 text-gray-900 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:active:bg-gray-600'}`}
             >
-              {linkCopied ? 'הועתק!' : 'העתק קישור'}
+              {linkCopied ? '✓ הועתק!' : '📋 העתק קישור'}
             </button>
             <button
               onClick={() => {
@@ -316,9 +316,9 @@ export default function CitationsScreen() {
                 const url = `${window.location.origin}/guest/${username}`
                 window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank')
               }}
-              className="min-h-[44px] flex-1 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+              className="min-h-[44px] flex-1 rounded-2xl bg-green-600 py-3 text-sm font-semibold text-white active:bg-green-700"
             >
-              שתף בוואטסאפ
+              📤 שתף בוואטסאפ
             </button>
           </div>
         </div>

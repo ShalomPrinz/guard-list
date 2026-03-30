@@ -692,14 +692,14 @@ describe('CitationsScreen guest link section', () => {
 
   it('shows "העתק קישור" and "שתף בוואטסאפ" buttons in normal mode', () => {
     renderCitations()
-    expect(screen.getByRole('button', { name: 'העתק קישור' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'שתף בוואטסאפ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '📋 העתק קישור' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '📤 שתף בוואטסאפ' })).toBeTruthy()
   })
 
   it('does not show guest link buttons in selection mode', () => {
     renderCitations('/citations', { selectionMode: true })
-    expect(screen.queryByRole('button', { name: 'העתק קישור' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'שתף בוואטסאפ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '📋 העתק קישור' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '📤 שתף בוואטסאפ' })).toBeNull()
   })
 
   it('"העתק קישור" calls clipboard.writeText with correct URL', async () => {
@@ -708,7 +708,7 @@ describe('CitationsScreen guest link section', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderCitations()
 
-    await user.click(screen.getByRole('button', { name: 'העתק קישור' }))
+    await user.click(screen.getByRole('button', { name: '📋 העתק קישור' }))
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
@@ -722,10 +722,10 @@ describe('CitationsScreen guest link section', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     renderCitations()
 
-    await user.click(screen.getByRole('button', { name: 'העתק קישור' }))
+    await user.click(screen.getByRole('button', { name: '📋 העתק קישור' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'הועתק!' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '✓ הועתק!' })).toBeTruthy()
     })
   })
 })
