@@ -183,6 +183,21 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ keys: allKeys });
     }
 
+    if (action === "mget") {
+      const keys = body.keys;
+      if (!Array.isArray(keys) || keys.length < 1 || keys.length > 100) {
+        return json({ error: "keys must be an array of 1–100 elements" }, 400);
+      }
+      for (const k of keys) {
+        if (typeof k !== "string" || !k || !k.startsWith(expectedPrefix)) {
+          console.warn("[kv] namespace violation in mget", { ip, username, key: k });
+          return json({ error: "Key namespace violation" }, 403);
+        }
+      }
+      const values = await kv.mget(...keys);
+      return json({ values });
+    }
+
     if (action === "crossSet") {
       const targetUsername =
         typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";

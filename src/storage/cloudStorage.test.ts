@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner, kvListGuestCitations, kvDeleteGuestCitation } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner, kvListGuestCitations, kvDeleteGuestCitation, kvMGet } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -296,6 +296,65 @@ describe('cloudStorage', () => {
     })
   })
 
+  describe('kvMGet', () => {
+    it('sends prefixed keys and returns values array', async () => {
+      const val1 = { id: 'c1', text: 'quote1', author: 'א. ב', submittedAt: 1000 }
+      const val2 = { id: 'c2', text: 'quote2', author: 'ג. ד', submittedAt: 2000 }
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ values: [val1, val2] }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvMGet<typeof val1>(['guestCitations:c1', 'guestCitations:c2'])
+
+      expect(result).toEqual([val1, val2])
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('mget')
+      expect(body.keys).toEqual(['testuser:guestCitations:c1', 'testuser:guestCitations:c2'])
+      expect(body.username).toBe('testuser')
+    })
+
+    it('returns all-null array when keys is empty', async () => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvMGet([])
+
+      expect(result).toEqual([])
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('returns all-null array when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvMGet(['guestCitations:c1'])
+
+      expect(result).toEqual([null])
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('returns all-null array and logs on HTTP error', async () => {
+      mockFetch({}, false)
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+      const result = await kvMGet(['guestCitations:c1', 'guestCitations:c2'])
+
+      expect(result).toEqual([null, null])
+      expect(spy).toHaveBeenCalled()
+    })
+
+    it('returns all-null array and logs on network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+      const result = await kvMGet(['guestCitations:c1'])
+
+      expect(result).toEqual([null])
+      expect(spy).toHaveBeenCalled()
+    })
+  })
+
   describe('kvCrossSet', () => {
     it('returns ok on success', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) }))
@@ -409,13 +468,14 @@ describe('cloudStorage', () => {
       const sub2 = { id: 'id2', text: 'quote2', author: 'ב. גד', submittedAt: 1000 }
       const fetchMock = vi.fn()
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ keys: ['testuser:guestCitations:id1', 'testuser:guestCitations:id2'] }) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub1 }) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub2 }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ values: [sub1, sub2] }) })
       vi.stubGlobal('fetch', fetchMock)
 
       const result = await kvListGuestCitations()
 
       expect(result).toEqual([sub2, sub1])
+      // Only 2 fetch calls: 1 list + 1 mget
+      expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
     it('returns empty array when username is null', async () => {
@@ -430,17 +490,18 @@ describe('cloudStorage', () => {
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
-    it('filters out null values from kvGet', async () => {
+    it('filters out null values from kvMGet', async () => {
       const sub1 = { id: 'id1', text: 'quote1', author: 'א. בן', submittedAt: 1000 }
       const fetchMock = vi.fn()
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ keys: ['testuser:guestCitations:id1', 'testuser:guestCitations:id2'] }) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: sub1 }) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ value: null }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ values: [sub1, null] }) })
       vi.stubGlobal('fetch', fetchMock)
 
       const result = await kvListGuestCitations()
 
       expect(result).toEqual([sub1])
+      // Only 2 fetch calls: 1 list + 1 mget
+      expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
     it('returns empty array when list returns no keys', async () => {

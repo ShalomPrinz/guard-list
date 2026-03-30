@@ -189,6 +189,25 @@ export async function kvCrossReadPartner(
 }
 
 /**
+ * Batch-get multiple keys in a single network request.
+ * Keys must be unscoped (no username prefix) — the prefix is added automatically.
+ * Returns an array of values in the same order as the input keys.
+ * Returns all-null array on error or when no username is set.
+ */
+export async function kvMGet<T>(keys: string[]): Promise<(T | null)[]> {
+  const username = getUsername()
+  if (!username || keys.length === 0) return keys.map(() => null)
+  const prefixed = keys.map(k => `${username}:${k}`)
+  try {
+    const data = (await callKv({ action: 'mget', keys: prefixed, username })) as { values: (T | null)[] }
+    return data.values
+  } catch (e) {
+    console.error('[kv] mget failed:', e)
+    return keys.map(() => null)
+  }
+}
+
+/**
  * Fetch all pending guest citation submissions for the current user.
  * Scans {username}:guestCitations:* and returns values sorted by submittedAt ascending.
  * Returns [] on error or when no username is set.
@@ -198,9 +217,8 @@ export async function kvListGuestCitations(): Promise<GuestCitationSubmission[]>
   if (!username) return []
   try {
     const keys = await kvList('guestCitations:')
-    const results = await Promise.all(
-      keys.map(k => kvGet<GuestCitationSubmission>(k))
-    )
+    if (keys.length === 0) return []
+    const results = await kvMGet<GuestCitationSubmission>(keys)
     return results
       .filter((s): s is GuestCitationSubmission => s !== null)
       .sort((a, b) => a.submittedAt - b.submittedAt)
