@@ -40,23 +40,6 @@ function AuthenticatedApp() {
     }
   }, [hasUsername])
 
-  useEffect(() => {
-    if (!hasUsername) return
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void syncFromCloud().then(() => {
-          setIncomingShareRequest(getLocalIncomingRequest())
-        })
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onVisible)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onVisible)
-    }
-  }, [hasUsername])
-
   if (!hasUsername) {
     return <UsernameGate onConfirmed={() => setHasUsername(true)} />
   }
