@@ -43,6 +43,271 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+async function handleGuestSubmit(
+  body: Record<string, unknown>,
+  ip: string
+): Promise<Response> {
+  const { success: guestOk } = await guestRatelimit.limit(ip);
+  if (!guestOk) return json({ error: "Too many requests" }, 429);
+
+  const targetUsername =
+    typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
+  if (!isValidUsername(targetUsername)) return json({ error: "Invalid targetUsername" }, 400);
+
+  const text = typeof body.text === "string" ? body.text : "";
+  if (!text || text.length > 500) return json({ error: "Invalid text" }, 400);
+
+  const author = typeof body.author === "string" ? body.author : "";
+  if (!author || author.length > 120) return json({ error: "Invalid author" }, 400);
+
+  const id = crypto.randomUUID();
+  await kv.set(`${targetUsername}:guestCitations:${id}`, { id, text, author, submittedAt: Date.now() });
+  return json({ ok: true, id });
+}
+
+// SECURITY: rawGet/rawSet are a restricted escape hatch for device-registration keys only.
+// Keys must match a safe ASCII pattern and cannot use username namespacing.
+async function handleRawGet(body: Record<string, unknown>): Promise<Response> {
+  const key = body.key as string;
+  if (!key || !RAW_KEY_RE.test(key)) return json({ error: "Invalid key" }, 400);
+  const value = await kv.get(key);
+  return json({ value: value ?? null });
+}
+
+async function handleRawSet(body: Record<string, unknown>): Promise<Response> {
+  const key = body.key as string;
+  // SECURITY: rawGet/rawSet are a restricted escape hatch for device-registration keys only.
+  // Keys must match a safe ASCII pattern and cannot use username namespacing.
+  if (!key || !RAW_KEY_RE.test(key)) return json({ error: "Invalid key" }, 400);
+  await kv.set(key, body.value);
+  return json({ ok: true });
+}
+
+async function handleGet(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string
+): Promise<Response> {
+  const key = body.key as string;
+  // SECURITY: Reject any key that escapes the caller's declared username namespace.
+  if (!key || !key.startsWith(expectedPrefix)) {
+    console.warn("[kv] namespace violation", { ip, username, key });
+    return json({ error: "Key namespace violation" }, 403);
+  }
+  const value = await kv.get(key);
+  return json({ value: value ?? null });
+}
+
+async function handleSet(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string
+): Promise<Response> {
+  const key = body.key as string;
+  // SECURITY: Reject any key that escapes the caller's declared username namespace.
+  if (!key || !key.startsWith(expectedPrefix)) {
+    console.warn("[kv] namespace violation", { ip, username, key });
+    return json({ error: "Key namespace violation" }, 403);
+  }
+  await kv.set(key, body.value);
+  return json({ ok: true });
+}
+
+async function handleDel(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string
+): Promise<Response> {
+  const key = body.key as string;
+  // SECURITY: Reject any key that escapes the caller's declared username namespace.
+  if (!key || !key.startsWith(expectedPrefix)) {
+    console.warn("[kv] namespace violation", { ip, username, key });
+    return json({ error: "Key namespace violation" }, 403);
+  }
+  await kv.del(key);
+  return json({ ok: true });
+}
+
+async function handleList(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string
+): Promise<Response> {
+  const prefix = body.prefix as string;
+  // SECURITY: Reject any prefix that escapes the caller's declared username namespace.
+  if (!prefix || !prefix.startsWith(expectedPrefix)) {
+    console.warn("[kv] namespace violation", { ip, username, key: prefix });
+    return json({ error: "Key namespace violation" }, 403);
+  }
+  // SECURITY: Reject suffix glob characters to prevent broader-than-intended key scans.
+  const suffix = prefix.slice(expectedPrefix.length);
+  if (suffix && !/^[a-zA-Z0-9_\-/:]+$/.test(suffix)) {
+    return json({ error: "Invalid prefix" }, 400);
+  }
+  const allKeys: string[] = [];
+  let cursor = 0;
+  do {
+    const [nextCursor, batch] = await kv.scan(cursor, { match: prefix + "*", count: 100 });
+    allKeys.push(...batch);
+    cursor = nextCursor as number;
+  } while (cursor !== 0);
+  return json({ keys: allKeys });
+}
+
+async function handleMget(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string
+): Promise<Response> {
+  const keys = body.keys;
+  if (!Array.isArray(keys) || keys.length < 1 || keys.length > 100) {
+    return json({ error: "keys must be an array of 1–100 elements" }, 400);
+  }
+  for (const k of keys) {
+    if (typeof k !== "string" || !k || !k.startsWith(expectedPrefix)) {
+      console.warn("[kv] namespace violation in mget", { ip, username, key: k });
+      return json({ error: "Key namespace violation" }, 403);
+    }
+  }
+  const values = await kv.mget(...keys);
+  return json({ values });
+}
+
+async function handleCrossSet(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const targetUsername =
+    typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
+  if (!isValidUsername(targetUsername)) {
+    return json({ error: "Invalid targetUsername" }, 400);
+  }
+  if (username === targetUsername) {
+    return json({ error: "Cannot cross-write to own namespace" }, 400);
+  }
+  const key = body.key as string;
+  // SECURITY: Strict allowlist — only these sub-keys may be written cross-namespace.
+  const ALLOWED_CROSS_KEYS = ["share:groupInvitation", "share:acceptNotification", "share:rejectionNotification"] as const;
+  if (!ALLOWED_CROSS_KEYS.includes(key as (typeof ALLOWED_CROSS_KEYS)[number])) {
+    return json({ error: "Key not allowed for cross-write" }, 403);
+  }
+  // Enforce one-open-invitation-at-a-time rule for groupInvitation key.
+  if (key === "share:groupInvitation") {
+    const existing = await kv.get(`${targetUsername}:share:groupInvitation`);
+    if (existing !== null) {
+      return json({ error: "Target already has a pending invitation" }, 409);
+    }
+  }
+  await kv.set(`${targetUsername}:${key}`, body.value);
+  return json({ ok: true });
+}
+
+async function handleCrossRead(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const partnerUsername =
+    typeof body.partnerUsername === "string" ? body.partnerUsername.trim().toLowerCase() : "";
+  if (!isValidUsername(partnerUsername)) {
+    return json({ error: "Invalid partnerUsername" }, 400);
+  }
+  // SECURITY: Group-based consent check — both users must be in the same sharing group.
+  const callerGroupId = await kv.get(`${username}:share:groupId`);
+  const targetGroupId = await kv.get(`${partnerUsername}:share:groupId`);
+  if (!callerGroupId || !targetGroupId || callerGroupId !== targetGroupId) {
+    return json({ error: "not in same group" }, 403);
+  }
+  try {
+    // Scan all citations for the partner.
+    const allKeys: string[] = [];
+    let cursor = 0;
+    do {
+      const [nextCursor, batch] = await kv.scan(cursor, {
+        match: `${partnerUsername}:citations:*`,
+        count: 100,
+      });
+      allKeys.push(...batch);
+      cursor = nextCursor as number;
+    } while (cursor !== 0);
+    const citations = await Promise.all(allKeys.map((k) => kv.get(k)));
+    const deleteLog = (await kv.get(`${partnerUsername}:share:deleteLog`)) as string[] | null;
+    return json({ citations: citations.filter(Boolean), deleteLog: deleteLog ?? [] });
+  } catch {
+    return json({ error: "Internal server error" }, 500);
+  }
+}
+
+async function handleGroupCreate(username: string): Promise<Response> {
+  const existing = await kv.get(`${username}:share:groupId`);
+  if (existing !== null) {
+    return json({ error: "Already in a group" }, 400);
+  }
+  const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await kv.set(`group:${groupId}:members`, JSON.stringify([username]));
+  await kv.set(`${username}:share:groupId`, groupId);
+  return json({ groupId });
+}
+
+async function handleGroupJoin(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const groupId = typeof body.groupId === "string" ? body.groupId : "";
+  if (!groupId) return json({ error: "Missing groupId" }, 400);
+  const existing = await kv.get(`${username}:share:groupId`);
+  if (existing !== null) {
+    return json({ error: "Already in a group" }, 400);
+  }
+  const membersRaw = await kv.get(`group:${groupId}:members`);
+  if (membersRaw === null) return json({ error: "Group not found" }, 404);
+  const members: string[] = JSON.parse(membersRaw as string);
+  members.push(username);
+  await kv.set(`group:${groupId}:members`, JSON.stringify(members));
+  await kv.set(`${username}:share:groupId`, groupId);
+  return json({ ok: true });
+}
+
+async function handleGroupLeave(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const groupId = typeof body.groupId === "string" ? body.groupId : "";
+  if (!groupId) return json({ error: "Missing groupId" }, 400);
+  const storedGroupId = await kv.get(`${username}:share:groupId`);
+  if (storedGroupId !== groupId) {
+    return json({ error: "Not in this group" }, 403);
+  }
+  const membersRaw = await kv.get(`group:${groupId}:members`);
+  if (membersRaw !== null) {
+    const members: string[] = JSON.parse(membersRaw as string);
+    const updated = members.filter(m => m !== username);
+    await kv.set(`group:${groupId}:members`, JSON.stringify(updated));
+  }
+  await kv.del(`${username}:share:groupId`);
+  return json({ ok: true });
+}
+
+async function handleGroupGetMembers(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const groupId = typeof body.groupId === "string" ? body.groupId : "";
+  if (!groupId) return json({ error: "Missing groupId" }, 400);
+  const storedGroupId = await kv.get(`${username}:share:groupId`);
+  if (storedGroupId !== groupId) {
+    return json({ error: "Not in this group" }, 403);
+  }
+  const membersRaw = await kv.get(`group:${groupId}:members`);
+  if (membersRaw === null) return json({ error: "Group not found" }, 404);
+  const members: string[] = JSON.parse(membersRaw as string);
+  return json({ members });
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
@@ -69,22 +334,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   // guestSubmit: bypass origin check — guests visit from any URL (share links).
   if (action === "guestSubmit") {
-    const { success: guestOk } = await guestRatelimit.limit(ip);
-    if (!guestOk) return json({ error: "Too many requests" }, 429);
-
-    const targetUsername =
-      typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
-    if (!isValidUsername(targetUsername)) return json({ error: "Invalid targetUsername" }, 400);
-
-    const text = typeof body.text === "string" ? body.text : "";
-    if (!text || text.length > 500) return json({ error: "Invalid text" }, 400);
-
-    const author = typeof body.author === "string" ? body.author : "";
-    if (!author || author.length > 120) return json({ error: "Invalid author" }, 400);
-
-    const id = crypto.randomUUID();
-    await kv.set(`${targetUsername}:guestCitations:${id}`, { id, text, author, submittedAt: Date.now() });
-    return json({ ok: true, id });
+    return handleGuestSubmit(body, ip);
   }
 
   // SECURITY: Origin check — reject requests from origins other than known app domains.
@@ -106,20 +356,8 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    // SECURITY: rawGet/rawSet are a restricted escape hatch for device-registration keys only.
-    // Keys must match a safe ASCII pattern and cannot use username namespacing.
-    if (action === "rawGet") {
-      const key = body.key as string;
-      if (!key || !RAW_KEY_RE.test(key)) return json({ error: "Invalid key" }, 400);
-      const value = await kv.get(key);
-      return json({ value: value ?? null });
-    }
-    if (action === "rawSet") {
-      const key = body.key as string;
-      if (!key || !RAW_KEY_RE.test(key)) return json({ error: "Invalid key" }, 400);
-      await kv.set(key, body.value);
-      return json({ ok: true });
-    }
+    if (action === "rawGet") return handleRawGet(body);
+    if (action === "rawSet") return handleRawSet(body);
 
     // SECURITY: All other actions require a valid username. The server enforces that every
     // key/prefix starts with the declared username — the client-supplied key is never trusted
@@ -131,187 +369,17 @@ export default async function handler(req: Request): Promise<Response> {
     }
     const expectedPrefix = `${username}:`;
 
-    if (action === "get") {
-      const key = body.key as string;
-      // SECURITY: Reject any key that escapes the caller's declared username namespace.
-      if (!key || !key.startsWith(expectedPrefix)) {
-        console.warn("[kv] namespace violation", { ip, username, key });
-        return json({ error: "Key namespace violation" }, 403);
-      }
-      const value = await kv.get(key);
-      return json({ value: value ?? null });
-    }
-    if (action === "set") {
-      const key = body.key as string;
-      // SECURITY: Reject any key that escapes the caller's declared username namespace.
-      if (!key || !key.startsWith(expectedPrefix)) {
-        console.warn("[kv] namespace violation", { ip, username, key });
-        return json({ error: "Key namespace violation" }, 403);
-      }
-      await kv.set(key, body.value);
-      return json({ ok: true });
-    }
-    if (action === "del") {
-      const key = body.key as string;
-      // SECURITY: Reject any key that escapes the caller's declared username namespace.
-      if (!key || !key.startsWith(expectedPrefix)) {
-        console.warn("[kv] namespace violation", { ip, username, key });
-        return json({ error: "Key namespace violation" }, 403);
-      }
-      await kv.del(key);
-      return json({ ok: true });
-    }
-    if (action === "list") {
-      const prefix = body.prefix as string;
-      // SECURITY: Reject any prefix that escapes the caller's declared username namespace.
-      if (!prefix || !prefix.startsWith(expectedPrefix)) {
-        console.warn("[kv] namespace violation", { ip, username, key: prefix });
-        return json({ error: "Key namespace violation" }, 403);
-      }
-      // SECURITY: Reject suffix glob characters to prevent broader-than-intended key scans.
-      const suffix = prefix.slice(expectedPrefix.length);
-      if (suffix && !/^[a-zA-Z0-9_\-/:]+$/.test(suffix)) {
-        return json({ error: "Invalid prefix" }, 400);
-      }
-      const allKeys: string[] = [];
-      let cursor = 0;
-      do {
-        const [nextCursor, batch] = await kv.scan(cursor, { match: prefix + "*", count: 100 });
-        allKeys.push(...batch);
-        cursor = nextCursor as number;
-      } while (cursor !== 0);
-      return json({ keys: allKeys });
-    }
-
-    if (action === "mget") {
-      const keys = body.keys;
-      if (!Array.isArray(keys) || keys.length < 1 || keys.length > 100) {
-        return json({ error: "keys must be an array of 1–100 elements" }, 400);
-      }
-      for (const k of keys) {
-        if (typeof k !== "string" || !k || !k.startsWith(expectedPrefix)) {
-          console.warn("[kv] namespace violation in mget", { ip, username, key: k });
-          return json({ error: "Key namespace violation" }, 403);
-        }
-      }
-      const values = await kv.mget(...keys);
-      return json({ values });
-    }
-
-    if (action === "crossSet") {
-      const targetUsername =
-        typeof body.targetUsername === "string" ? body.targetUsername.trim().toLowerCase() : "";
-      if (!isValidUsername(targetUsername)) {
-        return json({ error: "Invalid targetUsername" }, 400);
-      }
-      if (username === targetUsername) {
-        return json({ error: "Cannot cross-write to own namespace" }, 400);
-      }
-      const key = body.key as string;
-      // SECURITY: Strict allowlist — only these sub-keys may be written cross-namespace.
-      const ALLOWED_CROSS_KEYS = ["share:groupInvitation", "share:acceptNotification", "share:rejectionNotification"] as const;
-      if (!ALLOWED_CROSS_KEYS.includes(key as (typeof ALLOWED_CROSS_KEYS)[number])) {
-        return json({ error: "Key not allowed for cross-write" }, 403);
-      }
-      // Enforce one-open-invitation-at-a-time rule for groupInvitation key.
-      if (key === "share:groupInvitation") {
-        const existing = await kv.get(`${targetUsername}:share:groupInvitation`);
-        if (existing !== null) {
-          return json({ error: "Target already has a pending invitation" }, 409);
-        }
-      }
-      await kv.set(`${targetUsername}:${key}`, body.value);
-      return json({ ok: true });
-    }
-
-    if (action === "crossRead") {
-      const partnerUsername =
-        typeof body.partnerUsername === "string" ? body.partnerUsername.trim().toLowerCase() : "";
-      if (!isValidUsername(partnerUsername)) {
-        return json({ error: "Invalid partnerUsername" }, 400);
-      }
-      // SECURITY: Group-based consent check — both users must be in the same sharing group.
-      const callerGroupId = await kv.get(`${username}:share:groupId`);
-      const targetGroupId = await kv.get(`${partnerUsername}:share:groupId`);
-      if (!callerGroupId || !targetGroupId || callerGroupId !== targetGroupId) {
-        return json({ error: "not in same group" }, 403);
-      }
-      try {
-        // Scan all citations for the partner.
-        const allKeys: string[] = [];
-        let cursor = 0;
-        do {
-          const [nextCursor, batch] = await kv.scan(cursor, {
-            match: `${partnerUsername}:citations:*`,
-            count: 100,
-          });
-          allKeys.push(...batch);
-          cursor = nextCursor as number;
-        } while (cursor !== 0);
-        const citations = await Promise.all(allKeys.map((k) => kv.get(k)));
-        const deleteLog = (await kv.get(`${partnerUsername}:share:deleteLog`)) as string[] | null;
-        return json({ citations: citations.filter(Boolean), deleteLog: deleteLog ?? [] });
-      } catch {
-        return json({ error: "Internal server error" }, 500);
-      }
-    }
-
-    if (action === "groupCreate") {
-      const existing = await kv.get(`${username}:share:groupId`);
-      if (existing !== null) {
-        return json({ error: "Already in a group" }, 400);
-      }
-      const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      await kv.set(`group:${groupId}:members`, JSON.stringify([username]));
-      await kv.set(`${username}:share:groupId`, groupId);
-      return json({ groupId });
-    }
-
-    if (action === "groupJoin") {
-      const groupId = typeof body.groupId === "string" ? body.groupId : "";
-      if (!groupId) return json({ error: "Missing groupId" }, 400);
-      const existing = await kv.get(`${username}:share:groupId`);
-      if (existing !== null) {
-        return json({ error: "Already in a group" }, 400);
-      }
-      const membersRaw = await kv.get(`group:${groupId}:members`);
-      if (membersRaw === null) return json({ error: "Group not found" }, 404);
-      const members: string[] = JSON.parse(membersRaw as string);
-      members.push(username);
-      await kv.set(`group:${groupId}:members`, JSON.stringify(members));
-      await kv.set(`${username}:share:groupId`, groupId);
-      return json({ ok: true });
-    }
-
-    if (action === "groupLeave") {
-      const groupId = typeof body.groupId === "string" ? body.groupId : "";
-      if (!groupId) return json({ error: "Missing groupId" }, 400);
-      const storedGroupId = await kv.get(`${username}:share:groupId`);
-      if (storedGroupId !== groupId) {
-        return json({ error: "Not in this group" }, 403);
-      }
-      const membersRaw = await kv.get(`group:${groupId}:members`);
-      if (membersRaw !== null) {
-        const members: string[] = JSON.parse(membersRaw as string);
-        const updated = members.filter(m => m !== username);
-        await kv.set(`group:${groupId}:members`, JSON.stringify(updated));
-      }
-      await kv.del(`${username}:share:groupId`);
-      return json({ ok: true });
-    }
-
-    if (action === "groupGetMembers") {
-      const groupId = typeof body.groupId === "string" ? body.groupId : "";
-      if (!groupId) return json({ error: "Missing groupId" }, 400);
-      const storedGroupId = await kv.get(`${username}:share:groupId`);
-      if (storedGroupId !== groupId) {
-        return json({ error: "Not in this group" }, 403);
-      }
-      const membersRaw = await kv.get(`group:${groupId}:members`);
-      if (membersRaw === null) return json({ error: "Group not found" }, 404);
-      const members: string[] = JSON.parse(membersRaw as string);
-      return json({ members });
-    }
+    if (action === "get") return handleGet(body, ip, username, expectedPrefix);
+    if (action === "set") return handleSet(body, ip, username, expectedPrefix);
+    if (action === "del") return handleDel(body, ip, username, expectedPrefix);
+    if (action === "list") return handleList(body, ip, username, expectedPrefix);
+    if (action === "mget") return handleMget(body, ip, username, expectedPrefix);
+    if (action === "crossSet") return handleCrossSet(body, username);
+    if (action === "crossRead") return handleCrossRead(body, username);
+    if (action === "groupCreate") return handleGroupCreate(username);
+    if (action === "groupJoin") return handleGroupJoin(body, username);
+    if (action === "groupLeave") return handleGroupLeave(body, username);
+    if (action === "groupGetMembers") return handleGroupGetMembers(body, username);
 
     return json({ error: "Unknown action" }, 400);
   } catch (_e) {
