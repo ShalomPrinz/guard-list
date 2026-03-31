@@ -149,12 +149,13 @@ async function handleList(
     return json({ error: "Invalid prefix" }, 400);
   }
   const allKeys: string[] = [];
-  let cursor = 0;
-  do {
-    const [nextCursor, batch] = await kv.scan(cursor, { match: prefix + "*", count: 100 });
-    allKeys.push(...batch);
-    cursor = nextCursor as number;
-  } while (cursor !== 0);
+  // TODO #INSTANT - broken scan causes API usage overflow even on small datasets
+  // let cursor = 0;
+  // do {
+  //   const [nextCursor, batch] = await kv.scan(cursor, { match: prefix + "*", count: 100 });
+  //   allKeys.push(...batch);
+  //   cursor = nextCursor as number;
+  // } while (cursor !== 0);
   return json({ keys: allKeys });
 }
 
@@ -225,15 +226,16 @@ async function handleCrossRead(
   try {
     // Scan all citations for the partner.
     const allKeys: string[] = [];
-    let cursor = 0;
-    do {
-      const [nextCursor, batch] = await kv.scan(cursor, {
-        match: `${partnerUsername}:citations:*`,
-        count: 100,
-      });
-      allKeys.push(...batch);
-      cursor = nextCursor as number;
-    } while (cursor !== 0);
+    // TODO #INSTANT - broken scan causes API usage overflow even on small datasets
+    // let cursor = 0;
+    // do {
+    //   const [nextCursor, batch] = await kv.scan(cursor, {
+    //     match: `${partnerUsername}:citations:*`,
+    //     count: 100,
+    //   });
+    //   allKeys.push(...batch);
+    //   cursor = nextCursor as number;
+    // } while (cursor !== 0);
     const citations = await Promise.all(allKeys.map((k) => kv.get(k)));
     const deleteLog = (await kv.get(`${partnerUsername}:share:deleteLog`)) as string[] | null;
     return json({ citations: citations.filter(Boolean), deleteLog: deleteLog ?? [] });
