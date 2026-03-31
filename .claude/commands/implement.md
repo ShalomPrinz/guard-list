@@ -12,10 +12,3 @@ Then, Tell the user (in your response, not in the file) about any instructions o
 
 3. **Update Documents**
 Update project memory by following the instructions in `@.claude/commands/update-docs.md`. The scope is limited to what you just implemented — do not review the entire conversation history.
-
-4. **Commit Message Suggestion**
-Finally, suggest a git commit message matching the style in `CLAUDE.md`.
-Print it as a copyable code block — do not run git yourself. The format to print is:
-```
-git commit -m "<commit_message>"
-```
