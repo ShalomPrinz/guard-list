@@ -12,7 +12,7 @@ import {
   loadSharingCenterUpdates,
 } from '../storage/citationShare'
 import { getUsername } from '../storage/userStorage'
-import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
+import { kvListGuestCitations, kvDeleteGuestCitation, kvInvitationCancel } from '../storage/cloudStorage'
 import { getGroups } from '../storage/groups'
 import { upsertCitation } from '../storage/citations'
 import { saveCitationAuthorLink } from '../storage/citationAuthorLinks'
@@ -35,6 +35,7 @@ export default function SharingCenterScreen() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [inviteCancelledMsg, setInviteCancelledMsg] = useState(false)
 
   // Guest link
   const [linkCopied, setLinkCopied] = useState(false)
@@ -133,9 +134,12 @@ export default function SharingCenterScreen() {
   async function handleAccept() {
     if (!invitation) return
     setActionLoading(true)
-    await acceptGroupInvitation(invitation)
+    const result = await acceptGroupInvitation(invitation)
     refreshState()
     setActionLoading(false)
+    if (result === 'cancelled') {
+      setInviteCancelledMsg(true)
+    }
   }
 
   async function handleDecline() {
@@ -204,6 +208,15 @@ export default function SharingCenterScreen() {
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">מרכז השיתוף</h1>
       </div>
+
+      {/* Cancelled invitation banner */}
+      {inviteCancelledMsg && (
+        <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 dark:bg-red-900/30">
+          <p className="text-sm text-red-800 dark:text-red-200">
+            ההזמנה בוטלה — בקש מהמזמין להזמין שוב
+          </p>
+        </div>
+      )}
 
       {/* Notification banner */}
       {notification !== null && (
@@ -308,7 +321,11 @@ export default function SharingCenterScreen() {
                   הזמנה נשלחה ל-<span className="font-semibold">{outgoing.toUsername}</span>
                 </p>
                 <button
-                  onClick={() => { clearOutgoingInvitation(); refreshState() }}
+                  onClick={async () => {
+                    await kvInvitationCancel(outgoing.toUsername)
+                    clearOutgoingInvitation()
+                    refreshState()
+                  }}
                   className="min-h-[44px] px-3 text-xs text-red-600 dark:text-red-400"
                 >
                   בטל

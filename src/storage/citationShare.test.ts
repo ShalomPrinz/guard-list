@@ -2,9 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createLocalStorageMock } from '../tests/localStorageMock'
 import type { Citation, GroupInvitation } from '../types'
 
+const mockKvGet = vi.fn().mockResolvedValue(null)
+
 vi.mock('./cloudStorage', () => ({
   kvSet: vi.fn().mockResolvedValue(undefined),
   kvDel: vi.fn().mockResolvedValue(undefined),
+  kvGet: (...args: unknown[]) => mockKvGet(...args),
   kvCrossSet: vi.fn().mockResolvedValue('ok'),
   kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
   kvGroupCreate: vi.fn().mockResolvedValue(null),
@@ -232,12 +235,21 @@ describe('citationShare storage', () => {
   describe('acceptGroupInvitation', () => {
     const invitation: GroupInvitation = { groupId: 'grp_test', fromUsername: 'bob', sentAt: 1000 }
 
+    beforeEach(() => {
+      // Default: KV invitation exists (not cancelled)
+      mockKvGet.mockImplementation((key: string) => {
+        if (key === 'share:groupInvitation') return Promise.resolve(invitation)
+        return Promise.resolve(null)
+      })
+    })
+
     it('joins the group and sets local group', async () => {
       mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
       setLocalGroupInvitation(invitation, storage)
 
-      await acceptGroupInvitation(invitation, storage)
+      const result = await acceptGroupInvitation(invitation, storage)
 
+      expect(result).toBe('ok')
       expect(mockedKvGroupJoin).toHaveBeenCalledWith('grp_test')
       const group = getLocalGroup(storage)
       expect(group?.groupId).toBe('grp_test')
@@ -295,9 +307,10 @@ describe('citationShare storage', () => {
       expect(stored.find(c => c.id === 'del1')).toBeUndefined()
     })
 
-    it('does nothing when kvGroupJoin fails', async () => {
+    it('returns error when kvGroupJoin fails', async () => {
       mockedKvGroupJoin.mockResolvedValue('error')
-      await acceptGroupInvitation(invitation, storage)
+      const result = await acceptGroupInvitation(invitation, storage)
+      expect(result).toBe('error')
       expect(getLocalGroup(storage)).toBeNull()
     })
 
@@ -308,9 +321,21 @@ describe('citationShare storage', () => {
       expect(getLocalGroup(storage)).toBeNull()
     })
 
-    it('does nothing when no username', async () => {
+    it('returns error when no username', async () => {
       mockedGetUsername.mockReturnValue(null)
-      await acceptGroupInvitation(invitation, storage)
+      const result = await acceptGroupInvitation(invitation, storage)
+      expect(result).toBe('error')
+      expect(mockedKvGroupJoin).not.toHaveBeenCalled()
+    })
+
+    it('returns cancelled and clears local invitation when KV invitation is gone', async () => {
+      mockKvGet.mockResolvedValue(null) // KV invitation gone
+      setLocalGroupInvitation(invitation, storage)
+
+      const result = await acceptGroupInvitation(invitation, storage)
+
+      expect(result).toBe('cancelled')
+      expect(getLocalGroupInvitation(storage)).toBeNull()
       expect(mockedKvGroupJoin).not.toHaveBeenCalled()
     })
   })

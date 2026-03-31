@@ -12,8 +12,10 @@ import {
   setLocalGroupInvitation,
   setOutgoingInvitation,
   getLocalGroup,
+  getLocalGroupInvitation,
   getOutgoingInvitation,
   loadSharingCenterUpdates,
+  acceptGroupInvitation,
 } from '@/storage/citationShare'
 import { getCitations } from '@/storage/citations'
 import { getCitationAuthorLinks } from '@/storage/citationAuthorLinks'
@@ -28,6 +30,7 @@ const mockKvDel = vi.fn()
 const mockKvGroupGetMembers = vi.fn()
 const mockKvListGuestCitations = vi.fn<() => Promise<GuestCitationSubmission[]>>()
 const mockKvDeleteGuestCitation = vi.fn<(id: string) => Promise<void>>()
+const mockKvInvitationCancel = vi.fn<(targetUsername: string) => Promise<void>>()
 
 vi.mock('@/storage/cloudStorage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/storage/cloudStorage')>()
@@ -38,6 +41,7 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvGroupGetMembers: (...args: unknown[]) => mockKvGroupGetMembers(...args),
     kvListGuestCitations: (...args: unknown[]) => mockKvListGuestCitations(...(args as [])),
     kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
+    kvInvitationCancel: (...args: unknown[]) => mockKvInvitationCancel(...(args as [string])),
     kvGroupLeave: vi.fn().mockResolvedValue(undefined),
     kvCrossSet: vi.fn().mockResolvedValue('ok'),
     kvGroupJoin: vi.fn().mockResolvedValue('ok'),
@@ -77,6 +81,7 @@ beforeEach(() => {
   mockKvGroupGetMembers.mockResolvedValue(null)
   mockKvListGuestCitations.mockResolvedValue([])
   mockKvDeleteGuestCitation.mockResolvedValue(undefined)
+  mockKvInvitationCancel.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -105,8 +110,13 @@ describe('SharingCenterScreen — not in a group', () => {
 // ─── Pending invitation on mount ─────────────────────────────────────────────
 
 describe('SharingCenterScreen — pending invitation on mount', () => {
-  it('shows pending invitation card when invitation exists in localStorage', async () => {
-    setLocalGroupInvitation(makeInvitation({ fromUsername: 'alice' }))
+  it('shows pending invitation card when invitation exists in localStorage and KV', async () => {
+    const inv = makeInvitation({ fromUsername: 'alice' })
+    setLocalGroupInvitation(inv)
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
     renderSharingCenter()
 
     await waitFor(() => {
@@ -303,7 +313,12 @@ describe('loadSharingCenterUpdates', () => {
 describe('SharingCenterScreen — invitation visible on mount (regression)', () => {
   it('shows invitation immediately on mount without user action', async () => {
     // This was the bug: invitation state was never populated from localStorage on mount
-    setLocalGroupInvitation(makeInvitation({ fromUsername: 'inviter' }))
+    const inv = makeInvitation({ fromUsername: 'inviter' })
+    setLocalGroupInvitation(inv)
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
     renderSharingCenter()
 
     // Must appear after loading completes, not require any user interaction
@@ -584,6 +599,130 @@ describe('SharingCenterScreen — guest inbox', () => {
 
     await waitFor(() => {
       expect(screen.getByText('3')).toBeTruthy()
+    })
+  })
+})
+
+// ─── loadSharingCenterUpdates — invitation delivery and cancellation ───────────
+
+describe('loadSharingCenterUpdates — invitation delivery', () => {
+  it('saves invitation to localStorage when local is empty but KV has one', async () => {
+    const inv = makeInvitation({ fromUsername: 'inviter' })
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
+
+    await loadSharingCenterUpdates()
+
+    expect(getLocalGroupInvitation()).toEqual(inv)
+  })
+
+  it('does not overwrite existing local invitation when KV also has one', async () => {
+    const localInv = makeInvitation({ fromUsername: 'inviter', sentAt: 1000 })
+    setLocalGroupInvitation(localInv)
+    const kvInv = makeInvitation({ fromUsername: 'inviter', sentAt: 2000 })
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(kvInv)
+      return Promise.resolve(null)
+    })
+
+    await loadSharingCenterUpdates()
+
+    // Local invitation unchanged — no overwrite when both exist
+    expect(getLocalGroupInvitation()?.sentAt).toBe(1000)
+  })
+
+  it('clears local invitation and returns invitationCancelled when KV key is gone', async () => {
+    setLocalGroupInvitation(makeInvitation({ fromUsername: 'inviter' }))
+    mockKvGet.mockResolvedValue(null) // KV returns null — invitation was cancelled
+
+    const result = await loadSharingCenterUpdates()
+
+    expect(getLocalGroupInvitation()).toBeNull()
+    expect(result.invitationCancelled).toBe(true)
+  })
+
+  it('does not set invitationCancelled when no local invitation and KV is also empty', async () => {
+    mockKvGet.mockResolvedValue(null)
+
+    const result = await loadSharingCenterUpdates()
+
+    expect(result.invitationCancelled).toBeUndefined()
+  })
+})
+
+// ─── acceptGroupInvitation — stale invitation guard ──────────────────────────
+
+describe('acceptGroupInvitation — stale guard', () => {
+  it('returns "cancelled" and clears local invitation when KV key is already gone', async () => {
+    setLocalGroupInvitation(makeInvitation({ fromUsername: 'inviter' }))
+    mockKvGet.mockResolvedValue(null) // KV invitation gone
+
+    const result = await acceptGroupInvitation(makeInvitation())
+
+    expect(result).toBe('cancelled')
+    expect(getLocalGroupInvitation()).toBeNull()
+  })
+
+  it('returns "ok" when KV invitation exists and join succeeds', async () => {
+    const inv = makeInvitation()
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser', 'alice'])
+
+    const result = await acceptGroupInvitation(inv)
+
+    expect(result).toBe('ok')
+  })
+})
+
+// ─── Cancel outgoing invitation ───────────────────────────────────────────────
+
+describe('SharingCenterScreen — cancel outgoing invitation', () => {
+  it('calls kvInvitationCancel and clears outgoing invitation on "בטל" click', async () => {
+    const user = userEvent.setup()
+    setLocalGroup(makeGroup())
+    setOutgoingInvitation({ toUsername: 'charlie', groupId: 'group-1', sentAt: Date.now() })
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByText('בטל'))
+    await user.click(screen.getByText('בטל'))
+
+    await waitFor(() => {
+      expect(mockKvInvitationCancel).toHaveBeenCalledWith('charlie')
+      expect(screen.queryByText(/charlie/)).toBeNull()
+    })
+  })
+})
+
+// ─── Cancelled invitation banner ─────────────────────────────────────────────
+
+describe('SharingCenterScreen — cancelled invitation banner', () => {
+  it('shows error banner when accepting an invitation that was cancelled between load and accept', async () => {
+    const user = userEvent.setup()
+    const inv = makeInvitation({ fromUsername: 'inviter' })
+    setLocalGroupInvitation(inv)
+    // On load (loadSharingCenterUpdates): KV has invitation → card shows
+    // On accept (acceptGroupInvitation): KV returns null → inviter cancelled in between
+    let invCallCount = 0
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') {
+        invCallCount++
+        return Promise.resolve(invCallCount === 1 ? inv : null)
+      }
+      return Promise.resolve(null)
+    })
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByText('אשר'))
+    await user.click(screen.getByText('אשר'))
+
+    await waitFor(() => {
+      expect(screen.getByText('ההזמנה בוטלה — בקש מהמזמין להזמין שוב')).toBeTruthy()
     })
   })
 })

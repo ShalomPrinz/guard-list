@@ -276,6 +276,25 @@ async function handleGroupLeave(
   return json({ ok: true });
 }
 
+async function handleInvitationCancel(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  const targetUsername =
+    typeof body.targetUsername === 'string' ? body.targetUsername.trim().toLowerCase() : ''
+  if (!isValidUsername(targetUsername)) return json({ error: 'Invalid targetUsername' }, 400)
+  if (username === targetUsername) return json({ error: 'Cannot cancel own invitation' }, 400)
+
+  const existing = await kv.get(`${targetUsername}:share:groupInvitation`)
+  if (existing === null) return json({ ok: true }) // already gone — idempotent
+
+  const inv = existing as { fromUsername?: string }
+  if (inv.fromUsername !== username) return json({ error: 'Not authorized' }, 403)
+
+  await kv.del(`${targetUsername}:share:groupInvitation`)
+  return json({ ok: true })
+}
+
 async function handleGroupGetMembers(
   body: Record<string, unknown>,
   username: string
@@ -364,6 +383,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === "groupJoin") return handleGroupJoin(body, username);
     if (action === "groupLeave") return handleGroupLeave(body, username);
     if (action === "groupGetMembers") return handleGroupGetMembers(body, username);
+    if (action === "invitationCancel") return handleInvitationCancel(body, username);
 
     return json({ error: "Unknown action" }, 400);
   } catch (_e) {

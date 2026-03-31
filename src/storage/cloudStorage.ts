@@ -301,6 +301,20 @@ export async function kvListGuestCitations(): Promise<GuestCitationSubmission[]>
 }
 
 /**
+ * Cancel an outgoing group invitation by deleting the target's KV key.
+ * Only succeeds if the caller is the one who sent the invitation (verified server-side).
+ */
+export async function kvInvitationCancel(targetUsername: string): Promise<void> {
+  const username = getUsername()
+  if (!username) return
+  try {
+    await callKv({ action: 'invitationCancel', username, targetUsername })
+  } catch (e) {
+    console.error('[kv] invitationCancel failed:', e)
+  }
+}
+
+/**
  * Delete a pending guest citation submission by id. Fire-and-forget.
  */
 export async function kvDeleteGuestCitation(id: string): Promise<void> {

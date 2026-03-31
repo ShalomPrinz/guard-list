@@ -122,14 +122,20 @@ export async function sendGroupInvitation(
 export async function acceptGroupInvitation(
   invitation: GroupInvitation,
   storage: Storage = window.localStorage,
-): Promise<void> {
+): Promise<'ok' | 'cancelled' | 'error'> {
   const currentUser = getUsername()
-  if (!currentUser) return
+  if (!currentUser) return 'error'
+
+  const kvInvitation = await kvGet<GroupInvitation>('share:groupInvitation')
+  if (kvInvitation === null) {
+    clearLocalGroupInvitation(storage)
+    return 'cancelled'
+  }
 
   const { kvGroupJoin, kvGroupGetMembers, kvCrossSet, kvCrossReadGroupMember } = await import('./cloudStorage')
 
   const joinResult = await kvGroupJoin(invitation.groupId)
-  if (joinResult !== 'ok') return
+  if (joinResult !== 'ok') return 'error'
 
   const members = await kvGroupGetMembers(invitation.groupId)
   if (members !== null) {
@@ -166,6 +172,8 @@ export async function acceptGroupInvitation(
       }
     } catch { /* silent */ }
   }
+
+  return 'ok'
 }
 
 export async function declineGroupInvitation(
@@ -191,8 +199,9 @@ export async function loadSharingCenterUpdates(storage: Storage = window.localSt
   acceptedBy?: string
   rejectedBy?: string
   freshMembers?: string[]
+  invitationCancelled?: true
 }> {
-  const result: { acceptedBy?: string; rejectedBy?: string; freshMembers?: string[] } = {}
+  const result: { acceptedBy?: string; rejectedBy?: string; freshMembers?: string[]; invitationCancelled?: true } = {}
 
   try {
     const acceptNotif = await kvGet<{ byUsername: string; groupId: string; at: number }>('share:acceptNotification')
@@ -216,6 +225,19 @@ export async function loadSharingCenterUpdates(storage: Storage = window.localSt
       clearOutgoingInvitation(storage)
       await kvDel('share:rejectionNotification')
       result.rejectedBy = rejectNotif.byUsername
+    }
+  } catch { /* silent */ }
+
+  try {
+    const existingLocal = getLocalGroupInvitation(storage)
+    const remoteInvitation = await kvGet<GroupInvitation>('share:groupInvitation')
+    if (existingLocal === null && remoteInvitation !== null) {
+      // Invitation arrived — save locally so the UI can render it
+      setLocalGroupInvitation(remoteInvitation, storage)
+    } else if (existingLocal !== null && remoteInvitation === null) {
+      // Invitation was cancelled by the inviter while we weren't looking
+      clearLocalGroupInvitation(storage)
+      result.invitationCancelled = true
     }
   } catch { /* silent */ }
 

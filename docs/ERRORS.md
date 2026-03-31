@@ -247,3 +247,13 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Rule:** Never use `kv.scan` anywhere in `api/kv.ts`. Use `kv.keys(pattern)` instead — it returns all matching keys in a single Redis command regardless of database size. If you find yourself writing a `do { ... } while (cursor !== 0)` loop against Redis, stop. The fix is `const allKeys = await kv.keys(\`${prefix}*\`)` — one command, zero loops.
 
 **Testing implication:** Tests for `list` and `crossRead` actions must mock `kvMock.keys`, not `kvMock.scan`. `kvMock.keys.mockResolvedValue([])` is set in `beforeEach` in `api/kv.test.ts`.
+
+---
+
+## E023 — loadSharingCenterUpdates Missing Invitation Fetch
+
+**What went wrong:** `loadSharingCenterUpdates()` checked KV for accept/reject notifications but never fetched `share:groupInvitation`. The inviter wrote the invitation to `{targetUsername}:share:groupInvitation` via `kvCrossSet`, but the invitee's localStorage was never populated. `SharingCenterScreen` read `getLocalGroupInvitation()` after the function returned and always got `null` — the invitation card was never shown.
+
+**Root cause:** `setLocalGroupInvitation()` existed in `citationShare.ts` but was never called from `loadSharingCenterUpdates`. The invitation delivery path was simply not implemented.
+
+**Rule:** `loadSharingCenterUpdates()` is the single point of truth for all KV → localStorage syncing of sharing state. Any new KV key that represents state visible to the user in `SharingCenterScreen` must be fetched here. The function also detects cancellation: if local has an invitation but KV key is gone, clear local and return `invitationCancelled: true`.
