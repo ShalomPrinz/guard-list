@@ -212,3 +212,26 @@ The synchronous `return null` prevents rendering the guarded content; the `useEf
 **Root cause:** Silent error swallowing at multiple layers masked the real failure.
 
 **Rule:** The origin check in `api/kv.ts` must use a `Set` covering `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` — still applies to all KV actions. `kvCrossSet` must log `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'` — still applies. Sharing state is now loaded on-demand in `SharingCenterScreen` via `loadSharingCenterUpdates()` — do not add `storage` event listeners to sync share state; that approach was replaced.
+
+---
+
+## E021 — SharingCenterScreen Stuck on "טוען..." Forever
+
+**What went wrong:** The mount `useEffect` used `void Promise.all([...]).then(...)`. If any promise in the array hung (slow network, KV timeout), `.then()` was never reached and `setLoading(false)` never fired. The screen remained stuck on "טוען..." indefinitely.
+
+**Root cause:** `void` discards the returned promise entirely — errors and hangs are silently swallowed. Additionally, `kvListGuestCitations` was called eagerly on mount, and its slow KV response was the likely cause of the hang in production.
+
+**Rule:** Never use `void promise.then(setState)` in a `useEffect` for loading state. Always use a named async function with `try/finally`:
+```ts
+useEffect(() => {
+  async function load() {
+    try {
+      // ... await calls and setState
+    } finally {
+      setLoading(false) // always fires
+    }
+  }
+  void load()
+}, [])
+```
+This guarantees `setLoading(false)` fires even if a network call rejects or hangs (after component unmounts, React will ignore the state update).

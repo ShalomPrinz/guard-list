@@ -50,19 +50,22 @@ export default function SharingCenterScreen() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-    void Promise.all([
-      loadSharingCenterUpdates(),
-      kvListGuestCitations(),
-    ]).then(([sharingResult, guestCitations]) => {
-      if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
-        setNotification(sharingResult)
+
+    async function load() {
+      try {
+        const sharingResult = await loadSharingCenterUpdates()
+        if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
+          setNotification(sharingResult)
+        }
+        setGroup(getLocalGroup())
+        setInvitation(getLocalGroupInvitation())
+        setOutgoing(getOutgoingInvitation())
+      } finally {
+        setLoading(false)
       }
-      setGroup(getLocalGroup())
-      setInvitation(getLocalGroupInvitation())
-      setOutgoing(getOutgoingInvitation())
-      setPendingGuest(guestCitations)
-      setLoading(false)
-    })
+    }
+
+    void load()
   }, [])
 
   function refreshState() {

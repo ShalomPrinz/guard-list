@@ -372,10 +372,8 @@ describe('SharingCenterScreen — guest inbox', () => {
   it('opens inbox modal and shows loading state', async () => {
     const user = userEvent.setup()
     let resolve!: (v: GuestCitationSubmission[]) => void
-    // First call (mount) resolves immediately; second call (openInbox) stays pending
-    mockKvListGuestCitations
-      .mockResolvedValueOnce([])
-      .mockReturnValueOnce(new Promise(r => { resolve = r }))
+    // openInbox call stays pending to observe loading state
+    mockKvListGuestCitations.mockReturnValueOnce(new Promise(r => { resolve = r }))
     renderSharingCenter()
 
     await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
@@ -569,13 +567,20 @@ describe('SharingCenterScreen — guest inbox', () => {
     expect(mockKvDeleteGuestCitation).toHaveBeenCalledWith('s2')
   })
 
-  it('badge count shows pending submissions count on mount', async () => {
+  it('badge count shows pending submissions count after opening inbox', async () => {
+    const user = userEvent.setup()
     mockKvListGuestCitations.mockResolvedValue([
       makeSubmission('s1'),
       makeSubmission('s2'),
       makeSubmission('s3'),
     ])
     renderSharingCenter()
+
+    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
+    // Badge does not show before inbox is opened (lazy load)
+    expect(screen.queryByText('3')).toBeNull()
+
+    await user.click(screen.getByText('ציטוטים ממבקרים'))
 
     await waitFor(() => {
       expect(screen.getByText('3')).toBeTruthy()
