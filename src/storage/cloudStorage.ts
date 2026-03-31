@@ -24,6 +24,8 @@ import { getUsername } from './userStorage'
 
 export const isKvAvailable: boolean = true;
 
+const KV_TIMEOUT_MS = 30_000
+
 function scopedKey(key: string): string | null {
   const username = getUsername()
   if (!username) return null
@@ -31,21 +33,35 @@ function scopedKey(key: string): string | null {
 }
 
 async function callKv(body: unknown): Promise<unknown> {
-  const res = await fetch("/api/kv", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`KV HTTP ${res.status}`);
-  return res.json();
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), KV_TIMEOUT_MS)
+  try {
+    const res = await fetch("/api/kv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new Error(`KV HTTP ${res.status}`)
+    return res.json()
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function callKvRaw(body: unknown): Promise<Response> {
-  return fetch("/api/kv", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), KV_TIMEOUT_MS)
+  try {
+    return await fetch("/api/kv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export async function kvGet<T>(key: string): Promise<T | null> {

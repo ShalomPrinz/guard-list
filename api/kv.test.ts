@@ -296,35 +296,29 @@ describe('api/kv handler', () => {
       warn.mockRestore()
     })
 
-    // TODO #INSTANT - broken scan causes API usage overflow even on small datasets
-    // it('returns keys from single scan page in response body', async () => {
-    //   kvMock.scan.mockResolvedValueOnce([0, ['alice:schedules:1', 'alice:schedules:2']])
-    //   const res = await handler(
-    //     makeReq({ action: 'list', username: 'alice', prefix: 'alice:schedules:' }),
-    //   )
-    //   expect(res.status).toBe(200)
-    //   const body = await res.json() as { keys: string[] }
-    //   expect(body.keys).toEqual(['alice:schedules:1', 'alice:schedules:2'])
-    // })
+    it('returns keys matching prefix in response body', async () => {
+      kvMock.keys.mockResolvedValueOnce(['alice:schedules:1', 'alice:schedules:2'])
+      const res = await handler(
+        makeReq({ action: 'list', username: 'alice', prefix: 'alice:schedules:' }),
+      )
+      expect(res.status).toBe(200)
+      const body = await res.json() as { keys: string[] }
+      expect(body.keys).toEqual(['alice:schedules:1', 'alice:schedules:2'])
+      expect(kvMock.keys).toHaveBeenCalledWith('alice:schedules:*')
+    })
 
-    // TODO #INSTANT - broken scan causes API usage overflow even on small datasets
-    // it('merges keys across multiple scan pages (cursor loop)', async () => {
-    //   kvMock.scan
-    //     .mockResolvedValueOnce([42, ['alice:schedules:1', 'alice:schedules:2']])
-    //     .mockResolvedValueOnce([0, ['alice:schedules:3']])
-    //   const res = await handler(
-    //     makeReq({ action: 'list', username: 'alice', prefix: 'alice:schedules:' }),
-    //   )
-    //   expect(res.status).toBe(200)
-    //   const body = await res.json() as { keys: string[] }
-    //   expect(body.keys).toEqual(['alice:schedules:1', 'alice:schedules:2', 'alice:schedules:3'])
-    //   expect(kvMock.scan).toHaveBeenCalledTimes(2)
-    //   expect(kvMock.scan).toHaveBeenNthCalledWith(1, 0, { match: 'alice:schedules:*', count: 100 })
-    //   expect(kvMock.scan).toHaveBeenNthCalledWith(2, 42, { match: 'alice:schedules:*', count: 100 })
-    // })
+    it('calls kv.keys with the prefix pattern including wildcard suffix', async () => {
+      kvMock.keys.mockResolvedValueOnce(['alice:schedules:3'])
+      const res = await handler(
+        makeReq({ action: 'list', username: 'alice', prefix: 'alice:schedules:' }),
+      )
+      expect(res.status).toBe(200)
+      expect(kvMock.keys).toHaveBeenCalledTimes(1)
+      expect(kvMock.keys).toHaveBeenCalledWith('alice:schedules:*')
+    })
 
-    it('returns empty keys array when scan finds nothing', async () => {
-      kvMock.scan.mockResolvedValueOnce([0, []])
+    it('returns empty keys array when keys finds nothing', async () => {
+      kvMock.keys.mockResolvedValueOnce([])
       const res = await handler(
         makeReq({ action: 'list', username: 'alice', prefix: 'alice:schedules:' }),
       )

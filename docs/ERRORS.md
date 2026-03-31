@@ -235,3 +235,15 @@ useEffect(() => {
 }, [])
 ```
 This guarantees `setLoading(false)` fires even if a network call rejects or hangs (after component unmounts, React will ignore the state update).
+
+---
+
+## E022 — kv.scan Cursor Loop Exhausted Monthly Redis Quota in One Hour
+
+**What went wrong:** `handleList` and `handleCrossRead` in `api/kv.ts` used a `kv.scan` cursor loop to find keys by prefix. Upstash charges one Redis command per cursor page. Because SCAN iterates the entire keyspace (not just matching keys), a database with many keys from multiple users required hundreds of pages per call — consuming ~250K of 500K monthly commands in a single hour of app usage.
+
+**Root cause:** The HTTP-level rate limiter (`ratelimit.slidingWindow(60, "1 m")`) counts one HTTP request per scan call, but each scan call fired 100+ Redis commands internally. The rate limiter was never designed to prevent multi-command server-side Redis patterns — it only throttles HTTP throughput.
+
+**Rule:** Never use `kv.scan` anywhere in `api/kv.ts`. Use `kv.keys(pattern)` instead — it returns all matching keys in a single Redis command regardless of database size. If you find yourself writing a `do { ... } while (cursor !== 0)` loop against Redis, stop. The fix is `const allKeys = await kv.keys(\`${prefix}*\`)` — one command, zero loops.
+
+**Testing implication:** Tests for `list` and `crossRead` actions must mock `kvMock.keys`, not `kvMock.scan`. `kvMock.keys.mockResolvedValue([])` is set in `beforeEach` in `api/kv.test.ts`.

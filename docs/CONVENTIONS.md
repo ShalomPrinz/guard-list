@@ -194,6 +194,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 ## KV / Cloud Storage
 
 - Fetch from KV only what is needed immediately. Do not preload data that is only required after a user action. Calling `kvListGuestCitations()` on mount is the canonical example of what NOT to do — it was moved to on-demand (called only when the user opens the inbox).
+- Never use `kv.scan` — use `kv.keys(pattern)` for listing keys by prefix. SCAN charges one Redis command per cursor page; KEYS charges one command for the entire result set.
 - All KV access goes through `src/storage/cloudStorage.ts`. Never import Upstash Redis directly from components or logic.
 - Raw KV actions (`rawGet`/`rawSet` in `api/kv.ts`) are restricted to keys matching `device:[a-zA-Z0-9_\-.]{1,128}`. Device keys in `UsernameGate.tsx` are constructed as `` `device:${username}` `` — never `` `${username}:device` ``. This ensures raw-action keys structurally cannot overlap with user-namespaced keys (`{username}:*`).
 - Cross-user writes use the `crossSet` action in `api/kv.ts`. Allowed sub-keys: `share:groupInvitation`, `share:acceptNotification`, `share:rejectionNotification`. Any other key returns 403. Use `kvCrossSet` from `cloudStorage.ts` — never call `crossSet` directly.
