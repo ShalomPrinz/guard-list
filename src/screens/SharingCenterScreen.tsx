@@ -35,7 +35,8 @@ export default function SharingCenterScreen() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [inviteCancelledMsg, setInviteCancelledMsg] = useState(false)
+  const [inviteCancelledBy, setInviteCancelledBy] = useState<string | null>(null)
+  const [autoLeftMsg, setAutoLeftMsg] = useState(false)
 
   // Guest link
   const [linkCopied, setLinkCopied] = useState(false)
@@ -57,6 +58,12 @@ export default function SharingCenterScreen() {
         const sharingResult = await loadSharingCenterUpdates()
         if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
           setNotification(sharingResult)
+        }
+        if (sharingResult.invitationCancelledBy) {
+          setInviteCancelledBy(sharingResult.invitationCancelledBy)
+        }
+        if (sharingResult.autoLeftLoneGroup) {
+          setAutoLeftMsg(true)
         }
         setGroup(getLocalGroup())
         setInvitation(getLocalGroupInvitation())
@@ -133,12 +140,13 @@ export default function SharingCenterScreen() {
 
   async function handleAccept() {
     if (!invitation) return
+    const fromUsername = invitation.fromUsername
     setActionLoading(true)
     const result = await acceptGroupInvitation(invitation)
     refreshState()
     setActionLoading(false)
     if (result === 'cancelled') {
-      setInviteCancelledMsg(true)
+      setInviteCancelledBy(fromUsername)
     }
   }
 
@@ -210,10 +218,10 @@ export default function SharingCenterScreen() {
       </div>
 
       {/* Cancelled invitation banner */}
-      {inviteCancelledMsg && (
-        <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 dark:bg-red-900/30">
-          <p className="text-sm text-red-800 dark:text-red-200">
-            ההזמנה בוטלה — בקש מהמזמין להזמין שוב
+      {inviteCancelledBy && (
+        <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 dark:bg-red-900/20">
+          <p className="text-sm text-red-700 dark:text-red-300">
+            המשתמש &quot;{inviteCancelledBy}&quot; ביטל את ההזמנה לקבוצה שלו
           </p>
         </div>
       )}
@@ -296,6 +304,15 @@ export default function SharingCenterScreen() {
               דחה
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Auto-left lone group message */}
+      {autoLeftMsg && group === null && (
+        <div className="mb-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            מצטערים, נשארת לבד בקבוצת השיתוף ולכן סגרנו אותה עבורך
+          </p>
         </div>
       )}
 

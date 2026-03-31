@@ -306,6 +306,42 @@ describe('loadSharingCenterUpdates', () => {
     const result = await loadSharingCenterUpdates()
     expect(result.freshMembers).toBeUndefined()
   })
+
+  it('returns autoLeftLoneGroup and clears local group when user is the sole remaining member', async () => {
+    setLocalGroup(makeGroup({ groupId: 'g1', members: ['currentuser', 'bob'] }))
+    // KV shows only currentuser remains
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser'])
+
+    const result = await loadSharingCenterUpdates()
+
+    expect(result.autoLeftLoneGroup).toBe(true)
+    expect(getLocalGroup()).toBeNull()
+  })
+})
+
+// ─── Auto-left lone group ─────────────────────────────────────────────────────
+
+describe('SharingCenterScreen — auto-left lone group', () => {
+  it('shows "מצטערים, נשארת לבד" banner when user is the last member', async () => {
+    setLocalGroup(makeGroup({ groupId: 'g1', members: ['currentuser', 'bob'] }))
+    // KV returns only current user — everyone else left
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser'])
+    renderSharingCenter()
+
+    await waitFor(() => {
+      expect(screen.getByText(/נשארת לבד בקבוצת השיתוף/)).toBeTruthy()
+    })
+  })
+
+  it('does not show group section after auto-leave', async () => {
+    setLocalGroup(makeGroup({ groupId: 'g1', members: ['currentuser', 'bob'] }))
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser'])
+    renderSharingCenter()
+
+    await waitFor(() => {
+      expect(screen.queryByText('עזוב קבוצה')).toBeNull()
+    })
+  })
 })
 
 // ─── Regression: invitation visible on mount (bug fix) ───────────────────────
@@ -633,22 +669,22 @@ describe('loadSharingCenterUpdates — invitation delivery', () => {
     expect(getLocalGroupInvitation()?.sentAt).toBe(1000)
   })
 
-  it('clears local invitation and returns invitationCancelled when KV key is gone', async () => {
+  it('clears local invitation and returns invitationCancelledBy when KV key is gone', async () => {
     setLocalGroupInvitation(makeInvitation({ fromUsername: 'inviter' }))
     mockKvGet.mockResolvedValue(null) // KV returns null — invitation was cancelled
 
     const result = await loadSharingCenterUpdates()
 
     expect(getLocalGroupInvitation()).toBeNull()
-    expect(result.invitationCancelled).toBe(true)
+    expect(result.invitationCancelledBy).toBe('inviter')
   })
 
-  it('does not set invitationCancelled when no local invitation and KV is also empty', async () => {
+  it('does not set invitationCancelledBy when no local invitation and KV is also empty', async () => {
     mockKvGet.mockResolvedValue(null)
 
     const result = await loadSharingCenterUpdates()
 
-    expect(result.invitationCancelled).toBeUndefined()
+    expect(result.invitationCancelledBy).toBeUndefined()
   })
 })
 
@@ -722,7 +758,7 @@ describe('SharingCenterScreen — cancelled invitation banner', () => {
     await user.click(screen.getByText('אשר'))
 
     await waitFor(() => {
-      expect(screen.getByText('ההזמנה בוטלה — בקש מהמזמין להזמין שוב')).toBeTruthy()
+      expect(screen.getByText(/המשתמש "inviter" ביטל את ההזמנה לקבוצה שלו/)).toBeTruthy()
     })
   })
 })

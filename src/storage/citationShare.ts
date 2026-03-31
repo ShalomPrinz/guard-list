@@ -199,9 +199,10 @@ export async function loadSharingCenterUpdates(storage: Storage = window.localSt
   acceptedBy?: string
   rejectedBy?: string
   freshMembers?: string[]
-  invitationCancelled?: true
+  invitationCancelledBy?: string
+  autoLeftLoneGroup?: true
 }> {
-  const result: { acceptedBy?: string; rejectedBy?: string; freshMembers?: string[]; invitationCancelled?: true } = {}
+  const result: { acceptedBy?: string; rejectedBy?: string; freshMembers?: string[]; invitationCancelledBy?: string; autoLeftLoneGroup?: true } = {}
 
   try {
     const acceptNotif = await kvGet<{ byUsername: string; groupId: string; at: number }>('share:acceptNotification')
@@ -236,8 +237,9 @@ export async function loadSharingCenterUpdates(storage: Storage = window.localSt
       setLocalGroupInvitation(remoteInvitation, storage)
     } else if (existingLocal !== null && remoteInvitation === null) {
       // Invitation was cancelled by the inviter while we weren't looking
+      const cancelledBy = existingLocal.fromUsername
       clearLocalGroupInvitation(storage)
-      result.invitationCancelled = true
+      result.invitationCancelledBy = cancelledBy
     }
   } catch { /* silent */ }
 
@@ -247,6 +249,13 @@ export async function loadSharingCenterUpdates(storage: Storage = window.localSt
       const { kvGroupGetMembers } = await import('./cloudStorage')
       const freshMembers = await kvGroupGetMembers(group.groupId)
       if (freshMembers !== null) {
+        const currentUser = getUsername() ?? ''
+        const othersExist = freshMembers.some(m => m !== currentUser)
+        if (!othersExist) {
+          await leaveGroup(storage)
+          result.autoLeftLoneGroup = true
+          return result
+        }
         setLocalGroup({ ...group, members: freshMembers }, storage)
         result.freshMembers = freshMembers
       }
