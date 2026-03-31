@@ -12,8 +12,14 @@ import {
   loadSharingCenterUpdates,
 } from '../storage/citationShare'
 import { getUsername } from '../storage/userStorage'
-import type { SharingGroup, GroupInvitation } from '../types'
+import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
+import { getGroups } from '../storage/groups'
+import { upsertCitation } from '../storage/citations'
+import { saveCitationAuthorLink } from '../storage/citationAuthorLinks'
+import { formatDate } from '../logic/formatting'
+import type { SharingGroup, GroupInvitation, GuestCitationSubmission, Member, Citation } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Modal from '../components/Modal'
 
 export default function SharingCenterScreen() {
   const navigate = useNavigate()
@@ -30,15 +36,31 @@ export default function SharingCenterScreen() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
+  // Guest link
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  // Guest citations inbox
+  const [pendingGuest, setPendingGuest] = useState<GuestCitationSubmission[] | null>(null)
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [inboxLoading, setInboxLoading] = useState(false)
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [acceptMemberIds, setAcceptMemberIds] = useState<Record<string, string>>({})
+
+  const allMembers: Member[] = getGroups().flatMap(g => g.members)
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-    void loadSharingCenterUpdates().then(result => {
-      if (result.acceptedBy || result.rejectedBy) {
-        setNotification(result)
+    void Promise.all([
+      loadSharingCenterUpdates(),
+      kvListGuestCitations(),
+    ]).then(([sharingResult, guestCitations]) => {
+      if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
+        setNotification(sharingResult)
       }
       setGroup(getLocalGroup())
       setInvitation(getLocalGroupInvitation())
       setOutgoing(getOutgoingInvitation())
+      setPendingGuest(guestCitations)
       setLoading(false)
     })
   }, [])
@@ -47,6 +69,62 @@ export default function SharingCenterScreen() {
     setGroup(getLocalGroup())
     setInvitation(getLocalGroupInvitation())
     setOutgoing(getOutgoingInvitation())
+  }
+
+  function handleCopyGuestLink() {
+    const username = getUsername()
+    if (!username) return
+    const url = `${window.location.origin}/guest/${username}`
+    void navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
+
+  async function openInbox() {
+    setInboxOpen(true)
+    setInboxLoading(true)
+    setAcceptingId(null)
+    setAcceptMemberIds({})
+    const submissions = await kvListGuestCitations()
+    setPendingGuest(submissions)
+    setInboxLoading(false)
+  }
+
+  function handleReject(submissionId: string) {
+    kvDeleteGuestCitation(submissionId)
+    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submissionId) : prev)
+    if (acceptingId === submissionId) setAcceptingId(null)
+  }
+
+  function handleAcceptOne(submission: GuestCitationSubmission, memberId: string) {
+    const newCitation: Citation = {
+      id: crypto.randomUUID(),
+      text: submission.text,
+      author: submission.author,
+      usedInListIds: [],
+    }
+    upsertCitation(newCitation)
+    if (memberId) saveCitationAuthorLink(submission.author, memberId)
+    kvDeleteGuestCitation(submission.id)
+    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submission.id) : prev)
+    setAcceptingId(null)
+  }
+
+  function handleAcceptAll() {
+    const list = pendingGuest ?? []
+    for (const submission of list) {
+      const newCitation: Citation = {
+        id: crypto.randomUUID(),
+        text: submission.text,
+        author: submission.author,
+        usedInListIds: [],
+      }
+      upsertCitation(newCitation)
+      kvDeleteGuestCitation(submission.id)
+    }
+    setPendingGuest([])
+    setAcceptingId(null)
   }
 
   async function handleAccept() {
@@ -104,7 +182,7 @@ export default function SharingCenterScreen() {
           >
             ←
           </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">מרכז שיתוף</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">מרכז השיתוף</h1>
         </div>
         <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">טוען...</p>
       </div>
@@ -121,7 +199,7 @@ export default function SharingCenterScreen() {
         >
           ←
         </button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">מרכז שיתוף</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">מרכז השיתוף</h1>
       </div>
 
       {/* Notification banner */}
@@ -140,6 +218,45 @@ export default function SharingCenterScreen() {
           </button>
         </div>
       )}
+
+      {/* Guest link section */}
+      <div className="mb-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
+        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">שיתוף קישור למבקרים</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={handleCopyGuestLink}
+            className={`min-h-[44px] flex-1 rounded-2xl py-3 text-sm font-semibold transition-colors ${linkCopied ? 'bg-green-700 text-white' : 'bg-gray-200 text-gray-900 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:active:bg-gray-600'}`}
+          >
+            {linkCopied ? '✓ הועתק!' : '📋 העתק קישור'}
+          </button>
+          <button
+            onClick={() => {
+              const username = getUsername()
+              if (!username) return
+              const url = `${window.location.origin}/guest/${username}`
+              window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank')
+            }}
+            className="min-h-[44px] flex-1 rounded-2xl bg-green-600 py-3 text-sm font-semibold text-white active:bg-green-700"
+          >
+            📤 שתף בוואטסאפ
+          </button>
+        </div>
+      </div>
+
+      {/* Guest citations inbox */}
+      <div className="mb-4">
+        <button
+          onClick={openInbox}
+          className="relative min-h-[44px] w-full rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+        >
+          ציטוטים ממבקרים
+          {pendingGuest !== null && pendingGuest.length > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+              {pendingGuest.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Pending invitation */}
       {invitation !== null && (
@@ -277,6 +394,85 @@ export default function SharingCenterScreen() {
           onConfirm={handleLeave}
           onCancel={() => setShowLeaveConfirm(false)}
         />
+      )}
+
+      {/* Guest citations inbox modal */}
+      {inboxOpen && (
+        <Modal onClose={() => setInboxOpen(false)} title="ציטוטים ממבקרים">
+          {inboxLoading ? (
+            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">טוען...</p>
+          ) : pendingGuest === null || pendingGuest.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">אין ציטוטים ממתינים</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pendingGuest.length > 1 && (
+                <button
+                  onClick={handleAcceptAll}
+                  className="min-h-[44px] w-full rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                >
+                  קבל הכל
+                </button>
+              )}
+              {pendingGuest.map(submission => (
+                <div key={submission.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                  <p className="mb-1 text-sm text-gray-900 dark:text-gray-100">{submission.text}</p>
+                  <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">
+                    {submission.author ? `— ${submission.author}` : ''}
+                  </p>
+                  <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
+                    {formatDate(new Date(submission.submittedAt))}
+                  </p>
+
+                  {acceptingId === submission.id ? (
+                    <div className="flex flex-col gap-2">
+                      {allMembers.length > 0 && (
+                        <select
+                          value={acceptMemberIds[submission.id] ?? ''}
+                          onChange={e => setAcceptMemberIds(prev => ({ ...prev, [submission.id]: e.target.value }))}
+                          className="w-full rounded-xl bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
+                        >
+                          <option value="">ללא קישור</option>
+                          {allMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setAcceptingId(null)}
+                          className="min-h-[44px] flex-1 rounded-2xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+                        >
+                          ביטול
+                        </button>
+                        <button
+                          onClick={() => handleAcceptOne(submission, acceptMemberIds[submission.id] ?? '')}
+                          className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                        >
+                          אשר
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReject(submission.id)}
+                        className="min-h-[44px] flex-1 rounded-2xl border border-red-300 text-sm font-medium text-red-600 active:bg-red-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
+                      >
+                        דחה
+                      </button>
+                      <button
+                        onClick={() => setAcceptingId(submission.id)}
+                        className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
+                      >
+                        קבל
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )

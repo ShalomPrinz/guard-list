@@ -2,12 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getCitations, upsertCitation, deleteCitation } from '../storage/citations'
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
-import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
 import { getUsername } from '../storage/userStorage'
-import type { GuestCitationSubmission } from '../types'
 import { getGroups } from '../storage/groups'
 import { formatAuthorName } from '../logic/citations'
-import { formatDate } from '../logic/formatting'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
 import type { Citation, Member } from '../types'
@@ -30,26 +27,6 @@ export default function CitationsScreen() {
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
-
-  // Guest citations inbox
-  const [pendingGuest, setPendingGuest] = useState<GuestCitationSubmission[] | null>(null)
-  const [inboxOpen, setInboxOpen] = useState(false)
-  const [inboxLoading, setInboxLoading] = useState(false)
-  const [acceptingId, setAcceptingId] = useState<string | null>(null)
-  const [acceptMemberIds, setAcceptMemberIds] = useState<Record<string, string>>({})
-
-  // Guest link copy state
-  const [linkCopied, setLinkCopied] = useState(false)
-
-  function handleCopyGuestLink() {
-    const username = getUsername()
-    if (!username) return
-    const url = `${window.location.origin}/guest/${username}`
-    void navigator.clipboard.writeText(url).then(() => {
-      setLinkCopied(true)
-      setTimeout(() => setLinkCopied(false), 2000)
-    })
-  }
 
   const allMembers: Member[] = getGroups().flatMap(g => g.members)
   const [authorLinks, setAuthorLinks] = useState(() => getCitationAuthorLinks())
@@ -115,56 +92,6 @@ export default function CitationsScreen() {
     setEditing(null)
   }
 
-  async function openInbox() {
-    setInboxOpen(true)
-    setInboxLoading(true)
-    setAcceptingId(null)
-    setAcceptMemberIds({})
-    const submissions = await kvListGuestCitations()
-    setPendingGuest(submissions)
-    setInboxLoading(false)
-  }
-
-  function handleReject(submissionId: string) {
-    kvDeleteGuestCitation(submissionId)
-    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submissionId) : prev)
-    if (acceptingId === submissionId) setAcceptingId(null)
-  }
-
-  function handleAcceptOne(submission: GuestCitationSubmission, memberId: string) {
-    const newCitation: Citation = {
-      id: crypto.randomUUID(),
-      text: submission.text,
-      author: submission.author,
-      usedInListIds: [],
-    }
-    upsertCitation(newCitation)
-    if (memberId) saveCitationAuthorLink(submission.author, memberId)
-    kvDeleteGuestCitation(submission.id)
-    setPendingGuest(prev => prev ? prev.filter(s => s.id !== submission.id) : prev)
-    setAcceptingId(null)
-    setCitations(getCitations())
-    setAuthorLinks(getCitationAuthorLinks())
-  }
-
-  function handleAcceptAll() {
-    const list = pendingGuest ?? []
-    for (const submission of list) {
-      const newCitation: Citation = {
-        id: crypto.randomUUID(),
-        text: submission.text,
-        author: submission.author,
-        usedInListIds: [],
-      }
-      upsertCitation(newCitation)
-      kvDeleteGuestCitation(submission.id)
-    }
-    setPendingGuest([])
-    setAcceptingId(null)
-    setCitations(getCitations())
-    setAuthorLinks(getCitationAuthorLinks())
-  }
-
   function handleDelete(id: string) {
     deleteCitation(id)
     setCitations(getCitations())
@@ -204,40 +131,6 @@ export default function CitationsScreen() {
         </h1>
       </div>
 
-      {/* Guest link section (non-selection mode only) */}
-      {!selectionMode && (
-        <div className="mb-4 rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs text-gray-500 dark:text-gray-400">קישור לשליחת ציטוטים ממבקרים</p>
-            <button
-              onClick={() => navigate('/sharing-center')}
-              className="min-h-[44px] rounded-xl px-3 text-sm font-medium text-blue-600 active:text-blue-800 dark:text-blue-400 dark:active:text-blue-300"
-            >
-              מרכז שיתוף
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleCopyGuestLink}
-              className={`min-h-[44px] flex-1 rounded-2xl py-3 text-sm font-semibold transition-colors ${linkCopied ? 'bg-green-700 text-white' : 'bg-gray-200 text-gray-900 active:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:active:bg-gray-600'}`}
-            >
-              {linkCopied ? '✓ הועתק!' : '📋 העתק קישור'}
-            </button>
-            <button
-              onClick={() => {
-                const username = getUsername()
-                if (!username) return
-                const url = `${window.location.origin}/guest/${username}`
-                window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank')
-              }}
-              className="min-h-[44px] flex-1 rounded-2xl bg-green-600 py-3 text-sm font-semibold text-white active:bg-green-700"
-            >
-              📤 שתף בוואטסאפ
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Search */}
       <div className="mb-4">
         <input
@@ -247,6 +140,16 @@ export default function CitationsScreen() {
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
         />
       </div>
+
+      {/* Sharing center button (non-selection mode only) */}
+      {!selectionMode && (
+        <button
+          onClick={() => navigate('/sharing-center')}
+          className="mb-4 min-h-[44px] w-full rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+        >
+          🤝 מרכז השיתוף
+        </button>
+      )}
 
       {/* Citations list */}
       {filtered.length === 0 ? (
@@ -302,27 +205,14 @@ export default function CitationsScreen() {
         </ul>
       )}
 
-      {/* Add button and inbox button (normal mode only) */}
+      {/* Add button (non-selection mode only) */}
       {!selectionMode && (
-        <div className="flex gap-2">
-          <button
-            onClick={openNew}
-            className="flex-1 rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
-          >
-            + הוסף ציטוט
-          </button>
-          <button
-            onClick={openInbox}
-            className="relative min-h-[44px] rounded-2xl border border-gray-300 px-4 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
-          >
-            ציטוטים ממבקרים
-            {pendingGuest !== null && pendingGuest.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                {pendingGuest.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={openNew}
+          className="w-full rounded-2xl bg-blue-600 py-3 text-sm font-semibold text-white active:bg-blue-700"
+        >
+          + הוסף ציטוט
+        </button>
       )}
 
       {/* Edit / Add modal */}
@@ -403,86 +293,6 @@ export default function CitationsScreen() {
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
-
-      {/* Guest citations inbox modal */}
-      {inboxOpen && (
-        <Modal onClose={() => setInboxOpen(false)} title="ציטוטים ממבקרים">
-          {inboxLoading ? (
-            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">טוען...</p>
-          ) : pendingGuest === null || pendingGuest.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">אין ציטוטים ממתינים</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {pendingGuest.length > 1 && (
-                <button
-                  onClick={handleAcceptAll}
-                  className="min-h-[44px] w-full rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
-                >
-                  קבל הכל
-                </button>
-              )}
-              {pendingGuest.map(submission => (
-                <div key={submission.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
-                  <p className="mb-1 text-sm text-gray-900 dark:text-gray-100">{submission.text}</p>
-                  <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">
-                    {submission.author ? `— ${submission.author}` : ''}
-                  </p>
-                  <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
-                    {formatDate(new Date(submission.submittedAt))}
-                  </p>
-
-                  {acceptingId === submission.id ? (
-                    <div className="flex flex-col gap-2">
-                      {allMembers.length > 0 && (
-                        <select
-                          value={acceptMemberIds[submission.id] ?? ''}
-                          onChange={e => setAcceptMemberIds(prev => ({ ...prev, [submission.id]: e.target.value }))}
-                          className="w-full rounded-xl bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
-                        >
-                          <option value="">ללא קישור</option>
-                          {allMembers.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setAcceptingId(null)}
-                          className="min-h-[44px] flex-1 rounded-2xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
-                        >
-                          ביטול
-                        </button>
-                        <button
-                          onClick={() => handleAcceptOne(submission, acceptMemberIds[submission.id] ?? '')}
-                          className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
-                        >
-                          אשר
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleReject(submission.id)}
-                        className="min-h-[44px] flex-1 rounded-2xl border border-red-300 text-sm font-medium text-red-600 active:bg-red-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
-                      >
-                        דחה
-                      </button>
-                      <button
-                        onClick={() => setAcceptingId(submission.id)}
-                        className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700"
-                      >
-                        קבל
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Modal>
-      )}
-
     </div>
   )
 }
