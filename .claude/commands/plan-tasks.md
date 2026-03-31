@@ -53,6 +53,9 @@ Each file must follow this structure exactly:
 **Type:** Feature | Bugfix | Refactor | UI | Infrastructure | Tests
 (Optional) **Depends on:** [prompt file name]
 
+**User Raw Description:**
+> Copy verbatim the exact text from TODOS.md that this prompt addresses. Do not paraphrase. If multiple todo items are grouped into this prompt, include all of them.
+
 **Context:**
 > What currently exists in the codebase that this prompt touches. Be specific: name the files, components, functions, and data structures involved. Claude Code must be able to understand the starting state from this paragraph alone without reading the whole codebase.
 

@@ -3,6 +3,7 @@ Read the prompt file passed as argument. If it contains a "Depends on" section, 
 
 2. **Report**
 When implementation is complete, write a file named `verify-$ARGUMENTS.md` (in the same directory as the prompt file) with the following content:
+- The **User Raw Description** section copied verbatim from the prompt file (the exact user requirements as written)
 - Files created or modified
 - What was built, in 2–3 sentences
 - Any deliberate decisions or deviations from the prompt

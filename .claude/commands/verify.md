@@ -10,3 +10,14 @@ Do not write checklist items you can trivially confirm from the code alone — p
 Work through each item. Report ✅ or ❌ with one line per item. Fix any ❌ and re-run the affected checks before reporting done.
 
 If you notice any missing tests, write them and report about writing them.
+
+---
+
+**User Requirements Audit**
+
+After completing all checklist items, re-read the **User Raw Description** from the verify file. For each distinct requirement or expectation the user expressed:
+- State the requirement in one line
+- Report ✅ if it is fully satisfied or ❌ if it is missing, partial, or implemented differently than the user intended
+- For any ❌, explain the gap and fix it before reporting done
+
+This is the final gate — do not declare done until every user requirement is explicitly accounted for.
