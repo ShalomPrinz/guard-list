@@ -95,14 +95,14 @@ describe('SharingCenterScreen — not in a group', () => {
   it('shows "אינך חלק מקבוצת שיתוף" message', async () => {
     renderSharingCenter()
     await waitFor(() => {
-      expect(screen.getByText('אינך חלק מקבוצת שיתוף')).toBeTruthy()
+      expect(screen.getByText('אינך חלק מקבוצת שיתוף ציטוטים')).toBeTruthy()
     })
   })
 
   it('shows invite button in not-in-group state', async () => {
     renderSharingCenter()
     await waitFor(() => {
-      expect(screen.getByText('הזמן משתמש')).toBeTruthy()
+      expect(screen.getByText('הזמן חבר לשיתוף אוסף ציטוטים')).toBeTruthy()
     })
   })
 })
@@ -380,7 +380,7 @@ describe('SharingCenterScreen — guest inbox', () => {
   it('shows "ציטוטים ממבקרים" button', async () => {
     renderSharingCenter()
     await waitFor(() => {
-      expect(screen.getByText('ציטוטים ממבקרים')).toBeTruthy()
+      expect(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס')).toBeTruthy()
     })
   })
 
@@ -391,8 +391,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     mockKvListGuestCitations.mockReturnValueOnce(new Promise(r => { resolve = r }))
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     expect(screen.getByText('טוען...')).toBeTruthy()
     resolve([])
@@ -402,8 +402,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     const user = userEvent.setup()
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => {
       expect(screen.getByText('אין ציטוטים ממתינים')).toBeTruthy()
@@ -417,8 +417,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => {
       expect(screen.getByText('ציטוט מהמבקר')).toBeTruthy()
@@ -434,8 +434,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => {
       expect(screen.getByText('קבל הכל')).toBeTruthy()
@@ -447,8 +447,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => {
       expect(screen.queryByText('קבל הכל')).toBeNull()
@@ -462,8 +462,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('ציטוט לדחייה'))
     await user.click(screen.getByText('דחה'))
@@ -480,8 +480,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('קבל'))
     await user.click(screen.getByText('קבל'))
@@ -495,8 +495,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1', { text: 'test-text' })])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('קבל'))
     await user.click(screen.getByText('קבל'))
@@ -516,8 +516,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('קבל'))
     await user.click(screen.getByText('קבל'))
@@ -544,8 +544,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('קבל'))
     await user.click(screen.getByText('קבל'))
@@ -568,8 +568,8 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => screen.getByText('קבל הכל'))
     await user.click(screen.getByText('קבל הכל'))
@@ -591,11 +591,11 @@ describe('SharingCenterScreen — guest inbox', () => {
     ])
     renderSharingCenter()
 
-    await waitFor(() => screen.getByText('ציטוטים ממבקרים'))
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
     // Badge does not show before inbox is opened (lazy load)
     expect(screen.queryByText('3')).toBeNull()
 
-    await user.click(screen.getByText('ציטוטים ממבקרים'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
 
     await waitFor(() => {
       expect(screen.getByText('3')).toBeTruthy()

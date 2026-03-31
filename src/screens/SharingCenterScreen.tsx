@@ -237,7 +237,7 @@ export default function SharingCenterScreen() {
 
       {/* Guest link section */}
       <div className="mb-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">שיתוף קישור למבקרים</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">קישור לטופס הוספת ציטוטים לאוסף שלך -</h2>
         <div className="flex gap-2">
           <button
             onClick={handleCopyGuestLink}
@@ -265,7 +265,7 @@ export default function SharingCenterScreen() {
           onClick={openInbox}
           className="relative min-h-[44px] w-full rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
         >
-          ציטוטים ממבקרים
+          לבחירת ציטוטים שהתקבלו מהטופס
           {pendingGuest !== null && pendingGuest.length > 0 && (
             <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
               {pendingGuest.length}
@@ -303,7 +303,7 @@ export default function SharingCenterScreen() {
       {group !== null && invitation === null && (
         <div className="mb-4 flex flex-col gap-3">
           <div className="rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
-            <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">קבוצת שיתוף</h2>
+            <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">קבוצת שיתוף ציטוטים</h2>
             <ul className="mb-3 flex flex-col gap-1">
               {group.members.map(member => (
                 <li key={member} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
@@ -375,13 +375,13 @@ export default function SharingCenterScreen() {
       {/* Not in any group, no invitation */}
       {group === null && invitation === null && (
         <div className="rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
-          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">אינך חלק מקבוצת שיתוף</p>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">אינך חלק מקבוצת שיתוף ציטוטים</p>
 
           <button
             onClick={() => { setShowInviteInput(v => !v); setInviteError(null) }}
             className="min-h-[44px] w-full rounded-2xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700"
           >
-            הזמן משתמש
+            הזמן חבר לשיתוף אוסף ציטוטים
           </button>
 
           {showInviteInput && (
@@ -451,7 +451,7 @@ export default function SharingCenterScreen() {
                           onChange={e => setAcceptMemberIds(prev => ({ ...prev, [submission.id]: e.target.value }))}
                           className="w-full rounded-xl bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600"
                         >
-                          <option value="">ללא קישור</option>
+                          <option value="">ללא שיוך</option>
                           {allMembers.map(m => (
                             <option key={m.id} value={m.id}>{m.name}</option>
                           ))}
