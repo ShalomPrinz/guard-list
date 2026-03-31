@@ -4,6 +4,11 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api/kv': 'http://localhost:3001',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
