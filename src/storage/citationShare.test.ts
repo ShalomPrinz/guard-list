@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createLocalStorageMock } from '../tests/localStorageMock'
-import type { Citation } from '../types'
+import type { Citation, GroupInvitation } from '../types'
 
 vi.mock('./cloudStorage', () => ({
   kvSet: vi.fn().mockResolvedValue(undefined),
   kvDel: vi.fn().mockResolvedValue(undefined),
   kvCrossSet: vi.fn().mockResolvedValue('ok'),
-  kvCrossReadPartner: vi.fn().mockResolvedValue(null),
+  kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
+  kvGroupCreate: vi.fn().mockResolvedValue(null),
+  kvGroupJoin: vi.fn().mockResolvedValue('ok'),
+  kvGroupLeave: vi.fn().mockResolvedValue('ok'),
+  kvGroupGetMembers: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('./userStorage', () => ({
@@ -14,28 +18,32 @@ vi.mock('./userStorage', () => ({
 }))
 
 import {
-  getShareStatus,
-  setShareStatus,
-  clearShareStatus,
-  getOutgoingRequest,
-  setOutgoingRequest,
-  clearOutgoingRequest,
-  getLocalIncomingRequest,
-  setLocalIncomingRequest,
-  clearLocalIncomingRequest,
+  getLocalGroup,
+  setLocalGroup,
+  clearLocalGroup,
+  getLocalGroupInvitation,
+  setLocalGroupInvitation,
+  clearLocalGroupInvitation,
+  getOutgoingInvitation,
+  setOutgoingInvitation,
+  clearOutgoingInvitation,
   getDeleteLog,
   appendToDeleteLog,
   clearDeleteLog,
-  sendShareRequest,
-  acceptShareRequest,
-  declineShareRequest,
-  stopSharing,
+  sendGroupInvitation,
+  acceptGroupInvitation,
+  declineGroupInvitation,
+  leaveGroup,
 } from './citationShare'
-import { kvCrossSet, kvCrossReadPartner } from './cloudStorage'
+import { kvCrossSet, kvDel, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvCrossReadGroupMember } from './cloudStorage'
 import { getUsername } from './userStorage'
 
 const mockedKvCrossSet = vi.mocked(kvCrossSet)
-const mockedKvCrossReadPartner = vi.mocked(kvCrossReadPartner)
+const mockedKvGroupCreate = vi.mocked(kvGroupCreate)
+const mockedKvGroupJoin = vi.mocked(kvGroupJoin)
+const mockedKvGroupLeave = vi.mocked(kvGroupLeave)
+const mockedKvGroupGetMembers = vi.mocked(kvGroupGetMembers)
+const mockedKvCrossReadGroupMember = vi.mocked(kvCrossReadGroupMember)
 const mockedGetUsername = vi.mocked(getUsername)
 
 describe('citationShare storage', () => {
@@ -47,64 +55,84 @@ describe('citationShare storage', () => {
     vi.clearAllMocks()
     mockedGetUsername.mockReturnValue('alice')
     mockedKvCrossSet.mockResolvedValue('ok')
-    mockedKvCrossReadPartner.mockResolvedValue(null)
+    mockedKvGroupCreate.mockResolvedValue({ groupId: 'grp_test_abc' })
+    mockedKvGroupJoin.mockResolvedValue('ok')
+    mockedKvGroupLeave.mockResolvedValue('ok')
+    mockedKvGroupGetMembers.mockResolvedValue(null)
+    mockedKvCrossReadGroupMember.mockResolvedValue(null)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  describe('getShareStatus / setShareStatus / clearShareStatus', () => {
+  // ─── getLocalGroup / setLocalGroup / clearLocalGroup ─────────────────────────
+
+  describe('getLocalGroup / setLocalGroup / clearLocalGroup', () => {
     it('returns null when not set', () => {
-      expect(getShareStatus()).toBeNull()
+      expect(getLocalGroup()).toBeNull()
     })
 
-    it('returns the saved status', () => {
-      setShareStatus({ partnerUsername: 'bob', since: 1000 })
-      const status = getShareStatus()
-      expect(status).toEqual({ partnerUsername: 'bob', since: 1000 })
+    it('returns the saved group', () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice', 'bob'], joinedAt: 1000 })
+      expect(getLocalGroup()).toEqual({ groupId: 'grp_1', members: ['alice', 'bob'], joinedAt: 1000 })
     })
 
-    it('clearShareStatus removes the status', () => {
-      setShareStatus({ partnerUsername: 'bob', since: 1000 })
-      clearShareStatus()
-      expect(getShareStatus()).toBeNull()
+    it('clearLocalGroup removes the group', () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice'], joinedAt: 1000 })
+      clearLocalGroup()
+      expect(getLocalGroup()).toBeNull()
+    })
+
+    it('clearLocalGroup does NOT call any KV function', () => {
+      const mockedKvDel = vi.mocked(kvDel)
+      setLocalGroup({ groupId: 'grp_1', members: ['alice'], joinedAt: 1000 })
+      vi.clearAllMocks()
+      clearLocalGroup()
+      expect(mockedKvDel).not.toHaveBeenCalled()
     })
   })
 
-  describe('getOutgoingRequest / setOutgoingRequest / clearOutgoingRequest', () => {
+  // ─── getLocalGroupInvitation ──────────────────────────────────────────────────
+
+  describe('getLocalGroupInvitation / setLocalGroupInvitation / clearLocalGroupInvitation', () => {
     it('returns null when not set', () => {
-      expect(getOutgoingRequest()).toBeNull()
+      expect(getLocalGroupInvitation()).toBeNull()
     })
 
-    it('persists and retrieves the outgoing request', () => {
-      setOutgoingRequest({ toUsername: 'bob', sentAt: 2000 })
-      expect(getOutgoingRequest()).toEqual({ toUsername: 'bob', sentAt: 2000 })
+    it('persists and retrieves the invitation', () => {
+      const inv: GroupInvitation = { groupId: 'grp_1', fromUsername: 'carol', sentAt: 3000 }
+      setLocalGroupInvitation(inv)
+      expect(getLocalGroupInvitation()).toEqual(inv)
     })
 
-    it('clearOutgoingRequest removes the request', () => {
-      setOutgoingRequest({ toUsername: 'bob', sentAt: 2000 })
-      clearOutgoingRequest()
-      expect(getOutgoingRequest()).toBeNull()
+    it('clearLocalGroupInvitation removes the invitation', () => {
+      setLocalGroupInvitation({ groupId: 'grp_1', fromUsername: 'carol', sentAt: 3000 })
+      clearLocalGroupInvitation()
+      expect(getLocalGroupInvitation()).toBeNull()
     })
   })
 
-  describe('getLocalIncomingRequest / setLocalIncomingRequest / clearLocalIncomingRequest', () => {
+  // ─── getOutgoingInvitation ────────────────────────────────────────────────────
+
+  describe('getOutgoingInvitation / setOutgoingInvitation / clearOutgoingInvitation', () => {
     it('returns null when not set', () => {
-      expect(getLocalIncomingRequest()).toBeNull()
+      expect(getOutgoingInvitation()).toBeNull()
     })
 
-    it('persists and retrieves the incoming request', () => {
-      setLocalIncomingRequest({ fromUsername: 'carol', sentAt: 3000 })
-      expect(getLocalIncomingRequest()).toEqual({ fromUsername: 'carol', sentAt: 3000 })
+    it('persists and retrieves the outgoing invitation', () => {
+      setOutgoingInvitation({ toUsername: 'bob', groupId: 'grp_1', sentAt: 2000 })
+      expect(getOutgoingInvitation()).toEqual({ toUsername: 'bob', groupId: 'grp_1', sentAt: 2000 })
     })
 
-    it('clearLocalIncomingRequest removes the request', () => {
-      setLocalIncomingRequest({ fromUsername: 'carol', sentAt: 3000 })
-      clearLocalIncomingRequest()
-      expect(getLocalIncomingRequest()).toBeNull()
+    it('clearOutgoingInvitation removes it', () => {
+      setOutgoingInvitation({ toUsername: 'bob', groupId: 'grp_1', sentAt: 2000 })
+      clearOutgoingInvitation()
+      expect(getOutgoingInvitation()).toBeNull()
     })
   })
+
+  // ─── getDeleteLog / appendToDeleteLog / clearDeleteLog ───────────────────────
 
   describe('getDeleteLog / appendToDeleteLog / clearDeleteLog', () => {
     it('returns empty array when not set', () => {
@@ -124,130 +152,253 @@ describe('citationShare storage', () => {
     })
   })
 
-  describe('sendShareRequest', () => {
-    it('returns sent on success', async () => {
-      const result = await sendShareRequest('bob')
+  // ─── sendGroupInvitation ──────────────────────────────────────────────────────
+
+  describe('sendGroupInvitation', () => {
+    it('creates a group and sends invitation when no group exists', async () => {
+      mockedKvGroupCreate.mockResolvedValue({ groupId: 'grp_test_abc' })
+      const result = await sendGroupInvitation('bob', storage)
       expect(result).toBe('sent')
-      expect(getOutgoingRequest()?.toUsername).toBe('bob')
+      expect(mockedKvGroupCreate).toHaveBeenCalled()
+      expect(mockedKvCrossSet).toHaveBeenCalledWith(
+        'bob',
+        'share:groupInvitation',
+        expect.objectContaining({ fromUsername: 'alice', groupId: 'grp_test_abc' }),
+      )
+      expect(getLocalGroup(storage)?.groupId).toBe('grp_test_abc')
+      expect(getOutgoingInvitation(storage)?.toUsername).toBe('bob')
+    })
+
+    it('reuses existing group when already in one', async () => {
+      setLocalGroup({ groupId: 'grp_existing', members: ['alice'], joinedAt: 1000 }, storage)
+      const result = await sendGroupInvitation('bob', storage)
+      expect(result).toBe('sent')
+      expect(mockedKvGroupCreate).not.toHaveBeenCalled()
+      expect(mockedKvCrossSet).toHaveBeenCalledWith(
+        'bob',
+        'share:groupInvitation',
+        expect.objectContaining({ groupId: 'grp_existing' }),
+      )
     })
 
     it('normalizes target username to lowercase', async () => {
-      await sendShareRequest('BOB')
-      expect(getOutgoingRequest()?.toUsername).toBe('bob')
+      await sendGroupInvitation('BOB', storage)
+      expect(getOutgoingInvitation(storage)?.toUsername).toBe('bob')
     })
 
-    it('returns already_have_outgoing when outgoing exists', async () => {
-      setOutgoingRequest({ toUsername: 'carol', sentAt: 1000 })
-      const result = await sendShareRequest('bob')
+    it('returns already_have_outgoing when outgoing invitation exists', async () => {
+      setOutgoingInvitation({ toUsername: 'carol', groupId: 'grp_1', sentAt: 1000 }, storage)
+      const result = await sendGroupInvitation('bob', storage)
       expect(result).toBe('already_have_outgoing')
     })
 
-    it('returns already_sharing when already sharing', async () => {
-      setShareStatus({ partnerUsername: 'carol', since: 1000 })
-      const result = await sendShareRequest('bob')
-      expect(result).toBe('already_sharing')
+    it('returns own_namespace when targeting self', async () => {
+      const result = await sendGroupInvitation('alice', storage)
+      expect(result).toBe('own_namespace')
+    })
+
+    it('returns own_namespace (case-insensitive)', async () => {
+      const result = await sendGroupInvitation('ALICE', storage)
+      expect(result).toBe('own_namespace')
     })
 
     it('returns target_has_pending when crossSet returns already_pending', async () => {
       mockedKvCrossSet.mockResolvedValue('already_pending')
-      const result = await sendShareRequest('bob')
+      const result = await sendGroupInvitation('bob', storage)
       expect(result).toBe('target_has_pending')
     })
 
     it('returns error when crossSet returns error', async () => {
       mockedKvCrossSet.mockResolvedValue('error')
-      const result = await sendShareRequest('bob')
+      const result = await sendGroupInvitation('bob', storage)
+      expect(result).toBe('error')
+    })
+
+    it('returns error when kvGroupCreate fails', async () => {
+      mockedKvGroupCreate.mockResolvedValue(null)
+      const result = await sendGroupInvitation('bob', storage)
       expect(result).toBe('error')
     })
 
     it('returns error when no username', async () => {
       mockedGetUsername.mockReturnValue(null)
-      const result = await sendShareRequest('bob')
+      const result = await sendGroupInvitation('bob', storage)
       expect(result).toBe('error')
     })
   })
 
-  describe('acceptShareRequest', () => {
-    it('sets share status and clears incoming request', async () => {
-      setLocalIncomingRequest({ fromUsername: 'bob', sentAt: 1000 })
-      await acceptShareRequest('bob')
-      expect(getShareStatus()?.partnerUsername).toBe('bob')
-      expect(getLocalIncomingRequest()).toBeNull()
+  // ─── acceptGroupInvitation ────────────────────────────────────────────────────
+
+  describe('acceptGroupInvitation', () => {
+    const invitation: GroupInvitation = { groupId: 'grp_test', fromUsername: 'bob', sentAt: 1000 }
+
+    it('joins the group and sets local group', async () => {
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
+      setLocalGroupInvitation(invitation, storage)
+
+      await acceptGroupInvitation(invitation, storage)
+
+      expect(mockedKvGroupJoin).toHaveBeenCalledWith('grp_test')
+      const group = getLocalGroup(storage)
+      expect(group?.groupId).toBe('grp_test')
+      expect(group?.members).toEqual(['bob', 'alice'])
+    })
+
+    it('clears the local invitation', async () => {
+      setLocalGroupInvitation(invitation, storage)
+      await acceptGroupInvitation(invitation, storage)
+      expect(getLocalGroupInvitation(storage)).toBeNull()
     })
 
     it('sends accept notification via kvCrossSet', async () => {
-      await acceptShareRequest('bob')
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
+      await acceptGroupInvitation(invitation, storage)
       expect(mockedKvCrossSet).toHaveBeenCalledWith(
         'bob',
         'share:acceptNotification',
-        expect.objectContaining({ byUsername: 'alice' }),
+        expect.objectContaining({ byUsername: 'alice', groupId: 'grp_test' }),
       )
     })
 
-    it('merges partner citations on initial pull', async () => {
-      const partnerCitation: Citation = { id: 'pc1', text: 'partner text', author: 'P. Partner', usedInListIds: [] }
-      mockedKvCrossReadPartner.mockResolvedValueOnce({ citations: [partnerCitation], deleteLog: [] })
+    it('pulls citations from other group members', async () => {
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
+      const partnerCitation: Citation = { id: 'pc1', text: 'partner', author: 'B. Bob', usedInListIds: [] }
+      mockedKvCrossReadGroupMember.mockResolvedValueOnce({ citations: [partnerCitation], deleteLog: [] })
 
-      await acceptShareRequest('bob')
+      await acceptGroupInvitation(invitation, storage)
 
       const stored = JSON.parse(storage.getItem('citations') ?? '[]') as Citation[]
       expect(stored.find(c => c.id === 'pc1')).toBeDefined()
     })
 
-    it('does not duplicate local citations during initial pull', async () => {
+    it('does not duplicate local citations during pull', async () => {
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
       const existing: Citation = { id: 'local1', text: 'mine', author: 'A', usedInListIds: [] }
       storage.setItem('citations', JSON.stringify([existing]))
-      mockedKvCrossReadPartner.mockResolvedValueOnce({ citations: [existing], deleteLog: [] })
+      mockedKvCrossReadGroupMember.mockResolvedValueOnce({ citations: [existing], deleteLog: [] })
 
-      await acceptShareRequest('bob')
+      await acceptGroupInvitation(invitation, storage)
 
       const stored = JSON.parse(storage.getItem('citations') ?? '[]') as Citation[]
       expect(stored.filter(c => c.id === 'local1')).toHaveLength(1)
     })
 
-    it('applies partner delete log on initial pull', async () => {
+    it('applies delete log from partner', async () => {
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
       const toDelete: Citation = { id: 'del1', text: 'to delete', author: 'D', usedInListIds: [] }
       storage.setItem('citations', JSON.stringify([toDelete]))
-      mockedKvCrossReadPartner.mockResolvedValueOnce({ citations: [], deleteLog: ['del1'] })
+      mockedKvCrossReadGroupMember.mockResolvedValueOnce({ citations: [], deleteLog: ['del1'] })
 
-      await acceptShareRequest('bob')
+      await acceptGroupInvitation(invitation, storage)
 
       const stored = JSON.parse(storage.getItem('citations') ?? '[]') as Citation[]
       expect(stored.find(c => c.id === 'del1')).toBeUndefined()
     })
 
-    it('does not touch citations when initial pull returns null', async () => {
-      const local: Citation = { id: 'c1', text: 'keep', author: 'A', usedInListIds: [] }
-      storage.setItem('citations', JSON.stringify([local]))
-      mockedKvCrossReadPartner.mockResolvedValueOnce(null)
+    it('does nothing when kvGroupJoin fails', async () => {
+      mockedKvGroupJoin.mockResolvedValue('error')
+      await acceptGroupInvitation(invitation, storage)
+      expect(getLocalGroup(storage)).toBeNull()
+    })
 
-      await acceptShareRequest('bob')
+    it('does not set local group when kvGroupGetMembers returns null', async () => {
+      mockedKvGroupGetMembers.mockResolvedValue(null)
+      await acceptGroupInvitation(invitation, storage)
+      expect(mockedKvGroupJoin).toHaveBeenCalledWith('grp_test')
+      expect(getLocalGroup(storage)).toBeNull()
+    })
+
+    it('does nothing when no username', async () => {
+      mockedGetUsername.mockReturnValue(null)
+      await acceptGroupInvitation(invitation, storage)
+      expect(mockedKvGroupJoin).not.toHaveBeenCalled()
+    })
+  })
+
+  // ─── declineGroupInvitation ───────────────────────────────────────────────────
+
+  describe('declineGroupInvitation', () => {
+    it('clears the local invitation', async () => {
+      const invitation: GroupInvitation = { groupId: 'grp_1', fromUsername: 'bob', sentAt: 1000 }
+      setLocalGroupInvitation(invitation, storage)
+      await declineGroupInvitation(invitation, storage)
+      expect(getLocalGroupInvitation(storage)).toBeNull()
+    })
+
+    it('sends rejection notification to inviter', async () => {
+      const invitation: GroupInvitation = { groupId: 'grp_1', fromUsername: 'bob', sentAt: 1000 }
+      await declineGroupInvitation(invitation, storage)
+      expect(mockedKvCrossSet).toHaveBeenCalledWith(
+        'bob',
+        'share:rejectionNotification',
+        expect.objectContaining({ byUsername: 'alice', groupId: 'grp_1' }),
+      )
+    })
+
+    it('silently does nothing when no username', async () => {
+      mockedGetUsername.mockReturnValue(null)
+      const invitation: GroupInvitation = { groupId: 'grp_1', fromUsername: 'bob', sentAt: 1000 }
+      await expect(declineGroupInvitation(invitation, storage)).resolves.not.toThrow()
+      expect(mockedKvCrossSet).not.toHaveBeenCalled()
+    })
+
+    it('clears local invitation even when username is null', async () => {
+      mockedGetUsername.mockReturnValue(null)
+      const invitation: GroupInvitation = { groupId: 'grp_1', fromUsername: 'bob', sentAt: 1000 }
+      setLocalGroupInvitation(invitation, storage)
+      await declineGroupInvitation(invitation, storage)
+      expect(getLocalGroupInvitation(storage)).toBeNull()
+    })
+  })
+
+  // ─── leaveGroup ───────────────────────────────────────────────────────────────
+
+  describe('leaveGroup', () => {
+    it('calls kvGroupLeave and clears local group state', async () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice', 'bob'], joinedAt: 1000 }, storage)
+      await leaveGroup(storage)
+      expect(mockedKvGroupLeave).toHaveBeenCalledWith('grp_1')
+      expect(getLocalGroup(storage)).toBeNull()
+    })
+
+    it('removes citations owned by other group members', async () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice', 'bob'], joinedAt: 1000 }, storage)
+      const ownCitation: Citation = { id: 'c1', text: 'mine', author: 'A', usedInListIds: [], createdByUsername: 'alice' }
+      const partnerCitation: Citation = { id: 'c2', text: 'partner', author: 'B', usedInListIds: [], createdByUsername: 'bob' }
+      storage.setItem('citations', JSON.stringify([ownCitation, partnerCitation]))
+
+      await leaveGroup(storage)
 
       const stored = JSON.parse(storage.getItem('citations') ?? '[]') as Citation[]
-      expect(stored).toHaveLength(1)
-      expect(stored[0].id).toBe('c1')
+      expect(stored.find(c => c.id === 'c1')).toBeDefined()
+      expect(stored.find(c => c.id === 'c2')).toBeUndefined()
     })
-  })
 
-  describe('declineShareRequest', () => {
-    it('removes the local incoming request', () => {
-      setLocalIncomingRequest({ fromUsername: 'bob', sentAt: 1000 })
-      declineShareRequest()
-      expect(getLocalIncomingRequest()).toBeNull()
+    it('keeps citations with undefined createdByUsername (legacy)', async () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice', 'bob'], joinedAt: 1000 }, storage)
+      const legacyCitation: Citation = { id: 'c3', text: 'legacy', author: 'L', usedInListIds: [] }
+      storage.setItem('citations', JSON.stringify([legacyCitation]))
+
+      await leaveGroup(storage)
+
+      const stored = JSON.parse(storage.getItem('citations') ?? '[]') as Citation[]
+      expect(stored.find(c => c.id === 'c3')).toBeDefined()
     })
-  })
 
-  describe('stopSharing', () => {
-    it('clears status, delete log, and outgoing request', () => {
-      setShareStatus({ partnerUsername: 'bob', since: 1000 })
-      appendToDeleteLog('c1')
-      setOutgoingRequest({ toUsername: 'carol', sentAt: 2000 })
+    it('clears delete log and outgoing invitation', async () => {
+      setLocalGroup({ groupId: 'grp_1', members: ['alice'], joinedAt: 1000 }, storage)
+      appendToDeleteLog('c1', storage)
+      setOutgoingInvitation({ toUsername: 'bob', groupId: 'grp_1', sentAt: 2000 }, storage)
 
-      stopSharing()
+      await leaveGroup(storage)
 
-      expect(getShareStatus()).toBeNull()
-      expect(getDeleteLog()).toEqual([])
-      expect(getOutgoingRequest()).toBeNull()
+      expect(getDeleteLog(storage)).toEqual([])
+      expect(getOutgoingInvitation(storage)).toBeNull()
+    })
+
+    it('does nothing when not in a group', async () => {
+      await leaveGroup(storage)
+      expect(mockedKvGroupLeave).not.toHaveBeenCalled()
     })
   })
 })

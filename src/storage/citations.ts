@@ -1,6 +1,6 @@
 import type { Citation } from '../types'
 import { kvSet, kvDel } from './cloudStorage'
-import { getShareStatus, appendToDeleteLog } from './citationShare'
+import { getLocalGroup, appendToDeleteLog } from './citationShare'
 
 const KEY = 'citations'
 
@@ -31,7 +31,7 @@ export function upsertCitation(citation: Citation, storage: Storage = window.loc
 }
 
 export function deleteCitation(id: string, storage: Storage = window.localStorage): void {
-  if (getShareStatus(storage) !== null) {
+  if (getLocalGroup(storage) !== null) {
     appendToDeleteLog(id, storage)
   }
   saveCitations(getCitations(storage).filter(c => c.id !== id), storage)

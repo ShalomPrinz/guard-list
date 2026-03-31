@@ -2,16 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getCitations, upsertCitation, deleteCitation } from '../storage/citations'
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
-import {
-  getShareStatus,
-  getOutgoingRequest,
-  clearOutgoingRequest,
-  stopSharing,
-  sendShareRequest,
-} from '../storage/citationShare'
 import { kvListGuestCitations, kvDeleteGuestCitation } from '../storage/cloudStorage'
 import { getUsername } from '../storage/userStorage'
-import type { CitationShareStatus, GuestCitationSubmission } from '../types'
+import type { GuestCitationSubmission } from '../types'
 import { getGroups } from '../storage/groups'
 import { formatAuthorName } from '../logic/citations'
 import { formatDate } from '../logic/formatting'
@@ -47,14 +40,6 @@ export default function CitationsScreen() {
   // Guest link copy state
   const [linkCopied, setLinkCopied] = useState(false)
 
-  // Share state
-  const [shareStatus, setShareStatus] = useState<CitationShareStatus | null>(() => getShareStatus())
-  const [outgoingRequest, setOutgoingRequest] = useState<{ toUsername: string; sentAt: number } | null>(() => getOutgoingRequest())
-  const [showShareModal, setShowShareModal] = useState(false)
-  const [shareInput, setShareInput] = useState('')
-  const [shareError, setShareError] = useState<string | null>(null)
-  const [shareLoading, setShareLoading] = useState(false)
-
   function handleCopyGuestLink() {
     const username = getUsername()
     if (!username) return
@@ -63,42 +48,6 @@ export default function CitationsScreen() {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)
     })
-  }
-
-  function refreshShareState() {
-    setShareStatus(getShareStatus())
-    setOutgoingRequest(getOutgoingRequest())
-  }
-
-  useEffect(() => {
-    const handler = () => refreshShareState()
-    window.addEventListener('storage', handler)
-    return () => window.removeEventListener('storage', handler)
-  }, [])
-
-  async function handleSendShareRequest() {
-    const trimmed = shareInput.trim()
-    if (!trimmed) return
-    setShareLoading(true)
-    setShareError(null)
-    const result = await sendShareRequest(trimmed)
-    setShareLoading(false)
-    if (result === 'sent') {
-      setShowShareModal(false)
-      setShareInput('')
-      refreshShareState()
-    } else if (result === 'own_namespace') {
-      setShareError('לא ניתן לשתף אוסף עם עצמך')
-    } else if (result === 'already_have_outgoing') {
-      setShareError('כבר יש בקשת שיתוף פתוחה')
-    } else if (result === 'target_has_pending') {
-      setShareError('למשתמש זה כבר יש בקשה ממתינה')
-    } else if (result === 'already_sharing') {
-      setShareError('כבר משותף עם משתמש זה')
-      refreshShareState()
-    } else {
-      setShareError('שגיאה בשליחה — נסה שוב')
-    }
   }
 
   const allMembers: Member[] = getGroups().flatMap(g => g.members)
@@ -253,50 +202,6 @@ export default function CitationsScreen() {
           {selectionMode ? 'בחר ציטוט' : 'ציטוטים'}
         </h1>
       </div>
-
-      {/* Share status panel (non-selection mode only) */}
-      {!selectionMode && (
-        <div className="mb-4 rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
-          {shareStatus !== null ? (
-            // State C: sharing active
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
-                <span className="truncate text-sm text-gray-700 dark:text-gray-300">
-                  שיתוף פעיל עם <span className="font-semibold">{shareStatus.partnerUsername}</span>
-                </span>
-              </div>
-              <button
-                onClick={() => { stopSharing(); refreshShareState() }}
-                className="min-h-[44px] shrink-0 rounded-xl border border-red-300 px-3 text-sm font-medium text-red-600 active:bg-red-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
-              >
-                הפסק שיתוף
-              </button>
-            </div>
-          ) : outgoingRequest !== null ? (
-            // State B: outgoing request pending
-            <div className="flex items-center justify-between gap-3">
-              <span className="truncate text-sm text-gray-500 dark:text-gray-400">
-                בקשת שיתוף נשלחה ל-<span className="font-medium">{outgoingRequest.toUsername}</span>
-              </span>
-              <button
-                onClick={() => { clearOutgoingRequest(); refreshShareState() }}
-                className="min-h-[44px] shrink-0 px-2 text-sm text-blue-600 underline dark:text-blue-400"
-              >
-                בטל בקשה
-              </button>
-            </div>
-          ) : (
-            // State A: not sharing
-            <button
-              onClick={() => { setShareInput(''); setShareError(null); setShowShareModal(true) }}
-              className="min-h-[44px] w-full rounded-xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
-            >
-              שתף אוסף
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Guest link section (non-selection mode only) */}
       {!selectionMode && (
@@ -568,28 +473,6 @@ export default function CitationsScreen() {
         </Modal>
       )}
 
-      {/* Send share request modal */}
-      {showShareModal && (
-        <Modal onClose={() => setShowShareModal(false)} title="שיתוף אוסף ציטוטים">
-          <input
-            value={shareInput}
-            onChange={e => setShareInput(e.target.value)}
-            placeholder="שם משתמש..."
-            dir="rtl"
-            className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
-          />
-          {shareError && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{shareError}</p>
-          )}
-          <button
-            onClick={handleSendShareRequest}
-            disabled={shareLoading || !shareInput.trim()}
-            className="mt-4 min-h-[44px] w-full rounded-2xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700 disabled:opacity-50"
-          >
-            {shareLoading ? 'שולח...' : 'שלח בקשה'}
-          </button>
-        </Modal>
-      )}
     </div>
   )
 }

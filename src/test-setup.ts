@@ -8,7 +8,11 @@ vi.mock('./storage/cloudStorage', () => ({
   kvDel: vi.fn().mockResolvedValue(undefined),
   kvList: vi.fn().mockResolvedValue([]),
   kvCrossSet: vi.fn().mockResolvedValue('ok'),
-  kvCrossReadPartner: vi.fn().mockResolvedValue(null),
+  kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
+  kvGroupCreate: vi.fn().mockResolvedValue(null),
+  kvGroupJoin: vi.fn().mockResolvedValue('ok'),
+  kvGroupLeave: vi.fn().mockResolvedValue('ok'),
+  kvGroupGetMembers: vi.fn().mockResolvedValue(null),
   isKvAvailable: false,
 }))
 

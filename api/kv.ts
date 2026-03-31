@@ -208,16 +208,16 @@ export default async function handler(req: Request): Promise<Response> {
         return json({ error: "Cannot cross-write to own namespace" }, 400);
       }
       const key = body.key as string;
-      // SECURITY: Strict allowlist — only these two sub-keys may be written cross-namespace.
-      const ALLOWED_CROSS_KEYS = ["share:incomingRequest", "share:acceptNotification"] as const;
+      // SECURITY: Strict allowlist — only these sub-keys may be written cross-namespace.
+      const ALLOWED_CROSS_KEYS = ["share:groupInvitation", "share:acceptNotification", "share:rejectionNotification"] as const;
       if (!ALLOWED_CROSS_KEYS.includes(key as (typeof ALLOWED_CROSS_KEYS)[number])) {
         return json({ error: "Key not allowed for cross-write" }, 403);
       }
-      // Enforce one-open-request-at-a-time rule for incomingRequest key.
-      if (key === "share:incomingRequest") {
-        const existing = await kv.get(`${targetUsername}:share:incomingRequest`);
+      // Enforce one-open-invitation-at-a-time rule for groupInvitation key.
+      if (key === "share:groupInvitation") {
+        const existing = await kv.get(`${targetUsername}:share:groupInvitation`);
         if (existing !== null) {
-          return json({ error: "Target already has a pending request" }, 409);
+          return json({ error: "Target already has a pending invitation" }, 409);
         }
       }
       await kv.set(`${targetUsername}:${key}`, body.value);
@@ -230,10 +230,11 @@ export default async function handler(req: Request): Promise<Response> {
       if (!isValidUsername(partnerUsername)) {
         return json({ error: "Invalid partnerUsername" }, 400);
       }
-      // SECURITY: Consent check — partner must have set their share:partner key to the caller's username.
-      const partnerConsent = await kv.get(`${partnerUsername}:share:partner`);
-      if (partnerConsent !== username) {
-        return json({ error: "Not authorized" }, 403);
+      // SECURITY: Group-based consent check — both users must be in the same sharing group.
+      const callerGroupId = await kv.get(`${username}:share:groupId`);
+      const targetGroupId = await kv.get(`${partnerUsername}:share:groupId`);
+      if (!callerGroupId || !targetGroupId || callerGroupId !== targetGroupId) {
+        return json({ error: "not in same group" }, 403);
       }
       try {
         // Scan all citations for the partner.
@@ -253,6 +254,63 @@ export default async function handler(req: Request): Promise<Response> {
       } catch {
         return json({ error: "Internal server error" }, 500);
       }
+    }
+
+    if (action === "groupCreate") {
+      const existing = await kv.get(`${username}:share:groupId`);
+      if (existing !== null) {
+        return json({ error: "Already in a group" }, 400);
+      }
+      const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await kv.set(`group:${groupId}:members`, JSON.stringify([username]));
+      await kv.set(`${username}:share:groupId`, groupId);
+      return json({ groupId });
+    }
+
+    if (action === "groupJoin") {
+      const groupId = typeof body.groupId === "string" ? body.groupId : "";
+      if (!groupId) return json({ error: "Missing groupId" }, 400);
+      const existing = await kv.get(`${username}:share:groupId`);
+      if (existing !== null) {
+        return json({ error: "Already in a group" }, 400);
+      }
+      const membersRaw = await kv.get(`group:${groupId}:members`);
+      if (membersRaw === null) return json({ error: "Group not found" }, 404);
+      const members: string[] = JSON.parse(membersRaw as string);
+      members.push(username);
+      await kv.set(`group:${groupId}:members`, JSON.stringify(members));
+      await kv.set(`${username}:share:groupId`, groupId);
+      return json({ ok: true });
+    }
+
+    if (action === "groupLeave") {
+      const groupId = typeof body.groupId === "string" ? body.groupId : "";
+      if (!groupId) return json({ error: "Missing groupId" }, 400);
+      const storedGroupId = await kv.get(`${username}:share:groupId`);
+      if (storedGroupId !== groupId) {
+        return json({ error: "Not in this group" }, 403);
+      }
+      const membersRaw = await kv.get(`group:${groupId}:members`);
+      if (membersRaw !== null) {
+        const members: string[] = JSON.parse(membersRaw as string);
+        const updated = members.filter(m => m !== username);
+        await kv.set(`group:${groupId}:members`, JSON.stringify(updated));
+      }
+      await kv.del(`${username}:share:groupId`);
+      return json({ ok: true });
+    }
+
+    if (action === "groupGetMembers") {
+      const groupId = typeof body.groupId === "string" ? body.groupId : "";
+      if (!groupId) return json({ error: "Missing groupId" }, 400);
+      const storedGroupId = await kv.get(`${username}:share:groupId`);
+      if (storedGroupId !== groupId) {
+        return json({ error: "Not in this group" }, 403);
+      }
+      const membersRaw = await kv.get(`group:${groupId}:members`);
+      if (membersRaw === null) return json({ error: "Group not found" }, 404);
+      const members: string[] = JSON.parse(membersRaw as string);
+      return json({ members });
     }
 
     return json({ error: "Unknown action" }, 400);

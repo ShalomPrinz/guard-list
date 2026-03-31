@@ -61,6 +61,7 @@ export interface Citation {
   text: string;
   author: string; // stored as formatted string, e.g. "י. ישראלי"
   usedInListIds: string[]; // schedule ids where this citation was used
+  createdByUsername?: string; // undefined = legacy, treated as owned by current user
 }
 
 export interface GuestCitationSubmission {
@@ -72,12 +73,14 @@ export interface GuestCitationSubmission {
 
 // ─── Citation Sharing ─────────────────────────────────────────────────────────
 
-export interface CitationShareStatus {
-  partnerUsername: string
-  since: number // ms timestamp
+export interface SharingGroup {
+  groupId: string
+  members: string[] // all current member usernames including self
+  joinedAt: number
 }
 
-export interface CitationShareRequest {
+export interface GroupInvitation {
+  groupId: string
   fromUsername: string
   sentAt: number
 }

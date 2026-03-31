@@ -1,57 +1,63 @@
-import type { CitationShareStatus, CitationShareRequest } from '../types'
-import { kvSet, kvDel, kvCrossSet } from './cloudStorage'
+import type { SharingGroup, GroupInvitation } from '../types'
+import { kvSet, kvDel } from './cloudStorage'
 import { getUsername } from './userStorage'
-import { getCitations, upsertCitation } from './citations'
+import { getCitations, deleteCitationSilent } from './citations'
 
-const KEY_STATUS = 'share:status'
-const KEY_OUTGOING = 'share:outgoingRequest'
-const KEY_INCOMING = 'share:incomingRequest'
+const KEY_GROUP = 'share:group'
+const KEY_GROUP_INVITATION = 'share:groupInvitation'
+const KEY_OUTGOING_INVITATION = 'share:outgoingInvitation'
 const KEY_DELETE_LOG = 'share:deleteLog'
 
-export function getShareStatus(storage: Storage = window.localStorage): CitationShareStatus | null {
-  const raw = storage.getItem(KEY_STATUS)
+// ─── share:group ─────────────────────────────────────────────────────────────
+
+export function getLocalGroup(storage: Storage = window.localStorage): SharingGroup | null {
+  const raw = storage.getItem(KEY_GROUP)
   if (!raw) return null
-  try { return JSON.parse(raw) as CitationShareStatus } catch { return null }
+  try { return JSON.parse(raw) as SharingGroup } catch { return null }
 }
 
-export function setShareStatus(status: CitationShareStatus, storage: Storage = window.localStorage): void {
-  storage.setItem(KEY_STATUS, JSON.stringify(status))
-  void kvSet('share:partner', status.partnerUsername)
+export function setLocalGroup(group: SharingGroup, storage: Storage = window.localStorage): void {
+  storage.setItem(KEY_GROUP, JSON.stringify(group))
 }
 
-export function clearShareStatus(storage: Storage = window.localStorage): void {
-  storage.removeItem(KEY_STATUS)
-  void kvDel('share:partner')
+/** Clears local group state only — does NOT call KV. Group leave is done via kvGroupLeave(). */
+export function clearLocalGroup(storage: Storage = window.localStorage): void {
+  storage.removeItem(KEY_GROUP)
 }
 
-export function getOutgoingRequest(storage: Storage = window.localStorage): { toUsername: string; sentAt: number } | null {
-  const raw = storage.getItem(KEY_OUTGOING)
+// ─── share:groupInvitation ───────────────────────────────────────────────────
+
+export function getLocalGroupInvitation(storage: Storage = window.localStorage): GroupInvitation | null {
+  const raw = storage.getItem(KEY_GROUP_INVITATION)
+  if (!raw) return null
+  try { return JSON.parse(raw) as GroupInvitation } catch { return null }
+}
+
+export function setLocalGroupInvitation(inv: GroupInvitation, storage: Storage = window.localStorage): void {
+  storage.setItem(KEY_GROUP_INVITATION, JSON.stringify(inv))
+}
+
+export function clearLocalGroupInvitation(storage: Storage = window.localStorage): void {
+  storage.removeItem(KEY_GROUP_INVITATION)
+}
+
+// ─── share:outgoingInvitation ─────────────────────────────────────────────────
+
+export function getOutgoingInvitation(storage: Storage = window.localStorage): { toUsername: string; groupId: string; sentAt: number } | null {
+  const raw = storage.getItem(KEY_OUTGOING_INVITATION)
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
 }
 
-export function setOutgoingRequest(req: { toUsername: string; sentAt: number }, storage: Storage = window.localStorage): void {
-  storage.setItem(KEY_OUTGOING, JSON.stringify(req))
+export function setOutgoingInvitation(inv: { toUsername: string; groupId: string; sentAt: number }, storage: Storage = window.localStorage): void {
+  storage.setItem(KEY_OUTGOING_INVITATION, JSON.stringify(inv))
 }
 
-export function clearOutgoingRequest(storage: Storage = window.localStorage): void {
-  storage.removeItem(KEY_OUTGOING)
+export function clearOutgoingInvitation(storage: Storage = window.localStorage): void {
+  storage.removeItem(KEY_OUTGOING_INVITATION)
 }
 
-export function getLocalIncomingRequest(storage: Storage = window.localStorage): CitationShareRequest | null {
-  const raw = storage.getItem(KEY_INCOMING)
-  if (!raw) return null
-  try { return JSON.parse(raw) as CitationShareRequest } catch { return null }
-}
-
-export function setLocalIncomingRequest(req: CitationShareRequest, storage: Storage = window.localStorage): void {
-  storage.setItem(KEY_INCOMING, JSON.stringify(req))
-}
-
-export function clearLocalIncomingRequest(storage: Storage = window.localStorage): void {
-  storage.removeItem(KEY_INCOMING)
-  void kvDel('share:incomingRequest')
-}
+// ─── share:deleteLog ──────────────────────────────────────────────────────────
 
 export function getDeleteLog(storage: Storage = window.localStorage): string[] {
   const raw = storage.getItem(KEY_DELETE_LOG)
@@ -71,73 +77,131 @@ export function clearDeleteLog(storage: Storage = window.localStorage): void {
   void kvDel('share:deleteLog')
 }
 
-export async function sendShareRequest(
+// ─── Group operations ─────────────────────────────────────────────────────────
+
+export async function sendGroupInvitation(
   targetUsername: string,
   storage: Storage = window.localStorage,
-): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'already_sharing' | 'own_namespace' | 'error'> {
-  if (getOutgoingRequest(storage) !== null) return 'already_have_outgoing'
-  if (getShareStatus(storage) !== null) return 'already_sharing'
+): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'own_namespace' | 'error'> {
+  if (getOutgoingInvitation(storage) !== null) return 'already_have_outgoing'
 
   const currentUser = getUsername()
   if (!currentUser) return 'error'
 
   const normalized = targetUsername.toLowerCase()
   if (normalized === currentUser.toLowerCase()) return 'own_namespace'
-  const result = await kvCrossSet(normalized, 'share:incomingRequest', {
+
+  const { kvGroupCreate, kvCrossSet } = await import('./cloudStorage')
+
+  // If no group yet, create one
+  let groupId: string
+  const existing = getLocalGroup(storage)
+  if (existing !== null) {
+    groupId = existing.groupId
+  } else {
+    const created = await kvGroupCreate()
+    if (!created) return 'error'
+    groupId = created.groupId
+    setLocalGroup({ groupId, members: [currentUser], joinedAt: Date.now() }, storage)
+  }
+
+  const sentAt = Date.now()
+  const result = await kvCrossSet(normalized, 'share:groupInvitation', {
+    groupId,
     fromUsername: currentUser,
-    sentAt: Date.now(),
+    sentAt,
   })
 
   if (result === 'already_pending') return 'target_has_pending'
   if (result === 'error') return 'error'
 
-  setOutgoingRequest({ toUsername: normalized, sentAt: Date.now() }, storage)
+  setOutgoingInvitation({ toUsername: normalized, groupId, sentAt }, storage)
   return 'sent'
 }
 
-export async function acceptShareRequest(
-  fromUsername: string,
+export async function acceptGroupInvitation(
+  invitation: GroupInvitation,
   storage: Storage = window.localStorage,
 ): Promise<void> {
-  setShareStatus({ partnerUsername: fromUsername, since: Date.now() }, storage)
-  clearLocalIncomingRequest(storage)
-
   const currentUser = getUsername()
-  if (currentUser) {
-    void kvCrossSet(fromUsername, 'share:acceptNotification', {
-      byUsername: currentUser,
-      at: Date.now(),
-    })
+  if (!currentUser) return
+
+  const { kvGroupJoin, kvGroupGetMembers, kvCrossSet, kvCrossReadGroupMember } = await import('./cloudStorage')
+
+  const joinResult = await kvGroupJoin(invitation.groupId)
+  if (joinResult !== 'ok') return
+
+  const members = await kvGroupGetMembers(invitation.groupId)
+  if (members !== null) {
+    setLocalGroup({ groupId: invitation.groupId, members, joinedAt: Date.now() }, storage)
   }
 
-  // Initial pull from partner
-  const { kvCrossReadPartner } = await import('./cloudStorage')
+  clearLocalGroupInvitation(storage)
+
+  void kvCrossSet(invitation.fromUsername, 'share:acceptNotification', {
+    byUsername: currentUser,
+    groupId: invitation.groupId,
+    at: Date.now(),
+  })
+
+  // Initial citation pull from all other group members
+  const otherMembers = (members ?? []).filter(m => m !== currentUser)
+  for (const member of otherMembers) {
+    try {
+      const result = await kvCrossReadGroupMember(member)
+      if (result !== null) {
+        const { upsertCitation } = await import('./citations')
+        const localIds = new Set(getCitations(storage).map(c => c.id))
+        for (const citation of result.citations) {
+          if (!localIds.has(citation.id)) {
+            upsertCitation(citation, storage)
+          }
+        }
+        const updatedIds = new Set(getCitations(storage).map(c => c.id))
+        for (const deletedId of result.deleteLog) {
+          if (updatedIds.has(deletedId)) {
+            deleteCitationSilent(deletedId, storage)
+          }
+        }
+      }
+    } catch { /* silent */ }
+  }
+}
+
+export async function declineGroupInvitation(
+  invitation: GroupInvitation,
+  storage: Storage = window.localStorage,
+): Promise<void> {
+  const currentUser = getUsername()
+  clearLocalGroupInvitation(storage)
+  if (!currentUser) return
   try {
-    const result = await kvCrossReadPartner(fromUsername)
-    if (result !== null) {
-      const localIds = new Set(getCitations(storage).map(c => c.id))
-      for (const citation of result.citations) {
-        if (!localIds.has(citation.id)) {
-          upsertCitation(citation, storage)
-        }
-      }
-      const { deleteCitationSilent } = await import('./citations')
-      const updatedIds = new Set(getCitations(storage).map(c => c.id))
-      for (const deletedId of result.deleteLog) {
-        if (updatedIds.has(deletedId)) {
-          deleteCitationSilent(deletedId, storage)
-        }
-      }
-    }
+    const { kvCrossSet } = await import('./cloudStorage')
+    void kvCrossSet(invitation.fromUsername, 'share:rejectionNotification', {
+      byUsername: currentUser,
+      groupId: invitation.groupId,
+      at: Date.now(),
+    })
   } catch { /* silent */ }
 }
 
-export function declineShareRequest(storage: Storage = window.localStorage): void {
-  clearLocalIncomingRequest(storage)
-}
+export async function leaveGroup(storage: Storage = window.localStorage): Promise<void> {
+  const group = getLocalGroup(storage)
+  if (!group) return
 
-export function stopSharing(storage: Storage = window.localStorage): void {
-  clearShareStatus(storage)
+  const { kvGroupLeave } = await import('./cloudStorage')
+  await kvGroupLeave(group.groupId)
+
+  // Remove citations owned by other group members
+  const currentUser = getUsername()
+  const citations = getCitations(storage)
+  for (const citation of citations) {
+    if (citation.createdByUsername !== undefined && citation.createdByUsername !== currentUser) {
+      deleteCitationSilent(citation.id, storage)
+    }
+  }
+
+  clearLocalGroup(storage)
   clearDeleteLog(storage)
-  clearOutgoingRequest(storage)
+  clearOutgoingInvitation(storage)
 }

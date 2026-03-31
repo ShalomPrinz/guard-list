@@ -41,7 +41,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 ## Data Model — Key Types
 
 - `Member` has: `id`, `name`, `availability: "base" | "home"`, `role: "commander" | "warrior"` (default `"warrior"`).
-- `Citation` has: `id`, `text`, `author` (formatted string), `usedInListIds: string[]`.
+- `Citation` has: `id`, `text`, `author` (formatted string), `usedInListIds: string[]`, `createdByUsername?: string` (undefined = legacy, treated as owned by current user).
 - `GuestCitationSubmission` has: `id`, `text`, `author`, `submittedAt` (ms timestamp). Stored in KV at `{username}:guestCitations:{id}`. Never in localStorage — fetched on demand via `kvListGuestCitations()`.
 - `citationAuthorLinks` in localStorage maps `authorString → memberId` for statistics attribution.
 - `Schedule` has `parentScheduleId?: string` when it is a continued round.
@@ -161,7 +161,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - **UniteScreen:** merges two schedules per station sorted by full datetime. Uses earlier schedule's name and citation. Never saved to localStorage.
 - **StatisticsScreen:** two tabs — "זמני שמירה" (guard time table) and "ציטוטים" (citation counts). Citation tab headers: "?באוסף" and "?שומש". Citation attribution uses `citationAuthorLinks` map, not name string matching.
 - **FallbackScreen:** route `/fallback`. Self-contained — no `Layout` or `Header` wrapper. Uses `fixed inset-0` full-screen, tap-anywhere-to-home. Shown when a wizard step guard fires (no active session). Never use as a general 404 — the `*` catch-all route still redirects to `/`.
-- **App routing structure:** `BrowserRouter` wraps everything. Top-level `Routes` has `/guest/:username → GuestCitationsScreen` (public, no auth) and `* → AuthenticatedApp`. `AuthenticatedApp` is a component inside `App.tsx` that owns the `UsernameGate` check, `syncFromCloud`, `IncomingShareRequestModal`, `WizardProvider`, and all authenticated routes. Never move `BrowserRouter` back inside the authenticated branch — the guest route must be reachable without a username.
+- **App routing structure:** `BrowserRouter` wraps everything. Top-level `Routes` has `/guest/:username → GuestCitationsScreen` (public, no auth) and `* → AuthenticatedApp`. `AuthenticatedApp` is a component inside `App.tsx` that owns the `UsernameGate` check, `syncFromCloud`, `WizardProvider`, and all authenticated routes. Never move `BrowserRouter` back inside the authenticated branch — the guest route must be reachable without a username.
 - **ErrorScreen:** self-contained full-screen (`fixed inset-0`), no `Layout` or `Header`. Shows "שגיאה!" in `text-red-500 dark:text-red-400` and a Hebrew apology message. Click-anywhere navigates via `window.location.href = '/'` — never `useNavigate`, because it may render outside Router context. Rendered exclusively by `ErrorBoundary`.
 - **ErrorBoundary:** class component at `src/components/ErrorBoundary.tsx`. Wraps the entire app in `src/main.tsx`, outside `App` (which contains `BrowserRouter`) so it catches router-level errors too. Uses `getDerivedStateFromError` + `componentDidCatch` (logs to console and fires `kvSet(`errors:${Date.now()}`, AppErrorReport)` as a fire-and-forget KV write). Currently there are no per-screen error boundaries — one global boundary only.
 
@@ -174,16 +174,18 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Random citation selection skips citations where `usedInListIds` contains any existing schedule id. If all used, picks least recently used.
 - Citation used in a confirmed schedule: add schedule id to `usedInListIds` and save.
 
-### Citation Sharing
+### Citation Sharing — Group Model
 
-- Citation sharing state is managed exclusively through `src/storage/citationShare.ts`. Never read/write share localStorage keys directly from components or other storage modules.
-- `sendShareRequest` full return type: `'sent' | 'already_have_outgoing' | 'target_has_pending' | 'already_sharing' | 'own_namespace' | 'error'`. Every case must be handled in the UI with a plain Hebrew message — never point users to the console. `'own_namespace'` is returned (without a network call) when the target username matches the current user. `'already_sharing'` is returned (not `'error'`) when `getShareStatus() !== null` — `CitationsScreen` shows "כבר משותף עם משתמש זה" and calls `refreshShareState()` to re-sync UI with localStorage.
-- `CitationsScreen` listens for `window` `storage` events to keep share state in sync when `syncFromCloud` writes to localStorage in the background. Any screen that displays share state must use this pattern.
-- Share status in localStorage key `share:status` (type `CitationShareStatus`). Mirrored to KV as `{username}:share:partner` so the server can enforce consent in `crossRead`.
-- Delete log (`share:deleteLog`) records citation ids deleted while sharing is active. `deleteCitation` in `citations.ts` appends to this log automatically when `getShareStatus()` is non-null. `deleteCitationSilent` bypasses the log — use it only when applying a partner's delete log to avoid re-logging.
-- `acceptShareRequest` and the inner `deleteCitationSilent` call use dynamic imports (`await import('./citations')`) to break a circular dependency (`citations.ts` imports from `citationShare.ts` which imports from `citations.ts`). Static imports of the other direction are fine — only the cycle-closing direction uses dynamic imports.
-- `IncomingShareRequestModal` follows the `UsernameGate` pattern: `fixed inset-0`, full-screen, not an instance of `Modal`. Use this pattern for any full-screen overlay that must block the entire UI but is not a sheet-style modal.
-- `syncFromCloud` runs three share sync blocks in order: (1) accept notification, (2) incoming request, (3) partner pull. Each block is independent and wrapped in its own `try/catch`. If `kvCrossReadPartner` returns `null` in block 3, sharing is stopped locally — the partner revoked consent.
+- Citation sharing uses a multi-member group model. Types: `SharingGroup { groupId, members, joinedAt }`, `GroupInvitation { groupId, fromUsername, sentAt }`. Both defined in `src/types/index.ts`.
+- All sharing localStorage state is managed exclusively through `src/storage/citationShare.ts`. Never read/write `share:*` keys directly from components or other storage modules.
+- localStorage keys: `share:group` (`SharingGroup | null`), `share:groupInvitation` (`GroupInvitation | null`), `share:outgoingInvitation`, `share:deleteLog`.
+- `{username}:share:groupId` is managed server-side by the KV group actions — never written directly by the client via `kvSet`.
+- Delete log (`share:deleteLog`) records citation ids deleted while in a group. `deleteCitation` in `citations.ts` appends to this log automatically when `getLocalGroup() !== null`. `deleteCitationSilent` bypasses the log — use it only when applying a remote delete log to avoid re-logging.
+- Group lifecycle functions in `citationShare.ts`: `sendGroupInvitation`, `acceptGroupInvitation`, `declineGroupInvitation`, `leaveGroup`. These use dynamic imports for cloudStorage group helpers (`kvGroupCreate`, `kvGroupJoin`, etc.) to avoid import cycle issues.
+- `acceptGroupInvitation` and functions that call `upsertCitation`/`deleteCitationSilent` use dynamic imports (`await import('./citations')`) for the cycle-closing direction. Static imports of `getCitations` and `deleteCitationSilent` at the top level are allowed because `citations.ts` → `citationShare.ts` is the base direction.
+- `leaveGroup` removes all citations where `createdByUsername !== undefined && createdByUsername !== currentUser`, then clears local group state. It does NOT call `clearLocalGroup` for the KV side — `kvGroupLeave` handles that server-side.
+- `syncFromCloud` has one share sync block: iterates `group.members` (excluding self) and calls `kvCrossReadGroupMember` for each. Returns null silently — member may have left; Sharing Center handles refresh.
+- `IncomingShareRequestModal` (`src/components/IncomingShareRequestModal.tsx`) follows the `UsernameGate` pattern: `fixed inset-0`, full-screen, not an instance of `Modal`. Use this pattern for any full-screen overlay that must block the entire UI but is not a sheet-style modal.
 
 ---
 
@@ -191,8 +193,9 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 - All KV access goes through `src/storage/cloudStorage.ts`. Never import Upstash Redis directly from components or logic.
 - Raw KV actions (`rawGet`/`rawSet` in `api/kv.ts`) are restricted to keys matching `device:[a-zA-Z0-9_\-.]{1,128}`. Device keys in `UsernameGate.tsx` are constructed as `` `device:${username}` `` — never `` `${username}:device` ``. This ensures raw-action keys structurally cannot overlap with user-namespaced keys (`{username}:*`).
-- Cross-user writes use the `crossSet` action in `api/kv.ts`. Only two sub-keys are allowed: `share:incomingRequest` and `share:acceptNotification`. Any other key returns 403. Use `kvCrossSet` from `cloudStorage.ts` — never call `crossSet` directly.
-- Cross-user reads use the `crossRead` action in `api/kv.ts`. Server enforces consent: it checks that `{partnerUsername}:share:partner` equals the caller's username before returning citations. Use `kvCrossReadPartner` from `cloudStorage.ts`.
+- Cross-user writes use the `crossSet` action in `api/kv.ts`. Allowed sub-keys: `share:groupInvitation`, `share:acceptNotification`, `share:rejectionNotification`. Any other key returns 403. Use `kvCrossSet` from `cloudStorage.ts` — never call `crossSet` directly.
+- Cross-user reads use the `crossRead` action in `api/kv.ts`. Server enforces group-based consent: checks that both `{username}:share:groupId` and `{partnerUsername}:share:groupId` are equal and non-null. Use `kvCrossReadGroupMember` from `cloudStorage.ts` (renamed from old `kvCrossReadPartner`).
+- Group actions (`groupCreate`, `groupJoin`, `groupLeave`, `groupGetMembers`) in `api/kv.ts` manage `group:{groupId}:members` as a raw KV key (not user-namespaced). They also read/write `{username}:share:groupId`. Client helpers: `kvGroupCreate`, `kvGroupJoin`, `kvGroupLeave`, `kvGroupGetMembers` in `cloudStorage.ts`.
 - `kvCrossSet` returns `'ok' | 'already_pending' | 'error'`. The `'already_pending'` case (HTTP 409) means the target already has an open inbound request — callers must handle it. On any other non-ok HTTP status, `kvCrossSet` logs `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'`. This is the only place in `cloudStorage.ts` that reads the raw HTTP status rather than delegating to `callKv`.
 - The internal `callKvRaw` helper in `cloudStorage.ts` exposes the raw `Response` object (not parsed JSON). It exists solely to let `kvCrossSet` inspect the 409 status and read the body on error. Do not use it for any other purpose.
 - The origin check in `api/kv.ts` uses a `Set<string>` populated from `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. If the set is empty (local dev), no restriction applies. Never revert to a single-origin check — `VERCEL_URL` is deployment-scoped and does not match the stable production alias URL.

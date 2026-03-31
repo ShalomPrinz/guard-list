@@ -9,10 +9,11 @@
  *   {username}:citations:{citationId}                 → Citation
  *   {username}:statistics:{participantName}           → ParticipantStats
  *   {username}:prefs:global                           → { theme: 'dark' | 'light' }
- *   {username}:share:partner                          → string (partner's username — written by owner)
- *   {username}:share:incomingRequest                  → { fromUsername: string, sentAt: number } — written via crossSet by requester
- *   {username}:share:acceptNotification               → { byUsername: string, at: number } — written via crossSet by accepting user
- *   {username}:share:deleteLog                        → string[] (citation IDs deleted while sharing active)
+ *   {username}:share:groupId                          → string (groupId — managed server-side by group actions)
+ *   {username}:share:groupInvitation                  → GroupInvitation — written via crossSet by inviting user
+ *   {username}:share:acceptNotification               → { byUsername: string, groupId: string, at: number } — written via crossSet by accepting user
+ *   {username}:share:deleteLog                        → string[] (citation IDs deleted while in a group)
+ *   group:{groupId}:members                           → string[] (all member usernames — managed server-side)
  *
  * All functions catch all errors silently — they never throw.
  * If no username is set, all helpers bail out silently without calling KV.
@@ -143,12 +144,12 @@ export async function kvList(prefix: string): Promise<string[]> {
 
 /**
  * Write a cross-user key into another user's namespace.
- * Only allowed sub-keys: 'share:incomingRequest' and 'share:acceptNotification'.
- * Returns 'already_pending' if the target already has an open incomingRequest.
+ * Allowed sub-keys: 'share:groupInvitation', 'share:acceptNotification', 'share:rejectionNotification'.
+ * Returns 'already_pending' if the target already has an open groupInvitation.
  */
 export async function kvCrossSet(
   targetUsername: string,
-  key: 'share:incomingRequest' | 'share:acceptNotification',
+  key: 'share:groupInvitation' | 'share:acceptNotification' | 'share:rejectionNotification',
   value: unknown,
 ): Promise<'ok' | 'already_pending' | 'error'> {
   const username = getUsername()
@@ -168,11 +169,11 @@ export async function kvCrossSet(
 }
 
 /**
- * Read a partner user's full citations collection.
- * Only succeeds if the partner has set their share:partner key to the current user's username.
- * Returns null on any error (including 403 meaning partner stopped sharing).
+ * Read a group member's full citations collection.
+ * Only succeeds if caller and target are in the same sharing group (verified server-side).
+ * Returns null on any error (including 403 meaning not in same group).
  */
-export async function kvCrossReadPartner(
+export async function kvCrossReadGroupMember(
   partnerUsername: string,
 ): Promise<{ citations: Citation[]; deleteLog: string[] } | null> {
   const username = getUsername()
@@ -183,6 +184,62 @@ export async function kvCrossReadPartner(
       deleteLog: string[];
     }
     return data
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Create a new sharing group. Returns { groupId } on success, null on error.
+ */
+export async function kvGroupCreate(): Promise<{ groupId: string } | null> {
+  const username = getUsername()
+  if (!username) return null
+  try {
+    const data = (await callKv({ action: 'groupCreate', username })) as { groupId: string }
+    return data
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Join an existing sharing group. Returns 'ok' or 'error'.
+ */
+export async function kvGroupJoin(groupId: string): Promise<'ok' | 'error'> {
+  const username = getUsername()
+  if (!username) return 'error'
+  try {
+    await callKv({ action: 'groupJoin', username, groupId })
+    return 'ok'
+  } catch {
+    return 'error'
+  }
+}
+
+/**
+ * Leave a sharing group. Returns 'ok' or 'error'.
+ */
+export async function kvGroupLeave(groupId: string): Promise<'ok' | 'error'> {
+  const username = getUsername()
+  if (!username) return 'error'
+  try {
+    await callKv({ action: 'groupLeave', username, groupId })
+    return 'ok'
+  } catch {
+    return 'error'
+  }
+}
+
+/**
+ * Get all members of a sharing group. Returns null on error or if not authorized.
+ */
+export async function kvGroupGetMembers(groupId: string): Promise<string[] | null> {
+  const username = getUsername()
+  if (!username) return null
+  try {
+    const data = (await callKv({ action: 'groupGetMembers', username, groupId })) as { members: string[] }
+    return data.members
   } catch {
     return null
   }

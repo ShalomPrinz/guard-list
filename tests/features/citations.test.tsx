@@ -341,99 +341,26 @@ describe('StatisticsScreen tabs', () => {
   })
 })
 
-// ─── CitationsScreen: share panel ─────────────────────────────────────────────
+// ─── CitationsScreen: sharing (group model) ───────────────────────────────────
 
-describe('CitationsScreen share panel', () => {
-  it('shows "שתף אוסף" button when not sharing and no outgoing request', () => {
+describe('CitationsScreen sharing (group model)', () => {
+  it('does not show old 1-to-1 share panel UI', () => {
     renderCitations()
-    expect(screen.getByText('שתף אוסף')).toBeTruthy()
-  })
-
-  it('shows outgoing request info when outgoing request is set', () => {
-    localStorage.setItem('share:outgoingRequest', JSON.stringify({ toUsername: 'bob', sentAt: Date.now() }))
-    renderCitations()
-    expect(screen.getByText(/בקשת שיתוף נשלחה ל-/)).toBeTruthy()
-    expect(screen.getByText('בטל בקשה')).toBeTruthy()
-  })
-
-  it('shows active sharing info when share status is set', () => {
-    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: Date.now() }))
-    renderCitations()
-    expect(screen.getByText(/שיתוף פעיל עם/)).toBeTruthy()
-    expect(screen.getByText('הפסק שיתוף')).toBeTruthy()
-  })
-
-  it('opens share request modal on "שתף אוסף" click', async () => {
-    const user = userEvent.setup()
-    renderCitations()
-    await user.click(screen.getByText('שתף אוסף'))
-    expect(screen.getByPlaceholderText('שם משתמש...')).toBeTruthy()
-    expect(screen.getByText('שלח בקשה')).toBeTruthy()
-  })
-
-  it('does not show share panel in selection mode', () => {
-    renderCitations('/citations', { selectionMode: true })
+    // Old share panel buttons should be gone — replaced by Sharing Center screen
     expect(screen.queryByText('שתף אוסף')).toBeNull()
+    expect(screen.queryByText('הפסק שיתוף')).toBeNull()
+    expect(screen.queryByText('בטל בקשה')).toBeNull()
   })
 
-  it('clears outgoing request on "בטל בקשה" click', async () => {
-    const user = userEvent.setup()
-    localStorage.setItem('share:outgoingRequest', JSON.stringify({ toUsername: 'bob', sentAt: Date.now() }))
+  it('shows guest link section in non-selection mode', () => {
     renderCitations()
-    await user.click(screen.getByText('בטל בקשה'))
-    await waitFor(() => {
-      expect(screen.getByText('שתף אוסף')).toBeTruthy()
-    })
+    expect(screen.getByText(/העתק קישור/)).toBeTruthy()
+    expect(screen.getByText(/שתף בוואטסאפ/)).toBeTruthy()
   })
 
-  it('clears share status on "הפסק שיתוף" click', async () => {
-    const user = userEvent.setup()
-    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'bob', since: Date.now() }))
-    renderCitations()
-    await user.click(screen.getByText('הפסק שיתוף'))
-    await waitFor(() => {
-      expect(screen.getByText('שתף אוסף')).toBeTruthy()
-    })
-  })
-
-  it('shows "כבר משותף עם משתמש זה" when sendShareRequest returns already_sharing', async () => {
-    // Simulate: component mounts with no share status, but syncFromCloud writes it
-    // after mount (stale state scenario). sendShareRequest reads localStorage directly
-    // and returns 'already_sharing'.
-    const user = userEvent.setup()
-    renderCitations()
-    await user.click(screen.getByText('שתף אוסף'))
-    // Simulate background write to localStorage (e.g. syncFromCloud)
-    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'carol', since: Date.now() }))
-    await user.type(screen.getByPlaceholderText('שם משתמש...'), 'bob')
-    await user.click(screen.getByText('שלח בקשה'))
-    await waitFor(() => {
-      expect(screen.getByText('כבר משותף עם משתמש זה')).toBeTruthy()
-    })
-  })
-
-  it('shows "לא ניתן לשתף אוסף עם עצמך" when user tries to share with themselves', async () => {
-    setUsername('alice')
-    const user = userEvent.setup()
-    renderCitations()
-    await user.click(screen.getByText('שתף אוסף'))
-    await user.type(screen.getByPlaceholderText('שם משתמש...'), 'alice')
-    await user.click(screen.getByText('שלח בקשה'))
-    await waitFor(() => {
-      expect(screen.getByText('לא ניתן לשתף אוסף עם עצמך')).toBeTruthy()
-    })
-  })
-
-  it('updates share panel when storage event fires', async () => {
-    // Simulate: component mounted without share status, then syncFromCloud in another
-    // module writes share:status and fires a storage event.
-    renderCitations()
-    expect(screen.getByText('שתף אוסף')).toBeTruthy()
-    localStorage.setItem('share:status', JSON.stringify({ partnerUsername: 'dave', since: Date.now() }))
-    window.dispatchEvent(new StorageEvent('storage'))
-    await waitFor(() => {
-      expect(screen.getByText(/שיתוף פעיל עם/)).toBeTruthy()
-    })
+  it('does not show guest link section in selection mode', () => {
+    renderCitations('/citations', { selectionMode: true })
+    expect(screen.queryByText(/העתק קישור/)).toBeNull()
   })
 })
 

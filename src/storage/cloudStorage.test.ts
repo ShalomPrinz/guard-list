@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadPartner, kvListGuestCitations, kvDeleteGuestCitation, kvMGet } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadGroupMember, kvListGuestCitations, kvDeleteGuestCitation, kvMGet, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -358,7 +358,7 @@ describe('cloudStorage', () => {
   describe('kvCrossSet', () => {
     it('returns ok on success', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) }))
-      const result = await kvCrossSet('otheruser', 'share:incomingRequest', { fromUsername: 'testuser', sentAt: 1 })
+      const result = await kvCrossSet('otheruser', 'share:groupInvitation', { groupId: 'grp_1', fromUsername: 'testuser', sentAt: 1 })
       expect(result).toBe('ok')
     })
 
@@ -366,19 +366,19 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
       vi.stubGlobal('fetch', fetchMock)
 
-      await kvCrossSet('otheruser', 'share:acceptNotification', { byUsername: 'testuser', at: 123 })
+      await kvCrossSet('otheruser', 'share:acceptNotification', { byUsername: 'testuser', groupId: 'grp_1', at: 123 })
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
       expect(body.action).toBe('crossSet')
       expect(body.username).toBe('testuser')
       expect(body.targetUsername).toBe('otheruser')
       expect(body.key).toBe('share:acceptNotification')
-      expect(body.value).toEqual({ byUsername: 'testuser', at: 123 })
+      expect(body.value).toEqual({ byUsername: 'testuser', groupId: 'grp_1', at: 123 })
     })
 
     it('returns already_pending on HTTP 409', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({ error: 'Target already has a pending request' }) }))
-      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({ error: 'Target already has a pending invitation' }) }))
+      const result = await kvCrossSet('otheruser', 'share:groupInvitation', {})
       expect(result).toBe('already_pending')
     })
 
@@ -390,14 +390,14 @@ describe('cloudStorage', () => {
         json: () => Promise.resolve({ error: 'Key not allowed' }),
       }))
       const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      const result = await kvCrossSet('otheruser', 'share:groupInvitation', {})
       expect(result).toBe('error')
       expect(spy).toHaveBeenCalledWith('[kv] crossSet failed: HTTP', 403, '{"error":"Key not allowed"}')
     })
 
     it('returns error on network failure', async () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
-      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      const result = await kvCrossSet('otheruser', 'share:groupInvitation', {})
       expect(result).toBe('error')
     })
 
@@ -407,21 +407,21 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn()
       vi.stubGlobal('fetch', fetchMock)
 
-      const result = await kvCrossSet('otheruser', 'share:incomingRequest', {})
+      const result = await kvCrossSet('otheruser', 'share:groupInvitation', {})
 
       expect(result).toBe('error')
       expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 
-  describe('kvCrossReadPartner', () => {
+  describe('kvCrossReadGroupMember', () => {
     it('returns citations and deleteLog on success', async () => {
       const payload = {
         citations: [{ id: 'c1', text: 'quote', author: 'א. בן', usedInListIds: [] }],
         deleteLog: ['c2'],
       }
       mockFetch(payload)
-      const result = await kvCrossReadPartner('partneruser')
+      const result = await kvCrossReadGroupMember('partneruser')
       expect(result).toEqual(payload)
     })
 
@@ -429,7 +429,7 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ citations: [], deleteLog: [] }) })
       vi.stubGlobal('fetch', fetchMock)
 
-      await kvCrossReadPartner('partneruser')
+      await kvCrossReadGroupMember('partneruser')
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
       expect(body.action).toBe('crossRead')
@@ -437,15 +437,15 @@ describe('cloudStorage', () => {
       expect(body.partnerUsername).toBe('partneruser')
     })
 
-    it('returns null on HTTP 403 (partner stopped sharing)', async () => {
-      mockFetch({ error: 'Not authorized' }, false)
-      const result = await kvCrossReadPartner('partneruser')
+    it('returns null on HTTP 403 (not in same group)', async () => {
+      mockFetch({ error: 'not in same group' }, false)
+      const result = await kvCrossReadGroupMember('partneruser')
       expect(result).toBeNull()
     })
 
     it('returns null on network failure', async () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
-      const result = await kvCrossReadPartner('partneruser')
+      const result = await kvCrossReadGroupMember('partneruser')
       expect(result).toBeNull()
     })
 
@@ -455,10 +455,107 @@ describe('cloudStorage', () => {
       const fetchMock = vi.fn()
       vi.stubGlobal('fetch', fetchMock)
 
-      const result = await kvCrossReadPartner('partneruser')
+      const result = await kvCrossReadGroupMember('partneruser')
 
       expect(result).toBeNull()
       expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('kvGroupCreate', () => {
+    it('returns groupId on success', async () => {
+      mockFetch({ groupId: 'grp_test_abc' })
+      const result = await kvGroupCreate()
+      expect(result).toEqual({ groupId: 'grp_test_abc' })
+    })
+
+    it('sends correct action and username', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ groupId: 'grp_1' }) })
+      vi.stubGlobal('fetch', fetchMock)
+      await kvGroupCreate()
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('groupCreate')
+      expect(body.username).toBe('testuser')
+    })
+
+    it('returns null on HTTP error', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGroupCreate()
+      expect(result).toBeNull()
+    })
+
+    it('returns null when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const result = await kvGroupCreate()
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('kvGroupJoin', () => {
+    it('returns ok on success', async () => {
+      mockFetch({ ok: true })
+      const result = await kvGroupJoin('grp_test')
+      expect(result).toBe('ok')
+    })
+
+    it('returns error on HTTP error', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGroupJoin('grp_test')
+      expect(result).toBe('error')
+    })
+
+    it('returns error when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const result = await kvGroupJoin('grp_test')
+      expect(result).toBe('error')
+    })
+  })
+
+  describe('kvGroupLeave', () => {
+    it('returns ok on success', async () => {
+      mockFetch({ ok: true })
+      const result = await kvGroupLeave('grp_test')
+      expect(result).toBe('ok')
+    })
+
+    it('returns error on HTTP error', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGroupLeave('grp_test')
+      expect(result).toBe('error')
+    })
+
+    it('returns error when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const result = await kvGroupLeave('grp_test')
+      expect(result).toBe('error')
+    })
+  })
+
+  describe('kvGroupGetMembers', () => {
+    it('returns members array on success', async () => {
+      mockFetch({ members: ['alice', 'bob'] })
+      const result = await kvGroupGetMembers('grp_test')
+      expect(result).toEqual(['alice', 'bob'])
+    })
+
+    it('returns null on HTTP error', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGroupGetMembers('grp_test')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const result = await kvGroupGetMembers('grp_test')
+      expect(result).toBeNull()
     })
   })
 
