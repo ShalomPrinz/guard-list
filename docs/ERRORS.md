@@ -211,4 +211,4 @@ The synchronous `return null` prevents rendering the guarded content; the `useEf
 
 **Root cause:** Silent error swallowing at multiple layers masked the real failure.
 
-**Rule:** The origin check in `api/kv.ts` must use a `Set` covering `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` — still applies to all KV actions. `kvCrossSet` must log `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'` — still applies. Any screen displaying share/group state must listen for `window` `storage` events to stay in sync with background localStorage writes from `syncFromCloud`.
+**Rule:** The origin check in `api/kv.ts` must use a `Set` covering `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` — still applies to all KV actions. `kvCrossSet` must log `console.error('[kv] crossSet failed: HTTP', status, body)` before returning `'error'` — still applies. Sharing state is now loaded on-demand in `SharingCenterScreen` via `loadSharingCenterUpdates()` — do not add `storage` event listeners to sync share state; that approach was replaced.

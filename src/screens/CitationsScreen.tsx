@@ -24,6 +24,7 @@ export default function CitationsScreen() {
   const location = useLocation()
   const selectionMode = (location.state as { selectionMode?: boolean } | null)?.selectionMode ?? false
 
+  const currentUsername = getUsername()
   const [citations, setCitations] = useState<Citation[]>(() => getCitations())
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -92,7 +93,7 @@ export default function CitationsScreen() {
     const author = formatAuthorName(editing.author.trim())
 
     if (editing.id === null) {
-      upsertCitation({ id: crypto.randomUUID(), text, author, usedInListIds: [] })
+      upsertCitation({ id: crypto.randomUUID(), text, author, usedInListIds: [], createdByUsername: currentUsername ?? undefined })
     } else {
       const existing = citations.find(c => c.id === editing.id)
       if (existing) {
@@ -206,7 +207,15 @@ export default function CitationsScreen() {
       {/* Guest link section (non-selection mode only) */}
       {!selectionMode && (
         <div className="mb-4 rounded-2xl bg-white px-4 py-3 dark:bg-gray-800">
-          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">קישור לשליחת ציטוטים ממבקרים</p>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">קישור לשליחת ציטוטים ממבקרים</p>
+            <button
+              onClick={() => navigate('/sharing-center')}
+              className="min-h-[44px] rounded-xl px-3 text-sm font-medium text-blue-600 active:text-blue-800 dark:text-blue-400 dark:active:text-blue-300"
+            >
+              מרכז שיתוף
+            </button>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleCopyGuestLink}
@@ -248,6 +257,7 @@ export default function CitationsScreen() {
         <ul className="mb-4 flex flex-col gap-2">
           {filtered.map(citation => {
             const currentLinkedMemberId = resolveLinkedMemberId(citation.author)
+            const canEditDelete = !citation.createdByUsername || citation.createdByUsername === currentUsername
             return (
               <li
                 key={citation.id}
@@ -255,8 +265,8 @@ export default function CitationsScreen() {
               >
                 <div
                   role="button"
-                  onClick={() => selectionMode ? handleSelect(citation) : openEdit(citation)}
-                  className="flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 active:bg-gray-50 dark:active:bg-gray-700"
+                  onClick={() => selectionMode ? handleSelect(citation) : (canEditDelete ? openEdit(citation) : undefined)}
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${selectionMode || canEditDelete ? 'cursor-pointer active:bg-gray-50 dark:active:bg-gray-700' : 'cursor-default'}`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">

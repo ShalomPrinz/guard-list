@@ -19,6 +19,7 @@ import StandbyScreen from './screens/StandbyScreen'
 import UniteScreen from './screens/UniteScreen'
 import UniteListPickerScreen from './screens/UniteListPickerScreen'
 import CitationsScreen from './screens/CitationsScreen'
+import SharingCenterScreen from './screens/SharingCenterScreen'
 import CommandersSelectScreen from './screens/CommandersSelectScreen'
 import FallbackScreen from './screens/FallbackScreen'
 import GuestCitationsScreen from './screens/GuestCitationsScreen'
@@ -56,6 +57,7 @@ function AuthenticatedApp() {
             <Route path="/statistics/:participantName" element={<ParticipantHistoryScreen />} />
             <Route path="/standby" element={<StandbyScreen />} />
             <Route path="/citations" element={<CitationsScreen />} />
+            <Route path="/sharing-center" element={<SharingCenterScreen />} />
             <Route path="/fallback" element={<FallbackScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

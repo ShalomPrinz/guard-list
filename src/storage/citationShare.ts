@@ -1,5 +1,5 @@
 import type { SharingGroup, GroupInvitation } from '../types'
-import { kvSet, kvDel } from './cloudStorage'
+import { kvSet, kvDel, kvGet } from './cloudStorage'
 import { getUsername } from './userStorage'
 import { getCitations, deleteCitationSilent } from './citations'
 
@@ -183,6 +183,55 @@ export async function declineGroupInvitation(
       at: Date.now(),
     })
   } catch { /* silent */ }
+}
+
+// ─── Sharing Center on-demand refresh ────────────────────────────────────────
+
+export async function loadSharingCenterUpdates(storage: Storage = window.localStorage): Promise<{
+  acceptedBy?: string
+  rejectedBy?: string
+  freshMembers?: string[]
+}> {
+  const result: { acceptedBy?: string; rejectedBy?: string; freshMembers?: string[] } = {}
+
+  try {
+    const acceptNotif = await kvGet<{ byUsername: string; groupId: string; at: number }>('share:acceptNotification')
+    if (acceptNotif !== null) {
+      const { kvGroupGetMembers } = await import('./cloudStorage')
+      const freshMembers = await kvGroupGetMembers(acceptNotif.groupId)
+      const existing = getLocalGroup(storage)
+      if (freshMembers !== null) {
+        setLocalGroup({ groupId: acceptNotif.groupId, members: freshMembers, joinedAt: existing?.joinedAt ?? Date.now() }, storage)
+        result.freshMembers = freshMembers
+      }
+      clearOutgoingInvitation(storage)
+      await kvDel('share:acceptNotification')
+      result.acceptedBy = acceptNotif.byUsername
+    }
+  } catch { /* silent */ }
+
+  try {
+    const rejectNotif = await kvGet<{ byUsername: string; groupId: string; at: number }>('share:rejectionNotification')
+    if (rejectNotif !== null) {
+      clearOutgoingInvitation(storage)
+      await kvDel('share:rejectionNotification')
+      result.rejectedBy = rejectNotif.byUsername
+    }
+  } catch { /* silent */ }
+
+  try {
+    const group = getLocalGroup(storage)
+    if (group !== null) {
+      const { kvGroupGetMembers } = await import('./cloudStorage')
+      const freshMembers = await kvGroupGetMembers(group.groupId)
+      if (freshMembers !== null) {
+        setLocalGroup({ ...group, members: freshMembers }, storage)
+        result.freshMembers = freshMembers
+      }
+    }
+  } catch { /* silent */ }
+
+  return result
 }
 
 export async function leaveGroup(storage: Storage = window.localStorage): Promise<void> {
