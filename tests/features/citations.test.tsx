@@ -233,6 +233,30 @@ describe('CitationsScreen', () => {
       expect(getCitations()).toHaveLength(0)
     })
   })
+
+  it('restores scroll after closing both edit modal and confirm dialog (E024 regression)', async () => {
+    const user = userEvent.setup()
+    upsertCitation(makeCitation('c1', { text: 'ציטוט לבדיקה' }))
+    renderCitations()
+
+    // Open edit modal → scroll should be locked
+    await user.click(screen.getByText('ציטוט לבדיקה'))
+    await screen.findByRole('dialog')
+    expect(document.body.style.overflow).toBe('hidden')
+
+    // Open confirm dialog on top of edit modal → still locked
+    const deleteBtn = screen.getByRole('button', { name: 'מחיקה' })
+    await user.click(deleteBtn)
+    expect(document.body.style.overflow).toBe('hidden')
+
+    // Confirm deletion — both modals close
+    const buttons = screen.getAllByRole('button', { name: 'מחיקה' })
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => {
+      expect(document.body.style.overflow).toBe('')
+    })
+  })
 })
 
 // ─── CitationsScreen: selection mode ──────────────────────────────────────────

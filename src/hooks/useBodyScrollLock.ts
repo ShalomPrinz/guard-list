@@ -1,15 +1,23 @@
 import { useEffect } from 'react'
 
+let _lockCount = 0
+let _savedScrollY = 0
+
 export function useBodyScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return
-    const original = document.body.style.overflow
-    const scrollY = window.scrollY
-    window.scrollTo({ top: 0, behavior: 'instant' })
-    document.body.style.overflow = 'hidden'
+    if (_lockCount === 0) {
+      _savedScrollY = window.scrollY
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      document.body.style.overflow = 'hidden'
+    }
+    _lockCount++
     return () => {
-      document.body.style.overflow = original
-      window.scrollTo({ top: scrollY, behavior: 'instant' })
+      _lockCount--
+      if (_lockCount === 0) {
+        document.body.style.overflow = ''
+        window.scrollTo({ top: _savedScrollY, behavior: 'instant' })
+      }
     }
   }, [active])
 }

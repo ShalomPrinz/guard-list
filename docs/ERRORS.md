@@ -257,3 +257,13 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Root cause:** `setLocalGroupInvitation()` existed in `citationShare.ts` but was never called from `loadSharingCenterUpdates`. The invitation delivery path was simply not implemented.
 
 **Rule:** `loadSharingCenterUpdates()` is the single point of truth for all KV → localStorage syncing of sharing state. Any new KV key that represents state visible to the user in `SharingCenterScreen` must be fetched here. The function also detects cancellation: if local has an invitation but KV key is gone, clear local and return `invitationCancelled: true`.
+
+---
+
+## E024 — Nested Modals Left body overflow: hidden After Both Closed
+
+**What went wrong:** Opening a `Modal` then a `ConfirmDialog` on top (e.g. editing a citation then confirming deletion) and closing both left `document.body.style.overflow = 'hidden'`, blocking scroll for the entire app. The old `useBodyScrollLock` saved/restored `overflow` per-instance: `Modal` saved `''`, set `hidden`; `ConfirmDialog` saved `hidden`, set `hidden`. React unmounts JSX siblings in order — `Modal`'s cleanup ran first, restoring `''` — then `ConfirmDialog`'s cleanup ran, restoring `hidden`.
+
+**Root cause:** Per-instance save/restore of `overflow` is not safe when multiple hooks are active simultaneously. Each instance captures the value at mount time; the restore order depends on React unmount order, which is JSX-declaration order, not activation order.
+
+**Rule:** `useBodyScrollLock` (`src/hooks/useBodyScrollLock.ts`) uses a module-level reference counter. The first mount locks the body; additional mounts only increment the counter. The last unmount releases. Intermediate unmounts do nothing. Never revert this to a per-instance save/restore pattern. Also, `Layout.tsx` resets `document.body.style.overflow = ''` on every `location.pathname` change as a safety net.

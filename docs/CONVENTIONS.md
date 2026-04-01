@@ -103,7 +103,8 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Use the shared `Modal` component (`src/components/Modal.tsx`) for all sheet-style modals (backdrop + panel + close button). Do not repeat this shell inline.
 - `Modal` props: `onClose: () => void`, `title?: string`, `children: ReactNode`, `maxWidth?: string` (default `max-w-lg`). Render it conditionally: `{isOpen && <Modal onClose={...}>...</Modal>}`.
 - `Modal` handles `useBodyScrollLock` internally — callers must not also call it. The `Modal` component calls `useBodyScrollLock(true)` unconditionally because it is only mounted when open.
-- `ConfirmDialog` is separate (centered positioning, cancel+confirm buttons built-in). Do not use `Modal` as its base.
+- `ConfirmDialog` uses `Modal` as its base — it is a thin content wrapper (message + cancel/confirm buttons) that delegates backdrop, panel, scroll lock, and close behavior to `Modal`. Props: `message`, `onConfirm`, `onCancel`, `confirmLabel?` (default `'מחיקה'`). Pass `onCancel` — not `onClose` — to `ConfirmDialog`; it maps internally to `Modal`'s `onClose`. Use `ConfirmDialog` for all yes/no confirmation prompts; use `Modal` directly for all other sheet-style modal surfaces. Never introduce a new modal pattern or component without explicit approval from the user — ask before doing so.
+- `Modal`'s inner panel carries `role="dialog"`. Tests that query a modal surface must use `findByRole('dialog')` — the role is on the panel `<div>`, not the backdrop.
 - `UsernameGate.tsx` uses `fixed inset-0` for full-screen loading — it is NOT a modal and must never receive modal treatment.
 - All modal surfaces use `fixed inset-0 z-50` as the backdrop. `Modal` uses `flex items-start justify-center pt-4` — never `items-end`.
 
