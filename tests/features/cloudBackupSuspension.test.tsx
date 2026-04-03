@@ -156,6 +156,25 @@ describe('Cloud Backup Suspension', () => {
     })
   })
 
+  it('SECURITY: suspension is enforced even when client Date.now() is overridden to bypass it', async () => {
+    const user = userEvent.setup()
+    const futureTs = Date.now() + 12 * 60 * 60 * 1000
+    // Server says suspended regardless of what the client clock says
+    vi.mocked(cloudStorage.kvGetBackupSuspension).mockResolvedValue(futureTs)
+    // Override Date.now to be MAX_SAFE_INTEGER — in old code this would bypass the check
+    vi.spyOn(Date, 'now').mockReturnValue(Number.MAX_SAFE_INTEGER)
+    localStorage.setItem('noBackup', '1')
+
+    renderHeader()
+    await openBackupModal(user)
+
+    // Button must still be disabled — server answer wins
+    await waitFor(() => {
+      expect(screen.getByText('חדש גיבוי').closest('button')).toHaveProperty('disabled', true)
+    })
+    expect(screen.getByText(/גיבוי מושהה/)).toBeTruthy()
+  })
+
   it('handleReenableBackup returns early without re-enabling when KV shows active suspension', async () => {
     const user = userEvent.setup()
     const futureTs = Date.now() + 12 * 60 * 60 * 1000

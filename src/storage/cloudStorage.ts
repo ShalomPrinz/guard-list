@@ -348,13 +348,25 @@ export async function kvClearUserData(): Promise<void> {
 }
 
 /**
- * Get the backup suspension timestamp from KV.
- * Returns null if there is no suspension or if the stored timestamp is already in the past.
+ * Check whether backup is currently suspended, using a server-side time comparison.
+ * The server reads {username}:backupSuspendedUntil and compares it against Date.now()
+ * server-side — the client never does any time arithmetic so Date.now() overrides cannot bypass it.
+ * Returns the suspendedUntil timestamp if suspension is active, null otherwise.
  */
 export async function kvGetBackupSuspension(): Promise<number | null> {
-  const val = await kvGet<number>('backupSuspendedUntil')
-  if (val === null || val <= Date.now()) return null
-  return val
+  const username = getUsername()
+  if (!username) return null
+  try {
+    const data = (await callKv({ action: 'checkBackupSuspension', username })) as {
+      suspended: boolean
+      suspendedUntil?: number
+    }
+    if (!data.suspended) return null
+    return data.suspendedUntil ?? null
+  } catch (e) {
+    console.error('[kv] checkBackupSuspension failed:', e)
+    return null
+  }
 }
 
 /**

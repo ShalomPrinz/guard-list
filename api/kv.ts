@@ -276,6 +276,14 @@ async function handleGroupLeave(
   return json({ ok: true });
 }
 
+async function handleCheckBackupSuspension(username: string): Promise<Response> {
+  const val = await kv.get(`${username}:backupSuspendedUntil`)
+  if (val === null || typeof val !== 'number' || val <= Date.now()) {
+    return json({ suspended: false })
+  }
+  return json({ suspended: true, suspendedUntil: val })
+}
+
 async function handleClearUserData(username: string): Promise<Response> {
   // Delete all user-namespaced keys in bulk
   const allKeys = await kv.keys(`${username}:*`);
@@ -395,6 +403,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === "groupLeave") return handleGroupLeave(body, username);
     if (action === "groupGetMembers") return handleGroupGetMembers(body, username);
     if (action === "invitationCancel") return handleInvitationCancel(body, username);
+    if (action === "checkBackupSuspension") return handleCheckBackupSuspension(username);
     if (action === "clearUserData") return handleClearUserData(username);
 
     return json({ error: "Unknown action" }, 400);

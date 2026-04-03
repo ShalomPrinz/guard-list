@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadGroupMember, kvListGuestCitations, kvDeleteGuestCitation, kvMGet, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadGroupMember, kvListGuestCitations, kvDeleteGuestCitation, kvMGet, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvGetBackupSuspension } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -612,6 +612,72 @@ describe('cloudStorage', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const result = await kvListGuestCitations()
       expect(result).toEqual([])
+    })
+  })
+
+  describe('kvGetBackupSuspension', () => {
+    it('uses checkBackupSuspension action, not get', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ suspended: false }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await kvGetBackupSuspension()
+
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('checkBackupSuspension')
+      expect(body.username).toBe('testuser')
+    })
+
+    it('returns suspendedUntil when server says suspended: true', async () => {
+      const ts = Date.now() + 12 * 60 * 60 * 1000
+      mockFetch({ suspended: true, suspendedUntil: ts })
+      const result = await kvGetBackupSuspension()
+      expect(result).toBe(ts)
+    })
+
+    it('returns null when server says suspended: false', async () => {
+      mockFetch({ suspended: false })
+      const result = await kvGetBackupSuspension()
+      expect(result).toBeNull()
+    })
+
+    it('SECURITY: returns active suspension even when client Date.now() is spoofed to MAX_SAFE_INTEGER', async () => {
+      const ts = Date.now() + 12 * 60 * 60 * 1000
+      mockFetch({ suspended: true, suspendedUntil: ts })
+      // Simulate a user overriding Date.now to bypass the old client-side check
+      vi.spyOn(Date, 'now').mockReturnValue(Number.MAX_SAFE_INTEGER)
+
+      const result = await kvGetBackupSuspension()
+
+      // Server said suspended: true — client must honor it regardless of local Date.now()
+      expect(result).toBe(ts)
+    })
+
+    it('SECURITY: returns null when server says not suspended, even when client Date.now() is spoofed to 0', async () => {
+      mockFetch({ suspended: false })
+      vi.spyOn(Date, 'now').mockReturnValue(0)
+
+      const result = await kvGetBackupSuspension()
+
+      expect(result).toBeNull()
+    })
+
+    it('returns null on HTTP error', async () => {
+      mockFetch({}, false)
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const result = await kvGetBackupSuspension()
+      expect(result).toBeNull()
+    })
+
+    it('returns null when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvGetBackupSuspension()
+
+      expect(result).toBeNull()
+      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 
