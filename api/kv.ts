@@ -276,6 +276,17 @@ async function handleGroupLeave(
   return json({ ok: true });
 }
 
+async function handleClearUserData(username: string): Promise<Response> {
+  // Delete all user-namespaced keys in bulk
+  const allKeys = await kv.keys(`${username}:*`);
+  if (allKeys.length > 0) {
+    await Promise.all(allKeys.map(k => kv.del(k)));
+  }
+  // Write opt-out preference back so it survives a localStorage wipe
+  await kv.set(`${username}:prefs:noBackup`, true);
+  return json({ ok: true });
+}
+
 async function handleInvitationCancel(
   body: Record<string, unknown>,
   username: string
@@ -384,6 +395,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === "groupLeave") return handleGroupLeave(body, username);
     if (action === "groupGetMembers") return handleGroupGetMembers(body, username);
     if (action === "invitationCancel") return handleInvitationCancel(body, username);
+    if (action === "clearUserData") return handleClearUserData(username);
 
     return json({ error: "Unknown action" }, 400);
   } catch (_e) {

@@ -10,6 +10,7 @@ vi.mock('./cloudStorage', () => ({
   kvList: vi.fn().mockResolvedValue([]),
   kvMGet: vi.fn().mockResolvedValue([]),
   kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
+  kvGetNoBackup: vi.fn().mockResolvedValue(false),
   isKvAvailable: true,
 }))
 

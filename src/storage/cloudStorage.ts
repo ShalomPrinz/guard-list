@@ -82,6 +82,7 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown): Promise<void> {
+  if (localStorage.getItem('noBackup')) return
   const username = getUsername()
   const prefixed = scopedKey(key)
   if (!prefixed || !username) {
@@ -97,6 +98,7 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
 }
 
 export async function kvDel(key: string): Promise<void> {
+  if (localStorage.getItem('noBackup')) return
   const username = getUsername()
   const prefixed = scopedKey(key)
   if (!prefixed || !username) {
@@ -138,6 +140,7 @@ export async function kvSetRaw(key: string, value: unknown): Promise<void> {
 }
 
 export async function kvList(prefix: string): Promise<string[]> {
+  if (localStorage.getItem('noBackup')) return []
   const username = getUsername()
   const prefixed = scopedKey(prefix)
   if (!prefixed || !username) {
@@ -319,4 +322,27 @@ export async function kvInvitationCancel(targetUsername: string): Promise<void> 
  */
 export async function kvDeleteGuestCitation(id: string): Promise<void> {
   await kvDel(`guestCitations:${id}`)
+}
+
+/**
+ * Check whether the user has set the noBackup opt-out flag in KV.
+ * Returns true if `{username}:prefs:noBackup` is set to true.
+ */
+export async function kvGetNoBackup(): Promise<boolean> {
+  const val = await kvGet<boolean>('prefs:noBackup')
+  return val === true
+}
+
+/**
+ * Delete all user-namespaced KV keys and write the noBackup opt-out flag.
+ * Server-side: deletes all `{username}:*` keys then sets `{username}:prefs:noBackup = true`.
+ */
+export async function kvClearUserData(): Promise<void> {
+  const username = getUsername()
+  if (!username) return
+  try {
+    await callKv({ action: 'clearUserData', username })
+  } catch (e) {
+    console.error('[kv] clearUserData failed:', e)
+  }
 }

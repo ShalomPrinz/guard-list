@@ -1,5 +1,5 @@
 import type { Group, StationConfig, Schedule, Citation, ParticipantStats } from '../types'
-import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGetNoBackup } from './cloudStorage'
 import { getUsername } from './userStorage'
 import { getGroups, upsertGroup } from './groups'
 import { getStationsConfig, saveStationsConfig } from './stationsConfig'
@@ -17,6 +17,13 @@ import { getLocalGroup } from './citationShare'
  */
 export async function syncFromCloud(): Promise<void> {
   if (getUsername() === null) return
+  // Check opt-out: fast path via localStorage, durable path via KV
+  if (localStorage.getItem('noBackup')) return
+  const noBackup = await kvGetNoBackup()
+  if (noBackup) {
+    localStorage.setItem('noBackup', '1')
+    return
+  }
   if (localStorage.getItem('synced')) return
 
   // Groups
