@@ -346,3 +346,28 @@ export async function kvClearUserData(): Promise<void> {
     console.error('[kv] clearUserData failed:', e)
   }
 }
+
+/**
+ * Get the backup suspension timestamp from KV.
+ * Returns null if there is no suspension or if the stored timestamp is already in the past.
+ */
+export async function kvGetBackupSuspension(): Promise<number | null> {
+  const val = await kvGet<number>('backupSuspendedUntil')
+  if (val === null || val <= Date.now()) return null
+  return val
+}
+
+/**
+ * Set the backup suspension timestamp in KV.
+ * Must be called before noBackup is written to localStorage so kvSet's guard passes.
+ */
+export async function kvSetBackupSuspension(until: number): Promise<void> {
+  await kvSet('backupSuspendedUntil', until)
+}
+
+/**
+ * Clear the backup suspension timestamp from KV.
+ */
+export async function kvClearBackupSuspension(): Promise<void> {
+  await kvDel('backupSuspendedUntil')
+}

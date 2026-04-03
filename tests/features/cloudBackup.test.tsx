@@ -20,6 +20,9 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvClearUserData: vi.fn().mockResolvedValue(undefined),
     kvDel: vi.fn().mockResolvedValue(undefined),
     kvGetNoBackup: vi.fn().mockResolvedValue(false),
+    kvGetBackupSuspension: vi.fn().mockResolvedValue(null),
+    kvSetBackupSuspension: vi.fn().mockResolvedValue(undefined),
+    kvClearBackupSuspension: vi.fn().mockResolvedValue(undefined),
   }
 })
 
@@ -49,6 +52,9 @@ beforeEach(() => {
   vi.mocked(cloudStorage.kvClearUserData).mockClear()
   vi.mocked(cloudStorage.kvDel).mockClear()
   vi.mocked(cloudStorage.kvGetNoBackup).mockResolvedValue(false)
+  vi.mocked(cloudStorage.kvGetBackupSuspension).mockResolvedValue(null)
+  vi.mocked(cloudStorage.kvSetBackupSuspension).mockClear()
+  vi.mocked(cloudStorage.kvClearBackupSuspension).mockClear()
   vi.mocked(syncFromCloudModule.syncFromCloud).mockClear()
   vi.mocked(syncFromCloudModule.pushLocalToCloud).mockClear()
 })

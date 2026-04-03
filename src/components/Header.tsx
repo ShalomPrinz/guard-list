@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../context/WizardContext'
 import { getUsername } from '../storage/userStorage'
 import Modal from './Modal'
 import ConfirmDialog from './ConfirmDialog'
-import { kvClearUserData, kvDel } from '../storage/cloudStorage'
+import { kvClearUserData, kvDel, kvGetBackupSuspension, kvSetBackupSuspension, kvClearBackupSuspension } from '../storage/cloudStorage'
 import { syncFromCloud, pushLocalToCloud } from '../storage/syncFromCloud'
 
 export default function Header() {
@@ -18,6 +18,12 @@ export default function Header() {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [noBackup, setNoBackup] = useState(() => !!localStorage.getItem('noBackup'))
+  const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!noBackup) return
+    void kvGetBackupSuspension().then(setSuspendedUntil)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleHome() {
     resetSession()
@@ -40,6 +46,8 @@ export default function Header() {
     setShowRemoveConfirm(false)
     setLoading(true)
     await kvClearUserData()
+    // Fire-and-forget: must be called before localStorage.setItem('noBackup') so kvSet's guard passes
+    void kvSetBackupSuspension(Date.now() + 24 * 60 * 60 * 1000)
     localStorage.setItem('noBackup', '1')
     setNoBackup(true)
     setLoading(false)
@@ -64,9 +72,14 @@ export default function Header() {
   }
 
   async function handleReenableBackup() {
+    // Server-side guard: re-fetch from KV to prevent bypass via React DevTools
+    const suspension = await kvGetBackupSuspension()
+    if (suspension !== null) return
     localStorage.removeItem('noBackup')
     await kvDel('prefs:noBackup')
+    void kvClearBackupSuspension()
     setNoBackup(false)
+    setSuspendedUntil(null)
     setStatusMsg(null)
   }
 
@@ -119,13 +132,20 @@ export default function Header() {
             )}
 
             {noBackup && (
-              <button
-                onClick={handleReenableBackup}
-                disabled={loading}
-                className="min-h-[44px] w-full rounded-2xl border border-blue-500 text-sm font-medium text-blue-600 active:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:active:bg-blue-900/20 disabled:opacity-50"
-              >
-                חדש גיבוי
-              </button>
+              <>
+                <button
+                  onClick={handleReenableBackup}
+                  disabled={suspendedUntil !== null || loading}
+                  className="min-h-[44px] w-full rounded-2xl border border-blue-500 text-sm font-medium text-blue-600 active:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:active:bg-blue-900/20 disabled:opacity-50"
+                >
+                  חדש גיבוי
+                </button>
+                {suspendedUntil !== null && (
+                  <p className="text-xs text-orange-600 dark:text-orange-400">
+                    גיבוי מושהה — ניתן להפעיל מחדש בעוד {Math.ceil((suspendedUntil - Date.now()) / (1000 * 60 * 60))} שעות
+                  </p>
+                )}
+              </>
             )}
 
             <button
