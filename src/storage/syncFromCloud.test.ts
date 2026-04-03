@@ -8,15 +8,17 @@ vi.mock('./cloudStorage', () => ({
   kvSet: vi.fn().mockResolvedValue(undefined),
   kvDel: vi.fn().mockResolvedValue(undefined),
   kvList: vi.fn().mockResolvedValue([]),
+  kvMGet: vi.fn().mockResolvedValue([]),
   kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
   isKvAvailable: true,
 }))
 
-import { kvGet, kvList, kvSet, kvCrossReadGroupMember } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember } from './cloudStorage'
 import { syncFromCloud, pushLocalToCloud } from './syncFromCloud'
 
 const mockedKvList = vi.mocked(kvList)
 const mockedKvGet = vi.mocked(kvGet)
+const mockedKvMGet = vi.mocked(kvMGet)
 const mockedKvSet = vi.mocked(kvSet)
 const mockedKvCrossReadGroupMember = vi.mocked(kvCrossReadGroupMember)
 
@@ -41,7 +43,24 @@ describe('syncFromCloud', () => {
     vi.clearAllMocks()
     mockedKvList.mockResolvedValue([])
     mockedKvGet.mockResolvedValue(null)
+    mockedKvMGet.mockResolvedValue([])
     mockedKvCrossReadGroupMember.mockResolvedValue(null)
+  })
+
+  it('skips entire sync body when synced flag is present in localStorage', async () => {
+    storage.setItem('synced', '1')
+
+    await syncFromCloud()
+
+    expect(mockedKvList).not.toHaveBeenCalled()
+    expect(mockedKvGet).not.toHaveBeenCalled()
+    expect(mockedKvMGet).not.toHaveBeenCalled()
+  })
+
+  it('sets synced flag after successful sync', async () => {
+    await syncFromCloud()
+
+    expect(storage.getItem('synced')).toBe('1')
   })
 
   it('writes a group from KV when not in localStorage', async () => {
@@ -50,9 +69,9 @@ describe('syncFromCloud', () => {
       if (prefix === 'groups:') return ['groups:g1']
       return []
     })
-    mockedKvGet.mockImplementation(async (key) => {
-      if (key === 'groups:g1') return group
-      return null
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('groups:g1')) return [group]
+      return keys.map(() => null)
     })
 
     await syncFromCloud()
@@ -69,12 +88,29 @@ describe('syncFromCloud', () => {
       if (prefix === 'groups:') return ['groups:g1']
       return []
     })
-    mockedKvGet.mockResolvedValue(makeGroup({ name: 'KV Version' }))
+    // kvMGet should not be called for already-local items — no missing keys
 
     await syncFromCloud()
 
     const stored = JSON.parse(storage.getItem('groups') ?? '[]') as Group[]
     expect(stored[0].name).toBe('Local Version')
+    expect(mockedKvMGet).not.toHaveBeenCalledWith(expect.arrayContaining(['groups:g1']))
+  })
+
+  it('calls kvMGet for namespace with missing items', async () => {
+    const group = makeGroup()
+    mockedKvList.mockImplementation(async (prefix) => {
+      if (prefix === 'groups:') return ['groups:g1']
+      return []
+    })
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('groups:g1')) return [group]
+      return keys.map(() => null)
+    })
+
+    await syncFromCloud()
+
+    expect(mockedKvMGet).toHaveBeenCalledWith(['groups:g1'])
   })
 
   it('writes a citation from KV when not in localStorage', async () => {
@@ -83,9 +119,9 @@ describe('syncFromCloud', () => {
       if (prefix === 'citations:') return ['citations:c1']
       return []
     })
-    mockedKvGet.mockImplementation(async (key) => {
-      if (key === 'citations:c1') return citation
-      return null
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('citations:c1')) return [citation]
+      return keys.map(() => null)
     })
 
     await syncFromCloud()
@@ -125,9 +161,9 @@ describe('syncFromCloud', () => {
       if (prefix === 'statistics:') return ['statistics:Alice']
       return []
     })
-    mockedKvGet.mockImplementation(async (key) => {
-      if (key === 'statistics:Alice') return participantStats
-      return null
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('statistics:Alice')) return [participantStats]
+      return keys.map(() => null)
     })
 
     await syncFromCloud()
@@ -142,9 +178,9 @@ describe('syncFromCloud', () => {
       if (prefix === 'stationConfigs:') return ['stationConfigs:sc1']
       return []
     })
-    mockedKvGet.mockImplementation(async (key) => {
-      if (key === 'stationConfigs:sc1') return config
-      return null
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('stationConfigs:sc1')) return [config]
+      return keys.map(() => null)
     })
 
     await syncFromCloud()
@@ -167,9 +203,9 @@ describe('syncFromCloud', () => {
       if (prefix === 'schedules:') return ['schedules:g1:sched1']
       return []
     })
-    mockedKvGet.mockImplementation(async (key) => {
-      if (key === 'schedules:g1:sched1') return schedule
-      return null
+    mockedKvMGet.mockImplementation(async (keys) => {
+      if (keys.includes('schedules:g1:sched1')) return [schedule]
+      return keys.map(() => null)
     })
 
     await syncFromCloud()
@@ -195,6 +231,7 @@ describe('syncFromCloud', () => {
 
     expect(mockedKvList).not.toHaveBeenCalled()
     expect(mockedKvGet).not.toHaveBeenCalled()
+    expect(mockedKvMGet).not.toHaveBeenCalled()
   })
 
   describe('share sync — group citation pull', () => {

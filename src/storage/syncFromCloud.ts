@@ -1,5 +1,5 @@
 import type { Group, StationConfig, Schedule, Citation, ParticipantStats } from '../types'
-import { kvGet, kvList, kvSet, kvCrossReadGroupMember } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember } from './cloudStorage'
 import { getUsername } from './userStorage'
 import { getGroups, upsertGroup } from './groups'
 import { getStationsConfig, saveStationsConfig } from './stationsConfig'
@@ -13,18 +13,20 @@ import { getLocalGroup } from './citationShare'
  * Backfills all six KV namespaces into localStorage on app startup.
  * Only writes data that does not already exist locally — never overwrites.
  * Safe to call multiple times (idempotent). Catches all errors silently.
- * Returns immediately if no username is set.
+ * Returns immediately if no username is set or if already synced.
  */
 export async function syncFromCloud(): Promise<void> {
   if (getUsername() === null) return
+  if (localStorage.getItem('synced')) return
+
   // Groups
   try {
     const keys = await kvList('groups:')
     const localIds = new Set(getGroups().map(g => g.id))
-    for (const key of keys) {
-      const id = key.replace('groups:', '')
-      if (!localIds.has(id)) {
-        const group = await kvGet<Group>(key)
+    const missingKeys = keys.filter(key => !localIds.has(key.replace('groups:', '')))
+    if (missingKeys.length > 0) {
+      const values = await kvMGet<Group>(missingKeys)
+      for (const group of values) {
         if (group) upsertGroup(group)
       }
     }
@@ -35,16 +37,13 @@ export async function syncFromCloud(): Promise<void> {
     const keys = await kvList('stationConfigs:')
     const localConfigs = getStationsConfig()
     const localIds = new Set(localConfigs.map(c => c.id))
-    const newConfigs: StationConfig[] = []
-    for (const key of keys) {
-      const id = key.replace('stationConfigs:', '')
-      if (!localIds.has(id)) {
-        const config = await kvGet<StationConfig>(key)
-        if (config) newConfigs.push(config)
+    const missingKeys = keys.filter(key => !localIds.has(key.replace('stationConfigs:', '')))
+    if (missingKeys.length > 0) {
+      const values = await kvMGet<StationConfig>(missingKeys)
+      const newConfigs = values.filter((v): v is StationConfig => v !== null)
+      if (newConfigs.length > 0) {
+        saveStationsConfig([...localConfigs, ...newConfigs])
       }
-    }
-    if (newConfigs.length > 0) {
-      saveStationsConfig([...localConfigs, ...newConfigs])
     }
   } catch { /* silent */ }
 
@@ -52,12 +51,14 @@ export async function syncFromCloud(): Promise<void> {
   try {
     const keys = await kvList('schedules:')
     const localIds = new Set(getSchedules().map(s => s.id))
-    for (const key of keys) {
-      // key format: schedules:{groupId}:{scheduleId}
+    const missingKeys = keys.filter(key => {
       const parts = key.split(':')
       const id = parts[parts.length - 1]
-      if (!localIds.has(id)) {
-        const schedule = await kvGet<Schedule>(key)
+      return !localIds.has(id)
+    })
+    if (missingKeys.length > 0) {
+      const values = await kvMGet<Schedule>(missingKeys)
+      for (const schedule of values) {
         if (schedule) upsertSchedule(schedule)
       }
     }
@@ -67,10 +68,10 @@ export async function syncFromCloud(): Promise<void> {
   try {
     const keys = await kvList('citations:')
     const localIds = new Set(getCitations().map(c => c.id))
-    for (const key of keys) {
-      const id = key.replace('citations:', '')
-      if (!localIds.has(id)) {
-        const citation = await kvGet<Citation>(key)
+    const missingKeys = keys.filter(key => !localIds.has(key.replace('citations:', '')))
+    if (missingKeys.length > 0) {
+      const values = await kvMGet<Citation>(missingKeys)
+      for (const citation of values) {
         if (citation) upsertCitation(citation)
       }
     }
@@ -80,18 +81,20 @@ export async function syncFromCloud(): Promise<void> {
   try {
     const keys = await kvList('statistics:')
     const stats = getStatistics()
-    let changed = false
-    for (const key of keys) {
-      const name = key.replace('statistics:', '')
-      if (!stats.participants[name]) {
-        const participantStats = await kvGet<ParticipantStats>(key)
+    const missingKeys = keys.filter(key => !stats.participants[key.replace('statistics:', '')])
+    if (missingKeys.length > 0) {
+      const values = await kvMGet<ParticipantStats>(missingKeys)
+      let changed = false
+      for (let i = 0; i < missingKeys.length; i++) {
+        const participantStats = values[i]
         if (participantStats) {
+          const name = missingKeys[i].replace('statistics:', '')
           stats.participants[name] = participantStats
           changed = true
         }
       }
+      if (changed) saveStatistics(stats)
     }
-    if (changed) saveStatistics(stats)
   } catch { /* silent */ }
 
   // Prefs (theme)
@@ -125,6 +128,8 @@ export async function syncFromCloud(): Promise<void> {
       }
     }
   } catch { /* silent */ }
+
+  localStorage.setItem('synced', '1')
 }
 
 /**
