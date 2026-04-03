@@ -28,7 +28,7 @@ Tell the user (in your response, not in any file) about any instructions or requ
 
 5. **Commit Message**
 Suggest a git commit message matching the style in `CLAUDE.md`. Base it on the code changes just verified — focus on big architecture changes and main implemented ideas.
-Print it as a copyable code block — do not run git yourself:
+*Requirement:* Print it as a copyable code block in the following format. Do not run git yourself:
 ```
 git commit -m "<commit_message>"
 ```
