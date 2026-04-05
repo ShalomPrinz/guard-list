@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { getGroupById } from '../storage/groups'
 import { upsertSchedule } from '../storage/schedules'
 import { useShortListWizard } from '../context/ShortListWizardContext'
 import { generateShortListSchedule } from '../logic/shortListGeneration'
+import TimePicker from '../components/TimePicker'
 
 export default function ShortListStep2() {
   const navigate = useNavigate()
-  const { groupId } = useParams<{ groupId: string }>()
   const { session, clearSession } = useShortListWizard()
 
   useEffect(() => {
@@ -21,10 +21,13 @@ export default function ShortListStep2() {
     }
   }, [session, navigate])
 
-  const group = groupId ? getGroupById(groupId) : null
+  const group = session?.groupId ? getGroupById(session.groupId) : null
   const availableCount = group ? group.members.filter(m => m.availability === 'base').length : 0
 
-  const [startHour, setStartHour] = useState(session?.startHour ?? 14)
+  const [startTime, setStartTime] = useState(() => {
+    const hour = String(session?.startHour ?? 14).padStart(2, '0')
+    return `${hour}:00`
+  })
   const [minutesPerWarrior, setMinutesPerWarrior] = useState(session?.minutesPerWarrior ?? 60)
   const [numberOfWarriors, setNumberOfWarriors] = useState(session?.numberOfWarriors ?? 1)
   const [error, setError] = useState('')
@@ -34,20 +37,13 @@ export default function ShortListStep2() {
     return null
   }
 
-  const durationMinutes = minutesPerWarrior * numberOfWarriors
-  const hours = Math.floor(durationMinutes / 60)
-  const minutes = durationMinutes % 60
-  const durationText = hours > 0 && minutes > 0
-    ? `${hours} שעות ו${minutes} דקות`
-    : hours > 0
-      ? `${hours} שעות`
-      : `${minutes} דקות`
+  const startHour = parseInt(startTime.split(':')[0], 10)
 
   function handleCreate() {
     setError('')
 
     // Validation
-    if (!groupId) {
+    if (!session?.groupId) {
       setError('קבוצה לא נמצאה')
       return
     }
@@ -61,13 +57,8 @@ export default function ShortListStep2() {
     }
 
     setIsLoading(true)
-    if (!session) {
-      setError('שגיאה: לא ניתן להוציא את הרשימה')
-      setIsLoading(false)
-      return
-    }
     const schedule = generateShortListSchedule(
-      groupId,
+      session.groupId,
       session.stations,
       startHour,
       minutesPerWarrior,
@@ -92,26 +83,15 @@ export default function ShortListStep2() {
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       <h1 className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100">הגדרת רשימה קצרה</h1>
 
-      {/* Start Hour */}
+      {/* Start Time */}
       <div className="mb-6">
         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           שעת התחלה
         </label>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min={0}
-            max={23}
-            value={startHour}
-            onChange={e => {
-              const val = Math.max(0, Math.min(23, parseInt(e.target.value, 10)))
-              setStartHour(isNaN(val) ? 0 : val)
-            }}
-            className="w-24 rounded-xl bg-gray-100 px-4 py-2.5 text-center text-lg font-semibold text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-          />
-          <span className="text-lg text-gray-700 dark:text-gray-300">:00</span>
-        </div>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">זמן התחלת השמירה</p>
+        <TimePicker
+          value={startTime}
+          onChange={setStartTime}
+        />
       </div>
 
       {/* Minutes Per Warrior */}
@@ -130,9 +110,6 @@ export default function ShortListStep2() {
           }}
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          זמן שמירה לחייל: {durationText}
-        </p>
       </div>
 
       {/* Number of Warriors */}
@@ -151,9 +128,6 @@ export default function ShortListStep2() {
           }}
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          מספר חיילים זמינים: {availableCount}
-        </p>
       </div>
 
       {/* Error */}

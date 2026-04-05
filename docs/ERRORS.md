@@ -267,3 +267,13 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Root cause:** Per-instance save/restore of `overflow` is not safe when multiple hooks are active simultaneously. Each instance captures the value at mount time; the restore order depends on React unmount order, which is JSX-declaration order, not activation order.
 
 **Rule:** `useBodyScrollLock` (`src/hooks/useBodyScrollLock.ts`) uses a module-level reference counter. The first mount locks the body; additional mounts only increment the counter. The last unmount releases. Intermediate unmounts do nothing. Never revert this to a per-instance save/restore pattern. Also, `Layout.tsx` resets `document.body.style.overflow = ''` on every `location.pathname` change as a safety net.
+
+---
+
+## E025 — Custom Time Picker Diverged from Standard
+
+**What went wrong:** `ShortListStep2` used a bespoke time input (a custom number field with `:00` appended) instead of the standard `TimePicker` component from `src/components/TimePicker.tsx`. This caused UX inconsistency — the short-list flow used a different time selection interaction than all other time-based inputs in the app (Step2_Time, Step4_Review, etc.).
+
+**Root cause:** New feature (short-list wizard) was built without referencing the existing shared time picker component.
+
+**Rule:** Always use the shared `TimePicker` component from `src/components/TimePicker.tsx` for any time input in the app, unless explicitly told otherwise and documented in a comment. Never build a custom time input or modify an existing one to diverge from the standard. `TimePicker` handles both mobile (native `<input type="time">`) and desktop (two numeric spinners) automatically — use it everywhere time is selected.
