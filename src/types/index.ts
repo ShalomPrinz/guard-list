@@ -125,6 +125,7 @@ export interface ShortListWizardSession {
   startHour: number;
   minutesPerWarrior: number;
   numberOfWarriors: number;
+  name?: string;
 }
 
 // ─── Wizard Session ───────────────────────────────────────────────────────────

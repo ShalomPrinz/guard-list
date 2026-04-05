@@ -99,6 +99,7 @@ export default function Step1_Stations() {
         startHour: 14,
         minutesPerWarrior: 60,
         numberOfWarriors: 1,
+        name: 'רשימת שמירה',
       })
     }
   }, [])
@@ -185,6 +186,7 @@ export default function Step1_Stations() {
         startHour: shortListSession?.startHour ?? 14,
         minutesPerWarrior: shortListSession?.minutesPerWarrior ?? 60,
         numberOfWarriors: shortListSession?.numberOfWarriors ?? 1,
+        name: shortListSession?.name ?? 'רשימת שמירה',
       })
       navigate('/short-list/step2')
       return

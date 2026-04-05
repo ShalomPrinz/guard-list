@@ -5,9 +5,12 @@ import { buildStationSchedule } from './generateSchedule'
 /**
  * Generate a short-list schedule by:
  * 1. Loading the group and filtering base-available members
- * 2. Randomly shuffling and selecting numberOfWarriors
- * 3. Distributing them evenly across stations with uniform duration
- * 4. Building the schedule
+ * 2. Calculating total warriors as numberOfWarriors * numberOfStations
+ * 3. Randomly shuffling and selecting total warriors
+ * 4. Distributing them evenly across stations with uniform duration (round-robin)
+ * 5. Building the schedule with the provided name
+ *
+ * numberOfWarriors is interpreted as "warriors per station", not total.
  */
 export function generateShortListSchedule(
   groupId: string,
@@ -15,22 +18,37 @@ export function generateShortListSchedule(
   startHour: number,
   minutesPerWarrior: number,
   numberOfWarriors: number,
+  nameOrStorage?: string | Storage,
   storage?: Storage,
 ): Schedule | null {
-  const group = getGroupById(groupId, storage)
+  // Handle overloads: name can be string or Storage (for backward compatibility)
+  let name: string | undefined
+  let actualStorage: Storage | undefined
+
+  if (typeof nameOrStorage === 'string') {
+    name = nameOrStorage
+    actualStorage = storage
+  } else if (nameOrStorage && typeof nameOrStorage === 'object') {
+    // It's a Storage object passed as the 6th argument (old signature)
+    actualStorage = nameOrStorage
+  }
+  const group = getGroupById(groupId, actualStorage)
   if (!group) return null
 
   // Filter to only base-available members
   const availableMembers = group.members.filter(m => m.availability === 'base')
 
+  // numberOfWarriors is per-station; calculate total
+  const totalWarriors = numberOfWarriors * stations.length
+
   // Check if enough warriors available
-  if (availableMembers.length < numberOfWarriors) {
+  if (availableMembers.length < totalWarriors) {
     return null
   }
 
-  // Randomly shuffle and select numberOfWarriors
+  // Randomly shuffle and select totalWarriors
   const shuffled = shuffleArray(availableMembers)
-  const selectedWarriors = shuffled.slice(0, numberOfWarriors)
+  const selectedWarriors = shuffled.slice(0, totalWarriors)
 
   // Distribute warriors across stations (round-robin)
   const stationParticipants: Map<string, Member[]> = new Map()
@@ -68,7 +86,7 @@ export function generateShortListSchedule(
 
   return {
     id: crypto.randomUUID(),
-    name: 'רשימה קצרה',
+    name: name || 'רשימת שמירה',
     groupId,
     createdAt: new Date().toISOString(),
     date: today,

@@ -48,11 +48,12 @@ export default function ShortListStep2() {
       return
     }
     if (numberOfWarriors < 1) {
-      setError('יש לבחור לפחות חייל אחד')
+      setError('יש לבחור לפחות חייל אחד לעמדה')
       return
     }
-    if (numberOfWarriors > availableCount) {
-      setError(`יש בחירת עד ${availableCount} חיילים זמינים`)
+    const totalWarriors = numberOfWarriors * session.stations.length
+    if (totalWarriors > availableCount) {
+      setError(`סך הכל ${totalWarriors} חיילים נדרשים, אבל רק ${availableCount} זמינים`)
       return
     }
 
@@ -63,6 +64,7 @@ export default function ShortListStep2() {
       startHour,
       minutesPerWarrior,
       numberOfWarriors,
+      session.name,
     )
 
     if (!schedule) {
@@ -112,10 +114,10 @@ export default function ShortListStep2() {
         />
       </div>
 
-      {/* Number of Warriors */}
+      {/* Number of Warriors Per Station */}
       <div className="mb-6">
         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          מספר חיילים
+          מספר חיילים לעמדה
         </label>
         <input
           type="number"
@@ -128,6 +130,11 @@ export default function ShortListStep2() {
           }}
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
+        {session?.stations.length ? (
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            סך הכל: {numberOfWarriors * session.stations.length} חיילים
+          </p>
+        ) : null}
       </div>
 
       {/* Error */}
