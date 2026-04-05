@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroupById } from '../storage/groups'
 import { upsertSchedule } from '../storage/schedules'
+import { recordShift } from '../storage/statistics'
 import { useShortListWizard } from '../context/ShortListWizardContext'
 import { generateShortListSchedule } from '../logic/shortListGeneration'
 import TimePicker from '../components/TimePicker'
@@ -87,6 +88,21 @@ export default function ShortListStep2() {
 
     // Save schedule to localStorage
     upsertSchedule(schedule)
+
+    // Record statistics for all participants
+    for (const st of schedule.stations) {
+      for (const p of st.participants) {
+        recordShift(p.name, {
+          scheduleId: schedule.id,
+          scheduleName: schedule.name,
+          stationName: st.stationName,
+          date: p.date,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          durationMinutes: p.durationMinutes,
+        })
+      }
+    }
 
     // Navigate to result — do NOT clear session here, it must survive for back button
     navigate(`/schedule/${schedule.id}/result`)
