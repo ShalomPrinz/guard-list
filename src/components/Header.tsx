@@ -15,6 +15,7 @@ export default function Header() {
   )
   const [showBackup, setShowBackup] = useState(false)
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [showReenableConfirm, setShowReenableConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [noBackup, setNoBackup] = useState(() => !!localStorage.getItem('noBackup'))
@@ -75,13 +76,21 @@ export default function Header() {
   async function handleReenableBackup() {
     // Server-side guard: re-fetch from KV to prevent bypass via React DevTools
     const suspension = await kvGetBackupSuspension()
-    if (suspension !== null) return
+    if (suspension !== null) {
+      const hoursRemaining = Math.ceil((suspension - Date.now()) / (1000 * 60 * 60))
+      setStatusMsg(`גיבוי מושהה — ניתן להפעיל מחדש בעוד ${hoursRemaining} שעות`)
+      return
+    }
+    setShowReenableConfirm(false)
+    setLoading(true)
     localStorage.removeItem('noBackup')
     await kvDel('prefs:noBackup')
     void kvClearBackupSuspension()
     setNoBackup(false)
     setSuspendedUntil(null)
     setStatusMsg(null)
+    setLoading(false)
+    setShowBackup(false)
   }
 
   return (
@@ -126,7 +135,13 @@ export default function Header() {
         <Modal onClose={() => setShowBackup(false)} title="גיבוי נתונים" maxWidth="max-w-sm">
           <div className="flex flex-col gap-3">
             {statusMsg && (
-              <p className="text-sm font-medium text-green-600 dark:text-green-400">{statusMsg}</p>
+              <p className={`text-sm font-medium ${
+                statusMsg.includes('מושהה')
+                  ? 'text-orange-600 dark:text-orange-400'
+                  : 'text-green-600 dark:text-green-400'
+              }`}>
+                {statusMsg}
+              </p>
             )}
             {loading && (
               <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>
@@ -135,7 +150,7 @@ export default function Header() {
             {noBackup && (
               <>
                 <button
-                  onClick={handleReenableBackup}
+                  onClick={() => setShowReenableConfirm(true)}
                   disabled={suspendedUntil !== null || loading}
                   className="min-h-[44px] w-full rounded-2xl border border-blue-500 text-sm font-medium text-blue-600 active:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:active:bg-blue-900/20 disabled:opacity-50"
                 >
@@ -178,9 +193,17 @@ export default function Header() {
 
       {showRemoveConfirm && (
         <ConfirmDialog
-          message="למחוק את הגיבוי בענן? הנתונים יישארו במכשיר זה."
+          message="למחוק את כל הנתונים מהענן? הנתונים יישארו במכשיר זה בלבד, והגיבוי יהיה מושהה למשך 24 שעות."
           onConfirm={handleRemoveBackup}
           onCancel={() => setShowRemoveConfirm(false)}
+        />
+      )}
+
+      {showReenableConfirm && (
+        <ConfirmDialog
+          message="להפעיל מחדש את הגיבוי בענן? כל הנתונים בהתקן יעלו לענן."
+          onConfirm={handleReenableBackup}
+          onCancel={() => setShowReenableConfirm(false)}
         />
       )}
     </>

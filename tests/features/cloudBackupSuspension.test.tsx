@@ -130,8 +130,8 @@ describe('Cloud Backup Suspension', () => {
     const removeButton = screen.getByText('הסר גיבוי').closest('button')
     expect(removeButton).toHaveProperty('disabled', false)
     await user.click(screen.getByText('הסר גיבוי'))
-    // ConfirmDialog should appear
-    expect(screen.getByText('למחוק את הגיבוי בענן? הנתונים יישארו במכשיר זה.')).toBeTruthy()
+    // ConfirmDialog should appear with updated message
+    expect(screen.getByText('למחוק את כל הנתונים מהענן? הנתונים יישארו במכשיר זה בלבד, והגיבוי יהיה מושהה למשך 24 שעות.')).toBeTruthy()
     await user.click(screen.getByText('מחיקה'))
     await waitFor(() => {
       expect(vi.mocked(cloudStorage.kvClearUserData)).toHaveBeenCalledOnce()
@@ -151,6 +151,9 @@ describe('Cloud Backup Suspension', () => {
     })
 
     await user.click(screen.getByText('חדש גיבוי'))
+    // ConfirmDialog appears
+    expect(screen.getByText('להפעיל מחדש את הגיבוי בענן? כל הנתונים בהתקן יעלו לענן.')).toBeTruthy()
+    await user.click(screen.getByText('מחיקה'))
     await waitFor(() => {
       expect(vi.mocked(cloudStorage.kvClearBackupSuspension)).toHaveBeenCalledOnce()
     })

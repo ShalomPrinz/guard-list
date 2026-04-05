@@ -91,8 +91,8 @@ describe('Cloud Backup Modal', () => {
     await user.click(screen.getByLabelText('גיבוי ענן'))
     await screen.findByRole('dialog')
     await user.click(screen.getByText('הסר גיבוי'))
-    // ConfirmDialog appears
-    expect(screen.getByText('למחוק את הגיבוי בענן? הנתונים יישארו במכשיר זה.')).toBeTruthy()
+    // ConfirmDialog appears with updated message
+    expect(screen.getByText('למחוק את כל הנתונים מהענן? הנתונים יישארו במכשיר זה בלבד, והגיבוי יהיה מושהה למשך 24 שעות.')).toBeTruthy()
     await user.click(screen.getByText('מחיקה'))
     await waitFor(() => {
       expect(vi.mocked(cloudStorage.kvClearUserData)).toHaveBeenCalledOnce()
@@ -150,7 +150,7 @@ describe('Cloud Backup Modal', () => {
     expect(screen.getByText('שמור לענן').closest('button')).toHaveProperty('disabled', true)
   })
 
-  it('"חדש גיבוי" appears when noBackup is set, and re-enables backup on click', async () => {
+  it('"חדש גיבוי" appears when noBackup is set, shows confirm dialog, then re-enables backup', async () => {
     const user = userEvent.setup()
     localStorage.setItem('noBackup', '1')
     renderHeader()
@@ -158,11 +158,16 @@ describe('Cloud Backup Modal', () => {
     await screen.findByRole('dialog')
     expect(screen.getByText('חדש גיבוי')).toBeTruthy()
     await user.click(screen.getByText('חדש גיבוי'))
+    // ConfirmDialog appears
+    expect(screen.getByText('להפעיל מחדש את הגיבוי בענן? כל הנתונים בהתקן יעלו לענן.')).toBeTruthy()
+    await user.click(screen.getByText('מחיקה'))
     await waitFor(() => {
       expect(vi.mocked(cloudStorage.kvDel)).toHaveBeenCalledWith('prefs:noBackup')
       expect(localStorage.getItem('noBackup')).toBeNull()
     })
-    // Sync/push buttons should now be enabled
-    expect(screen.getByText('סנכרן מהענן').closest('button')).toHaveProperty('disabled', false)
+    // Modal should close after successful re-enable
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
   })
 })
