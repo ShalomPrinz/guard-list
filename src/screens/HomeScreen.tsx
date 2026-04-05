@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGroups, deleteGroup } from '../storage/groups'
 import { getSchedules, deleteSchedule } from '../storage/schedules'
@@ -7,17 +7,45 @@ import type { Group, Schedule } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import CreateGroupModal from '../components/CreateGroupModal'
 
+const INITIAL_DISPLAY = 5
+const LOAD_MORE_COUNT = 10
+
 export default function HomeScreen() {
   const navigate = useNavigate()
   const [groups, setGroups] = useState<Group[]>(() => getGroups())
   const [schedules, setSchedules] = useState<Schedule[]>(() => getSchedules())
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'group' | 'schedule'; id: string; name: string } | null>(null)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(INITIAL_DISPLAY)
+  const [loadMoreClicked, setLoadMoreClicked] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setGroups(getGroups())
     setSchedules(getSchedules())
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }, [])
+
+  const schedulesReversed = [...schedules].reverse()
+  const visibleSchedules = schedulesReversed.slice(0, visibleCount)
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !loadMoreClicked) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && visibleCount < schedulesReversed.length) {
+        setVisibleCount(prev => Math.min(prev + LOAD_MORE_COUNT, schedulesReversed.length))
+      }
+    }, { threshold: 0.1 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [schedulesReversed.length, visibleCount, loadMoreClicked])
+
+  function handleLoadMore() {
+    setVisibleCount(prev => prev + LOAD_MORE_COUNT)
+    setLoadMoreClicked(true)
+  }
 
   function handleDeleteGroup(id: string) {
     deleteGroup(id)
@@ -150,30 +178,43 @@ export default function HomeScreen() {
             אין לוחות שמירה עדיין.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {[...schedules].reverse().map(schedule => (
-              <li
-                key={schedule.id}
-                onClick={() => navigate(`/schedule/${schedule.id}/result`)}
-                className="flex cursor-pointer items-center justify-between rounded-2xl bg-white px-4 py-3 active:bg-gray-50 dark:bg-gray-800 dark:active:bg-gray-750"
-              >
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{schedule.name || 'ללא שם'}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} עמדות
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={e => { e.stopPropagation(); setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' }) }}
-                    className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-red-600 active:bg-gray-200 dark:bg-gray-700 dark:text-red-400 dark:active:bg-gray-600"
-                  >
-                    מחיקה
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mb-4 flex flex-col gap-2">
+              {visibleSchedules.map(schedule => (
+                <li
+                  key={schedule.id}
+                  onClick={() => navigate(`/schedule/${schedule.id}/result`)}
+                  className="flex cursor-pointer items-center justify-between rounded-2xl bg-white px-4 py-3 active:bg-gray-50 dark:bg-gray-800 dark:active:bg-gray-750"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{schedule.name || 'ללא שם'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatScheduleDate(schedule.createdAt)} · {schedule.stations.length} עמדות
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDelete({ type: 'schedule', id: schedule.id, name: schedule.name || 'לוח שמירה זה' }) }}
+                      className="min-h-[36px] rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-red-600 active:bg-gray-200 dark:bg-gray-700 dark:text-red-400 dark:active:bg-gray-600"
+                    >
+                      מחיקה
+                    </button>
+                  </div>
+                </li>
+              ))}
+              {!loadMoreClicked && schedulesReversed.length > INITIAL_DISPLAY && (
+                <button
+                  onClick={handleLoadMore}
+                  className="min-h-[44px] rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
+                >
+                  טען רשימות ישנות
+                </button>
+              )}
+              {loadMoreClicked && (
+                <div ref={sentinelRef} className="h-1 mt-4" />
+              )}
+            </ul>
+          </>
         )}
       </section>
 
