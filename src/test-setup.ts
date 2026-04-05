@@ -18,6 +18,13 @@ vi.mock('./storage/cloudStorage', () => ({
 
 window.scrollTo = vi.fn();
 
+// Mock IntersectionObserver
+globalThis.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+})) as any
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({

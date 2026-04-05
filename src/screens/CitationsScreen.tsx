@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getCitations, upsertCitation, deleteCitation } from '../storage/citations'
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
@@ -8,6 +8,8 @@ import { formatAuthorName } from '../logic/citations'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
 import type { Citation, Member } from '../types'
+
+const PAGE_SIZE = 20
 
 interface EditState {
   id: string | null // null = new citation
@@ -24,9 +26,16 @@ export default function CitationsScreen() {
   const currentUsername = getUsername()
   const [citations, setCitations] = useState<Citation[]>(() => getCitations())
   const [search, setSearch] = useState('')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  // Reset visibleCount when search changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [search])
 
   const allMembers: Member[] = getGroups().flatMap(g => g.members)
   const [authorLinks, setAuthorLinks] = useState(() => getCitationAuthorLinks())
@@ -34,6 +43,21 @@ export default function CitationsScreen() {
   const filtered = citations.filter(c =>
     c.text.includes(search) || c.author.includes(search)
   )
+
+  const visible = filtered.slice(0, visibleCount)
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && visibleCount < filtered.length) {
+        setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filtered.length))
+      }
+    }, { threshold: 0.1 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [filtered.length, visibleCount])
 
   function resolveLinkedMemberId(author: string): string {
     const link = authorLinks[author]
@@ -158,7 +182,7 @@ export default function CitationsScreen() {
         </p>
       ) : (
         <ul className="mb-4 flex flex-col gap-2">
-          {filtered.map(citation => {
+          {visible.map(citation => {
             const currentLinkedMemberId = resolveLinkedMemberId(citation.author)
             const canEditDelete = !citation.createdByUsername || citation.createdByUsername === currentUsername
             return (
@@ -202,6 +226,7 @@ export default function CitationsScreen() {
               </li>
             )
           })}
+          <div ref={sentinelRef} className="h-4" />
         </ul>
       )}
 
