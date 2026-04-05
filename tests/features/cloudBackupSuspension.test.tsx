@@ -153,7 +153,7 @@ describe('Cloud Backup Suspension', () => {
     await user.click(screen.getByText('חדש גיבוי'))
     // ConfirmDialog appears
     expect(screen.getByText('להפעיל מחדש את הגיבוי בענן? כל הנתונים בהתקן יעלו לענן.')).toBeTruthy()
-    await user.click(screen.getByText('מחיקה'))
+    await user.click(screen.getByText('הפעל'))
     await waitFor(() => {
       expect(vi.mocked(cloudStorage.kvClearBackupSuspension)).toHaveBeenCalledOnce()
     })

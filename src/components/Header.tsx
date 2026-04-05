@@ -205,6 +205,8 @@ export default function Header() {
       {showReenableConfirm && (
         <ConfirmDialog
           message="להפעיל מחדש את הגיבוי בענן? כל הנתונים בהתקן יעלו לענן."
+          confirmLabel="הפעל"
+          confirmVariant="primary"
           onConfirm={handleReenableBackup}
           onCancel={() => setShowReenableConfirm(false)}
         />

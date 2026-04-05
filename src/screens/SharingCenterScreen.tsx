@@ -428,6 +428,7 @@ export default function SharingCenterScreen() {
       {showLeaveConfirm && (
         <ConfirmDialog
           message="לעזוב את קבוצת השיתוף? הציטוטים של שאר חברי הקבוצה יימחקו מהמכשיר שלך."
+          confirmLabel="עזיבה"
           onConfirm={handleLeave}
           onCancel={() => setShowLeaveConfirm(false)}
         />

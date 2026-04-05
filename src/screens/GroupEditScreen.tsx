@@ -299,6 +299,7 @@ export default function GroupEditScreen() {
       {confirmDeleteMember && (
         <ConfirmDialog
           message={`להסיר את "${confirmDeleteMember.name}" מהקבוצה?`}
+          confirmLabel="הסרה"
           onConfirm={() => deleteMember(confirmDeleteMember.id)}
           onCancel={() => setConfirmDeleteMember(null)}
         />

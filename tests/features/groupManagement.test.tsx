@@ -203,8 +203,8 @@ describe('GroupEditScreen — delete member', () => {
     const deleteButtons = screen.getAllByLabelText('הסר חבר')
     await user.click(deleteButtons[0])
 
-    // Confirm dialog appears — click מחיקה
-    await user.click(await screen.findByText('מחיקה'))
+    // Confirm dialog appears — click הסרה
+    await user.click(await screen.findByText('הסרה'))
 
     await waitFor(() => {
       expect(getGroupById('g1')?.members).toHaveLength(1)

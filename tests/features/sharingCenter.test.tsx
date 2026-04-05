@@ -245,8 +245,8 @@ describe('SharingCenterScreen — leave group', () => {
     await waitFor(() => screen.getByText('עזוב קבוצה'))
     await user.click(screen.getByText('עזוב קבוצה'))
 
-    // ConfirmDialog confirm button is always "מחיקה"
-    await user.click(screen.getByRole('button', { name: 'מחיקה' }))
+    // ConfirmDialog confirm button is "עזיבה" for leave group action
+    await user.click(screen.getByRole('button', { name: 'עזיבה' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('citations-screen')).toBeTruthy()

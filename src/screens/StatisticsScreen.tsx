@@ -178,6 +178,7 @@ export default function StatisticsScreen() {
       {confirmReset && (
         <ConfirmDialog
           message="למחוק את כל הסטטיסטיקות?"
+          confirmLabel="איפוס"
           onConfirm={handleReset}
           onCancel={() => setConfirmReset(false)}
         />

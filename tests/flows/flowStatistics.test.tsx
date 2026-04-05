@@ -179,8 +179,8 @@ describe('StatisticsScreen — reset', () => {
     )
 
     await user.click(screen.getByText('איפוס כל הסטטיסטיקות'))
-    // Confirm dialog appears — click the "מחיקה" confirmation button
-    await user.click(screen.getByText('מחיקה'))
+    // Confirm dialog appears — click the "איפוס" confirmation button
+    await user.click(screen.getByText('איפוס'))
 
     await waitFor(() => {
       expect(getStatistics().participants).toEqual({})

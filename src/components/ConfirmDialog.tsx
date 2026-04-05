@@ -3,11 +3,17 @@ import Modal from './Modal'
 interface Props {
   message: string
   confirmLabel?: string
+  confirmVariant?: 'danger' | 'primary'
   onConfirm: () => void
   onCancel: () => void
 }
 
-export default function ConfirmDialog({ message, confirmLabel = 'מחיקה', onConfirm, onCancel }: Props) {
+export default function ConfirmDialog({ message, confirmLabel = 'מחיקה', confirmVariant = 'danger', onConfirm, onCancel }: Props) {
+  const confirmClass =
+    confirmVariant === 'primary'
+      ? 'bg-blue-600 active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600'
+      : 'bg-red-600 active:bg-red-700'
+
   return (
     <Modal onClose={onCancel}>
       <p className="mb-6 text-sm text-gray-700 dark:text-gray-300">{message}</p>
@@ -20,7 +26,7 @@ export default function ConfirmDialog({ message, confirmLabel = 'מחיקה', on
         </button>
         <button
           onClick={onConfirm}
-          className="min-h-[44px] flex-1 rounded-2xl bg-red-600 text-sm font-semibold text-white active:bg-red-700"
+          className={`min-h-[44px] flex-1 rounded-2xl text-sm font-semibold text-white ${confirmClass}`}
         >
           {confirmLabel}
         </button>
