@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { getGroups } from '../storage/groups'
 import { getScheduleById } from '../storage/schedules'
 import { getStationsConfig, saveStationsConfig } from '../storage/stationsConfig'
 import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
+import { useShortListWizard } from '../context/ShortListWizardContext'
 import type { StationConfig, WizardStation } from '../types'
 import StepIndicator from '../components/StepIndicator'
 import TimePicker from '../components/TimePicker'
@@ -28,7 +29,13 @@ const FIXED_COUNTS = [1, 2, 3, 4] as const
 
 export default function Step1_Stations() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { groupId: shortListGroupId } = useParams<{ groupId: string }>()
   const { session, initSession } = useWizard()
+  const { session: shortListSession, setSession: setShortListSession } = useShortListWizard()
+
+  const isShortList = location.pathname.startsWith('/short-list')
+  const activeSession = isShortList ? shortListSession : session
 
   const groups = getGroups()
   const savedConfigs = getStationsConfig()
@@ -44,11 +51,11 @@ export default function Step1_Stations() {
   // ── Local form state ──────────────────────────────────────────────────────
 
   const [selectedGroupId, setSelectedGroupId] = useState<string>(
-    session?.groupId ?? groups[0]?.id ?? '',
+    isShortList ? (shortListGroupId ?? '') : (session?.groupId ?? groups[0]?.id ?? ''),
   )
 
-  const initCount = session?.stations.length
-    ? session.stations.length
+  const initCount = activeSession?.stations.length
+    ? activeSession.stations.length
     : savedConfigs.length > 0
       ? savedConfigs.length
       : 1
@@ -58,7 +65,13 @@ export default function Step1_Stations() {
   const [customStr, setCustomStr] = useState(initCount > 4 ? String(initCount) : '')
 
   const [stationForms, setStationForms] = useState<StationForm[]>(() => {
-    if (session?.stations.length) {
+    if (isShortList && shortListSession?.stations.length) {
+      return shortListSession.stations.map(s => ({
+        id: s.id,
+        name: s.name,
+      }))
+    }
+    if (!isShortList && session?.stations.length) {
       return session.stations.map(s => ({
         id: s.config.id,
         name: s.config.name,
@@ -76,7 +89,19 @@ export default function Step1_Stations() {
 
   // ── Sync station forms when count changes ─────────────────────────────────
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    // Initialize short-list session on mount
+    if (isShortList && !shortListSession && shortListGroupId) {
+      setShortListSession({
+        groupId: shortListGroupId,
+        stations: [],
+        startHour: 14,
+        minutesPerWarrior: 60,
+        numberOfWarriors: 1,
+      })
+    }
+  }, [])
 
   // savedConfigs is stable (computed once at mount), so only stationCount needs to be a dependency
   useEffect(() => {
@@ -145,7 +170,27 @@ export default function Step1_Stations() {
       }
     }
 
-    // Build wizard stations (participants populated later in Step 3)
+    // Build station configs for short-list, or wizard stations for regular wizard
+    const stationConfigs = stationForms.map(f => ({
+      id: f.id,
+      name: f.name.trim() || `עמדה ${stationForms.indexOf(f) + 1}`,
+      type: 'time-based' as const,
+    }))
+
+    // For short-list, just update the session and navigate to step2
+    if (isShortList) {
+      setShortListSession({
+        groupId: selectedGroupId,
+        stations: stationConfigs,
+        startHour: shortListSession?.startHour ?? 14,
+        minutesPerWarrior: shortListSession?.minutesPerWarrior ?? 60,
+        numberOfWarriors: shortListSession?.numberOfWarriors ?? 1,
+      })
+      navigate('/short-list/step2')
+      return
+    }
+
+    // For regular wizard, build wizard stations (participants populated later in Step 3)
     const stations: WizardStation[] = stationForms.map(f => {
       // Only look up the session station by exact ID (no fallback by index)
       const existingSessionStation = isContinueMode
@@ -396,7 +441,10 @@ export default function Step1_Stations() {
       {/* Navigation */}
       <div className="flex gap-3">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => {
+            if (isShortList) setShortListSession(null)
+            navigate('/')
+          }}
           className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה

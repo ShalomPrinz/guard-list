@@ -5,6 +5,7 @@ import { getGroupById } from '../storage/groups'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
 import { formatDate } from '../logic/formatting'
 import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
+import { useShortListWizard } from '../context/ShortListWizardContext'
 import Modal from '../components/Modal'
 import type { WizardSession, Schedule } from '../types'
 
@@ -36,6 +37,7 @@ export default function ResultScreen() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const navigate = useNavigate()
   const { session, initSession } = useWizard()
+  const { session: shortListSession, clearSession: clearShortListSession } = useShortListWizard()
 
   const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
 
@@ -196,8 +198,13 @@ export default function ResultScreen() {
       {/* Back — always returns to step4 for editing; reconstructs session if viewing from history */}
       <button
         onClick={() => {
-          if (!session) initSession(buildSessionFromSchedule(schedule))
-          navigate('/schedule/new/step4')
+          if (shortListSession) {
+            clearShortListSession()
+            navigate('/short-list/step2')
+          } else {
+            if (!session) initSession(buildSessionFromSchedule(schedule))
+            navigate('/schedule/new/step4')
+          }
         }}
         className="w-full rounded-2xl border border-gray-300 py-3 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
       >

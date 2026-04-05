@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../context/WizardContext'
+import { useShortListWizard } from '../context/ShortListWizardContext'
 import { getUsername } from '../storage/userStorage'
 import Modal from './Modal'
 import ConfirmDialog from './ConfirmDialog'
@@ -10,6 +11,7 @@ import { syncFromCloud, pushLocalToCloud } from '../storage/syncFromCloud'
 export default function Header() {
   const navigate = useNavigate()
   const { resetSession } = useWizard()
+  const { clearSession: clearShortListSession } = useShortListWizard()
   const [isDark, setIsDark] = useState(() =>
     document.documentElement.classList.contains('dark'),
   )
@@ -29,6 +31,7 @@ export default function Header() {
 
   function handleHome() {
     resetSession()
+    clearShortListSession()
     navigate('/')
   }
 

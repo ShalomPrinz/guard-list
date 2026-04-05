@@ -109,6 +109,20 @@ export default function HomeScreen() {
           + צור לוח שמירה
         </button>
         <button
+          onClick={() => {
+            if (groups.length === 0) return
+            if (groups.length === 1) {
+              navigate(`/short-list/step1/${groups[0].id}`)
+            } else {
+              // TODO: show group selector modal for multiple groups
+              navigate(`/short-list/step1/${groups[0].id}`)
+            }
+          }}
+          className="w-full rounded-2xl bg-amber-500 py-4 text-base font-semibold text-white shadow-lg active:bg-amber-600"
+        >
+          ⚡ רשימה קצרה
+        </button>
+        <button
           onClick={() => navigate('/standby')}
           className="w-full rounded-2xl bg-orange-500 py-4 text-base font-semibold text-white shadow-lg active:bg-orange-600"
         >

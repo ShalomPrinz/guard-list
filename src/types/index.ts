@@ -117,6 +117,16 @@ export interface Statistics {
   participants: Record<string, ParticipantStats>;
 }
 
+// ─── Short-List Wizard Session ────────────────────────────────────────────
+
+export interface ShortListWizardSession {
+  groupId: string;
+  stations: StationConfig[];
+  startHour: number;
+  minutesPerWarrior: number;
+  numberOfWarriors: number;
+}
+
 // ─── Wizard Session ───────────────────────────────────────────────────────────
 
 export type RoundingAlgorithm = 'round-up-10' | 'round-up-5' | 'round-nearest';
