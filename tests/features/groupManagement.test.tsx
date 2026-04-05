@@ -75,7 +75,7 @@ describe('HomeScreen — empty state', () => {
 // ─── Group creation ───────────────────────────────────────────────────────────
 
 describe('Group creation via modal', () => {
-  it('creates a group with parsed members and persists to localStorage', async () => {
+  it('creates an empty group and navigates to edit screen', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -85,35 +85,12 @@ describe('Group creation via modal', () => {
     // Fill group name
     await user.type(screen.getByPlaceholderText("למשל: מחלקה א'"), 'פלוגה א')
 
-    // Use the second textbox (textarea) since the first is the group name input
-    const textboxes = screen.getAllByRole('textbox')
-    await user.type(textboxes[1], 'Alice\nBob\nCharlie')
-
     await user.click(screen.getByText('צור'))
 
     const groups = getGroups()
     expect(groups).toHaveLength(1)
     expect(groups[0].name).toBe('פלוגה א')
-    expect(groups[0].members).toHaveLength(3)
-    expect(groups[0].members.map(m => m.name)).toEqual(['Alice', 'Bob', 'Charlie'])
-  })
-
-  it('deduplicates member names on creation', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await user.click(screen.getByText('צור קבוצה'))
-
-    const textboxes = screen.getAllByRole('textbox')
-    await user.type(textboxes[0], 'קבוצה')
-    await user.type(textboxes[1], 'Alice\nAlice\nalice\nBob')
-
-    await user.click(screen.getByText('צור'))
-
-    const groups = getGroups()
-    expect(groups[0].members).toHaveLength(2)
-    expect(groups[0].members[0].name).toBe('Alice')
-    expect(groups[0].members[1].name).toBe('Bob')
+    expect(groups[0].members).toHaveLength(0)
   })
 
   it('shows error when group name is empty', async () => {
@@ -125,30 +102,6 @@ describe('Group creation via modal', () => {
 
     expect(screen.getByText('שם הקבוצה נדרש')).toBeTruthy()
     expect(getGroups()).toHaveLength(0)
-  })
-
-  it('shows error when no members are provided', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await user.click(screen.getByText('צור קבוצה'))
-    await user.type(screen.getByPlaceholderText("למשל: מחלקה א'"), 'קבוצה')
-    await user.click(screen.getByText('צור'))
-
-    expect(screen.getByText('הוסף לפחות חבר אחד')).toBeTruthy()
-  })
-
-  it('all new members are initialized with base availability', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await user.click(screen.getByText('צור קבוצה'))
-    const textboxes = screen.getAllByRole('textbox')
-    await user.type(textboxes[0], 'קבוצה')
-    await user.type(textboxes[1], 'Alice')
-    await user.click(screen.getByText('צור'))
-
-    expect(getGroups()[0].members[0].availability).toBe('base')
   })
 })
 
@@ -256,6 +209,154 @@ describe('GroupEditScreen — delete member', () => {
     await waitFor(() => {
       expect(getGroupById('g1')?.members).toHaveLength(1)
       expect(getGroupById('g1')?.members[0].name).toBe('Bob')
+    })
+  })
+})
+
+describe('GroupEditScreen — bulk add members', () => {
+  it('opens bulk add textarea when toggle button is clicked', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    // Initially: group name input + add member input = 2 textboxes (no bulk textarea yet)
+    const textboxesInitial = screen.getAllByRole('textbox')
+    expect(textboxesInitial).toHaveLength(2)
+
+    const bulkButton = screen.getByText('הוסף מספר חברים בבת אחת')
+    await user.click(bulkButton)
+
+    // After clicking, should have 3 textboxes (group name + add input + bulk textarea)
+    const textboxesAfter = screen.getAllByRole('textbox')
+    expect(textboxesAfter).toHaveLength(3)
+  })
+
+  it('adds multiple comma-separated names and autosaves', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textareas = screen.getAllByRole('textbox')
+    const bulkTextarea = textareas[textareas.length - 1]
+    await user.type(bulkTextarea, 'Charlie, David, Eve')
+
+    const buttons = screen.getAllByText('הוסף')
+    const bulkAddButton = buttons[buttons.length - 1]
+    await user.click(bulkAddButton)
+
+    await waitFor(() => {
+      const group = getGroupById('g1')
+      expect(group?.members).toHaveLength(5)
+      expect(group?.members.map(m => m.name)).toContain('Charlie')
+      expect(group?.members.map(m => m.name)).toContain('David')
+      expect(group?.members.map(m => m.name)).toContain('Eve')
+    })
+  })
+
+  it('adds multiple newline-separated names and autosaves', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textareas = screen.getAllByRole('textbox')
+    const bulkTextarea = textareas[textareas.length - 1]
+    await user.type(bulkTextarea, 'Frank\nGrace\nHenry')
+
+    const buttons = screen.getAllByText('הוסף')
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => {
+      const group = getGroupById('g1')
+      expect(group?.members).toHaveLength(5)
+      expect(group?.members.map(m => m.name)).toEqual(['Alice', 'Bob', 'Frank', 'Grace', 'Henry'])
+    })
+  })
+
+  it('filters out duplicates when bulk adding', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textareas = screen.getAllByRole('textbox')
+    const bulkTextarea = textareas[textareas.length - 1]
+    await user.type(bulkTextarea, 'Charlie\nCharlie\ncharlie\nDavid')
+
+    const buttons = screen.getAllByText('הוסף')
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => {
+      const group = getGroupById('g1')
+      expect(group?.members).toHaveLength(4)
+    })
+  })
+
+  it('does not add names that already exist in the group (case-insensitive)', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textareas = screen.getAllByRole('textbox')
+    const bulkTextarea = textareas[textareas.length - 1]
+    await user.type(bulkTextarea, 'alice, bob, charlie')
+
+    const buttons = screen.getAllByText('הוסף')
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => {
+      const group = getGroupById('g1')
+      expect(group?.members).toHaveLength(3)
+      expect(group?.members.map(m => m.name)).toEqual(['Alice', 'Bob', 'charlie'])
+    })
+  })
+
+  it('closes bulk textarea after adding and clears input', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1' }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textboxes = screen.getAllByRole('textbox')
+    const bulkTextarea = textboxes[textboxes.length - 1] // Last textbox is the bulk textarea
+    await user.type(bulkTextarea, 'Charlie')
+
+    const buttons = screen.getAllByText('הוסף')
+    await user.click(buttons[buttons.length - 1]) // Last button is the bulk add button
+
+    await waitFor(() => {
+      // After adding, the member should be saved
+      const group = getGroupById('g1')
+      expect(group?.members).toHaveLength(3)
+      expect(group?.members.map(m => m.name)).toContain('Charlie')
+      // After adding and closing, should be back to 2 textboxes (group name + add input)
+      expect(screen.getAllByRole('textbox')).toHaveLength(2)
+    })
+  })
+
+  it('all bulk-added members are initialized with base availability and warrior role', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup({ id: 'g1', members: [] }))
+    renderApp('/group/g1/edit')
+
+    await user.click(screen.getByText('הוסף מספר חברים בבת אחת'))
+    const textareas = screen.getAllByRole('textbox')
+    const bulkTextarea = textareas[textareas.length - 1]
+    await user.type(bulkTextarea, 'Charlie, David')
+
+    const buttons = screen.getAllByText('הוסף')
+    await user.click(buttons[buttons.length - 1])
+
+    await waitFor(() => {
+      const group = getGroupById('g1')
+      const charlie = group?.members.find(m => m.name === 'Charlie')
+      const david = group?.members.find(m => m.name === 'David')
+      expect(charlie?.availability).toBe('base')
+      expect(charlie?.role).toBe('warrior')
+      expect(david?.availability).toBe('base')
+      expect(david?.role).toBe('warrior')
     })
   })
 })

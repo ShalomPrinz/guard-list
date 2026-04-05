@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getGroupById, upsertGroup } from '../storage/groups'
+import { parseNames } from '../logic/parseNames'
 import type { Group, Member } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AvailabilityToggle from '../components/AvailabilityToggle'
@@ -12,6 +13,8 @@ export default function GroupEditScreen() {
   const [group, setGroup] = useState<Group | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [newMemberName, setNewMemberName] = useState('')
+  const [bulkText, setBulkText] = useState('')
+  const [showBulk, setShowBulk] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<Member | null>(null)
@@ -96,6 +99,26 @@ export default function GroupEditScreen() {
     const member: Member = { id: crypto.randomUUID(), name, availability: 'base', role: 'warrior' }
     setGroup(prev => prev ? { ...prev, members: [...prev.members, member] } : prev)
     setNewMemberName('')
+  }
+
+  function handleBulkAdd() {
+    const parsed = parseNames(bulkText)
+    const existingNames = group?.members.map(m => m.name.toLowerCase()) ?? []
+
+    const newMembers = parsed
+      .filter(name => !existingNames.includes(name.toLowerCase()))
+      .map(name => ({
+        id: crypto.randomUUID(),
+        name,
+        availability: 'base' as const,
+        role: 'warrior' as const,
+      }))
+
+    if (newMembers.length > 0) {
+      setGroup(prev => prev ? { ...prev, members: [...prev.members, ...newMembers] } : prev)
+    }
+    setBulkText('')
+    setShowBulk(false)
   }
 
   if (notFound) {
@@ -226,7 +249,7 @@ export default function GroupEditScreen() {
       </div>
 
       {/* Add member */}
-      <div className="flex gap-2">
+      <div className="mb-4 flex gap-2">
         <input
           type="text"
           value={newMemberName}
@@ -243,6 +266,34 @@ export default function GroupEditScreen() {
           הוסף
         </button>
       </div>
+
+      {/* Bulk add toggle button */}
+      <button
+        onClick={() => setShowBulk(!showBulk)}
+        className="mb-4 w-full min-h-[44px] rounded-xl border border-blue-300 py-2.5 text-sm font-medium text-blue-600 active:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:active:bg-blue-900/20"
+      >
+        הוסף מספר חברים בבת אחת
+      </button>
+
+      {/* Bulk add textarea */}
+      {showBulk && (
+        <div className="mb-4">
+          <textarea
+            value={bulkText}
+            onChange={e => setBulkText(e.target.value)}
+            placeholder="שם, שם, שם\nאו שורה לכל חבר"
+            rows={5}
+            className="mb-2 w-full resize-none rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
+          />
+          <button
+            onClick={handleBulkAdd}
+            disabled={!bulkText.trim()}
+            className="w-full min-h-[44px] rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-40 active:bg-blue-700"
+          >
+            הוסף
+          </button>
+        </div>
+      )}
 
       {/* Confirm delete member */}
       {confirmDeleteMember && (
