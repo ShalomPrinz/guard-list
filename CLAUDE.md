@@ -58,6 +58,10 @@ Run it before ending any session where you: added a new component pattern, fixed
 
 1. `npx tsc --noEmit` — zero errors required
 2. `npx vitest run --coverage` — ≥90% coverage required for `src/logic/` and `src/storage/`
+3. You must end your response by suggesting a git commit message matching the style in the "Commit Style" section. Base it on verified changes (architecture/main ideas). Print it as a copyable code block in the following format. Do not run git yourself:
+```
+git commit -m "<commit_message>"
+```
 
 ## Commit Style
 

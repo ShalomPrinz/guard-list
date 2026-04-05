@@ -25,10 +25,3 @@ This is the final implementation gate — do not declare done until every user r
 Run `/update-docs`. Scope is limited to what was just implemented — do not review the entire conversation history.
 
 Tell the user (in your response, not in any file) about any instructions or requirements you decided to defer or ignore.
-
-5. **Final Step: Commit Message**
-*Requirement #1:* You must end your response by suggesting a git commit message matching the style in `CLAUDE.md`. Base it on verified changes (architecture/main ideas).
-*Requirement #2:* Print it as a copyable code block in the following format. Do not run git yourself:
-```
-git commit -m "<commit_message>"
-```
