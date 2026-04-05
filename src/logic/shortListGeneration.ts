@@ -90,6 +90,7 @@ export function generateShortListSchedule(
     groupId,
     createdAt: new Date().toISOString(),
     date: today,
+    createdFromShortList: true,
     stations: scheduleStations,
     unevenDistributionMode: 'equal-duration',
   }

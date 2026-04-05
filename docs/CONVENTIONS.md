@@ -44,7 +44,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - `Citation` has: `id`, `text`, `author` (formatted string), `usedInListIds: string[]`, `createdByUsername?: string` (undefined = legacy, treated as owned by current user).
 - `GuestCitationSubmission` has: `id`, `text`, `author`, `submittedAt` (ms timestamp). Stored in KV at `{username}:guestCitations:{id}`. Never in localStorage — fetched on demand via `kvListGuestCitations()`.
 - `citationAuthorLinks` in localStorage maps `authorString → memberId` for statistics attribution.
-- `Schedule` has `parentScheduleId?: string` when it is a continued round.
+- `Schedule` has `parentScheduleId?: string` when it is a continued round, and `createdFromShortList?: boolean` when generated via short-list wizard. The `createdFromShortList` flag enables ResultScreen back button to reconstruct the short-list session from a schedule opened from history — allowing users to edit and regenerate short-list schedules seamlessly.
 - `ScheduledParticipant` has `note?: string` (optional per-warrior note, never shown in WhatsApp output).
 - `ShortListWizardSession` holds ephemeral state for quick schedule generation: `groupId`, `stations` (array of `StationConfig`), `startHour`, `minutesPerWarrior`, `numberOfWarriors` (interpreted as "warriors per station", not total), `name?: string` (default "רשימת שמירה"). Never persisted to KV or localStorage — session-only, cleared when returning home.
 - All persisted types live in `src/types/index.ts`. Never define a persisted interface elsewhere.
@@ -115,7 +115,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 
 - Back navigation never loses form state. Every wizard step reads its initial values from wizard session context, not from props or URL params.
 - Every user-entered field in every wizard step must be part of wizard session context. Nothing the user typed disappears on Back navigation.
-- ResultScreen has no read-only mode. The Back button is always visible and always returns to Step4_Review with full wizard state intact. When a short-list session is active, the Back button clears the session and navigates to `/short-list/step2`.
+- ResultScreen has no read-only mode. The Back button is always visible. It detects whether the schedule was created via regular wizard or short-list wizard: if `schedule.createdFromShortList` is true (or active short-list session exists), it reconstructs the short-list session and navigates to `/short-list/step2`; otherwise, it reconstructs regular wizard context and navigates to `/schedule/new/step4`. The session is not cleared on back button — Step2 or Step4 will handle cleanup when user navigates home.
 - Re-saving an edited schedule overwrites the existing localStorage entry by `id`. Never creates a duplicate.
 - Clicking the global Header (logo + app name) navigates to HomeScreen and clears all wizard session state (both regular `WizardContext` and `ShortListWizardContext`).
 - `window.scrollTo({ top: 0, behavior: 'instant' })` is called on mount of every screen and wizard step.

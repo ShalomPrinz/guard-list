@@ -8,7 +8,7 @@ import TimePicker from '../components/TimePicker'
 
 export default function ShortListStep2() {
   const navigate = useNavigate()
-  const { session, clearSession } = useShortListWizard()
+  const { session, clearSession, setStartHour: setContextStartHour, setMinutesPerWarrior: setContextMinutesPerWarrior, setNumberOfWarriors: setContextNumberOfWarriors } = useShortListWizard()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -24,20 +24,32 @@ export default function ShortListStep2() {
   const group = session?.groupId ? getGroupById(session.groupId) : null
   const availableCount = group ? group.members.filter(m => m.availability === 'base').length : 0
 
-  const [startTime, setStartTime] = useState(() => {
-    const hour = String(session?.startHour ?? 14).padStart(2, '0')
-    return `${hour}:00`
-  })
-  const [minutesPerWarrior, setMinutesPerWarrior] = useState(session?.minutesPerWarrior ?? 60)
-  const [numberOfWarriors, setNumberOfWarriors] = useState(session?.numberOfWarriors ?? 1)
+  const startHour = session?.startHour ?? 14
+  const minutesPerWarrior = session?.minutesPerWarrior ?? 60
+  const numberOfWarriors = session?.numberOfWarriors ?? 1
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  const startTime = `${String(startHour).padStart(2, '0')}:00`
+
+  function handleSetStartTime(time: string) {
+    const hour = parseInt(time.split(':')[0], 10)
+    setContextStartHour(hour)
+  }
+
+  function handleSetMinutesPerWarrior(minutes: number) {
+    const val = Math.max(1, parseInt(String(minutes), 10))
+    setContextMinutesPerWarrior(isNaN(val) ? 60 : val)
+  }
+
+  function handleSetNumberOfWarriors(count: number) {
+    const val = Math.max(1, Math.min(availableCount, parseInt(String(count), 10)))
+    setContextNumberOfWarriors(isNaN(val) ? 1 : val)
+  }
 
   if (!session) {
     return null
   }
-
-  const startHour = parseInt(startTime.split(':')[0], 10)
 
   function handleCreate() {
     setError('')
@@ -76,8 +88,7 @@ export default function ShortListStep2() {
     // Save schedule to localStorage
     upsertSchedule(schedule)
 
-    // Clear session and navigate to result
-    clearSession()
+    // Navigate to result — do NOT clear session here, it must survive for back button
     navigate(`/schedule/${schedule.id}/result`)
   }
 
@@ -92,7 +103,7 @@ export default function ShortListStep2() {
         </label>
         <TimePicker
           value={startTime}
-          onChange={setStartTime}
+          onChange={handleSetStartTime}
         />
       </div>
 
@@ -106,10 +117,7 @@ export default function ShortListStep2() {
           min={1}
           max={999}
           value={minutesPerWarrior}
-          onChange={e => {
-            const val = Math.max(1, parseInt(e.target.value, 10))
-            setMinutesPerWarrior(isNaN(val) ? 60 : val)
-          }}
+          onChange={e => handleSetMinutesPerWarrior(parseInt(e.target.value, 10))}
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
       </div>
@@ -124,10 +132,7 @@ export default function ShortListStep2() {
           min={1}
           max={availableCount}
           value={numberOfWarriors}
-          onChange={e => {
-            const val = Math.max(1, Math.min(availableCount, parseInt(e.target.value, 10)))
-            setNumberOfWarriors(isNaN(val) ? 1 : val)
-          }}
+          onChange={e => handleSetNumberOfWarriors(parseInt(e.target.value, 10))}
           className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
         />
         {session?.stations.length ? (

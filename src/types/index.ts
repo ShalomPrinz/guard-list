@@ -48,6 +48,7 @@ export interface Schedule {
   createdAt: string;       // ISO datetime
   date: string;            // YYYY-MM-DD
   parentScheduleId?: string;
+  createdFromShortList?: boolean; // true if generated via short-list wizard
   stations: ScheduleStation[];
   unevenDistributionMode: 'equal-duration' | 'equal-endtime';
   quote?: string;

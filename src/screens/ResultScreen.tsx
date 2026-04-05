@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getScheduleById, updateScheduleName } from '../storage/schedules'
 import { getGroupById } from '../storage/groups'
+import { getStationsConfig } from '../storage/stationsConfig'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
 import { formatDate } from '../logic/formatting'
 import { useWizard, DEFAULT_TIME_CONFIG } from '../context/WizardContext'
 import { useShortListWizard } from '../context/ShortListWizardContext'
 import Modal from '../components/Modal'
-import type { WizardSession, Schedule } from '../types'
+import type { WizardSession, Schedule, ShortListWizardSession, StationConfig } from '../types'
 
 function buildSessionFromSchedule(schedule: Schedule): WizardSession {
   const group = getGroupById(schedule.groupId)
@@ -33,11 +34,45 @@ function buildSessionFromSchedule(schedule: Schedule): WizardSession {
   }
 }
 
+function buildShortListSessionFromSchedule(schedule: Schedule): ShortListWizardSession | null {
+  if (!schedule.createdFromShortList) return null
+
+  // Reconstruct stations from schedule
+  const stationIds = schedule.stations.map(st => st.stationConfigId)
+  const allConfigs = getStationsConfig()
+  const stations: StationConfig[] = stationIds
+    .map(id => allConfigs.find(cfg => cfg.id === id))
+    .filter((cfg): cfg is StationConfig => cfg !== undefined)
+
+  if (stations.length === 0) return null
+
+  // Reconstruct startHour from first participant
+  const firstParticipant = schedule.stations[0]?.participants[0]
+  const startHour = firstParticipant ? parseInt(firstParticipant.startTime.split(':')[0], 10) : 14
+
+  // Reconstruct minutesPerWarrior from first participant's duration
+  const minutesPerWarrior = firstParticipant?.durationMinutes ?? 60
+
+  // Reconstruct numberOfWarriors (per station)
+  const numberOfWarriors = schedule.stations.length > 0
+    ? Math.ceil(schedule.stations[0].participants.length)
+    : 1
+
+  return {
+    groupId: schedule.groupId,
+    stations,
+    startHour,
+    minutesPerWarrior,
+    numberOfWarriors,
+    name: schedule.name,
+  }
+}
+
 export default function ResultScreen() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const navigate = useNavigate()
   const { session, initSession } = useWizard()
-  const { session: shortListSession, clearSession: clearShortListSession } = useShortListWizard()
+  const { session: shortListSession, setSession: setShortListSession } = useShortListWizard()
 
   const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
 
@@ -195,13 +230,22 @@ export default function ResultScreen() {
         ↩ המשך סבב
       </button>
 
-      {/* Back — always returns to step4 for editing; reconstructs session if viewing from history */}
+      {/* Back — navigates based on how the schedule was created */}
       <button
         onClick={() => {
-          if (shortListSession) {
-            clearShortListSession()
+          if (shortListSession || schedule.createdFromShortList) {
+            // Short-list flow: reconstruct session if needed, then go back to Step2
+            // Don't clear here — Step2's cancel button handles cleanup when navigating home
+            if (!shortListSession) {
+              // Reconstruct session from schedule if it doesn't exist
+              const shortListSess = buildShortListSessionFromSchedule(schedule)
+              if (shortListSess) {
+                setShortListSession(shortListSess)
+              }
+            }
             navigate('/short-list/step2')
           } else {
+            // Regular wizard: reconstruct and go to Step4
             if (!session) initSession(buildSessionFromSchedule(schedule))
             navigate('/schedule/new/step4')
           }
