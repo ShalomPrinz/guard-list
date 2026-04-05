@@ -78,6 +78,7 @@ export default function Step1_Stations() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
+  // savedConfigs is stable (computed once at mount), so only stationCount needs to be a dependency
   useEffect(() => {
     setStationForms(prev => {
       if (stationCount === prev.length) return prev

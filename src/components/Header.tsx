@@ -20,6 +20,7 @@ export default function Header() {
   const [noBackup, setNoBackup] = useState(() => !!localStorage.getItem('noBackup'))
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null)
 
+  // Runs once on mount to fetch backup suspension status when backup is disabled
   useEffect(() => {
     if (!noBackup) return
     void kvGetBackupSuspension().then(setSuspendedUntil)

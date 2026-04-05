@@ -430,6 +430,7 @@ export default function Step4_Review() {
     return buildReviewStations(session)
   })
 
+  // Runs once on mount to apply citation from navigation state, then clears it
   // Apply a citation selected from CitationsScreen.
   useEffect(() => {
     const state = location.state as {
@@ -505,8 +506,7 @@ export default function Step4_Review() {
     if (!selectedCitation?.author) { setCitationLinkedMemberId(''); return }
     const link = getCitationAuthorLinks()[selectedCitation.author]
     setCitationLinkedMemberId(link && link !== 'skip' ? link : '')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCitation?.id])
+  }, [selectedCitation])
 
   useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
   if (!session) return null

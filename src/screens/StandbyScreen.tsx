@@ -50,6 +50,7 @@ export default function StandbyScreen() {
   const baseWarriors = warriors.filter(m => getMemberAvailability(m) === 'base')
 
   // Initialize selected names and reset overrides when group changes
+  // groups is immutable after init, so only selectedGroupId is reactive
   useEffect(() => {
     setLocalAvailabilityById({})
     setSelectedCommanderId(null)
