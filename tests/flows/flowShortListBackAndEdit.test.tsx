@@ -98,7 +98,7 @@ describe('Short-list back navigation fix', () => {
     })
 
     // Verify Step2 form is visible
-    const createBtn = screen.getByRole('button', { name: /יצור רשימה/ })
+    const createBtn = screen.getByRole('button', { name: /✓ צור רשימה/ })
     expect(createBtn).toBeTruthy()
 
     // Click create — this will generate schedule and navigate to ResultScreen
@@ -122,7 +122,7 @@ describe('Short-list back navigation fix', () => {
     })
 
     // Verify form state is preserved
-    expect(screen.getByRole('button', { name: /יצור רשימה/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /✓ צור רשימה/ })).toBeTruthy()
   })
 
   it('back button works when opening short-list schedule from history', async () => {

@@ -127,8 +127,8 @@ describe('Short-List Creation Flow', () => {
       // Fill in parameters using the helper
       fillShortListStep2(14, 90, 5)
 
-      // Click "יצור רשימה"
-      const createBtn = screen.getByText('יצור רשימה')
+      // Click "✓ צור רשימה"
+      const createBtn = screen.getByText('✓ צור רשימה')
       await user.click(createBtn)
 
       // Should navigate to ResultScreen (back button is always present there)
@@ -149,7 +149,7 @@ describe('Short-List Creation Flow', () => {
       fillShortListStep2(14, 90, 5)
 
       // Create schedule
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       // Wait for navigation and verify localStorage
       await waitFor(() => {
@@ -182,7 +182,7 @@ describe('Short-List Creation Flow', () => {
 
       fillShortListStep2(14, 90, 5)
 
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       await waitFor(() => {
         const backBtn = screen.getByText('← חזרה לעריכה')
@@ -223,7 +223,7 @@ describe('Short-List Creation Flow', () => {
       const totalWarriors = screen.getByText(/סך הכל:/)
       expect(totalWarriors.textContent).toContain('20 חיילים')
 
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       await waitFor(() => {
         const schedules = getSchedules()
@@ -279,7 +279,7 @@ describe('Short-List Creation Flow', () => {
 
       fillShortListStep2(14, 90, 5)
 
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       await waitFor(() => {
         const backBtn = screen.getByText('← חזרה לעריכה')
@@ -319,7 +319,7 @@ describe('Short-List Creation Flow', () => {
       // 2 warriors per station, total = 2 × 2 = 4 > 3 available
       fillShortListStep2(14, 60, 2)
 
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       // Should show error message
       await waitFor(() => {
@@ -343,7 +343,7 @@ describe('Short-List Creation Flow', () => {
       }
 
       // If we can get to Step2, it should error on creation due to no group
-      const createBtn = screen.queryByText('יצור רשימה')
+      const createBtn = screen.queryByText('✓ צור רשימה')
       if (createBtn) {
         await user.click(createBtn)
         await waitFor(() => {
@@ -363,7 +363,7 @@ describe('Short-List Creation Flow', () => {
 
       fillShortListStep2(14, 90, 5)
 
-      await user.click(screen.getByText('יצור רשימה'))
+      await user.click(screen.getByText('✓ צור רשימה'))
 
       // Wait for navigation to complete (check for result screen elements)
       await waitFor(() => {

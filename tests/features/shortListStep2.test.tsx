@@ -155,7 +155,7 @@ describe('ShortListStep2', () => {
     const numberOfWarriorsInput = screen.getByDisplayValue('1') as HTMLInputElement
     fireEvent.change(numberOfWarriorsInput, { target: { value: '' } })
 
-    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    const createButton = screen.getByRole('button', { name: /✓ צור רשימה/ })
     fireEvent.click(createButton)
 
     await waitFor(() => {
@@ -197,7 +197,7 @@ describe('ShortListStep2', () => {
     const minutesInput = screen.getByDisplayValue('60') as HTMLInputElement
     fireEvent.change(minutesInput, { target: { value: '' } })
 
-    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    const createButton = screen.getByRole('button', { name: /✓ צור רשימה/ })
     fireEvent.click(createButton)
 
     await waitFor(() => {
@@ -240,7 +240,7 @@ describe('ShortListStep2', () => {
     const numberOfWarriorsInput = screen.getByDisplayValue('1') as HTMLInputElement
     fireEvent.change(numberOfWarriorsInput, { target: { value: '5' } })
 
-    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    const createButton = screen.getByRole('button', { name: /✓ צור רשימה/ })
     fireEvent.click(createButton)
 
     await waitFor(() => {
@@ -321,8 +321,8 @@ describe('ShortListStep2', () => {
       expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
     })
 
-    // Click "יצור רשימה" button
-    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    // Click "✓ צור רשימה" button
+    const createButton = screen.getByRole('button', { name: /✓ צור רשימה/ })
     fireEvent.click(createButton)
 
     // Wait for the schedule to be created
