@@ -1,5 +1,5 @@
 import type { Group, StationConfig, Schedule, Citation, ParticipantStats } from '../types'
-import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGetNoBackup } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers, kvGetNoBackup } from './cloudStorage'
 import { getUsername } from './userStorage'
 import { getGroups, upsertGroup } from './groups'
 import { getStationsConfig, saveStationsConfig } from './stationsConfig'
@@ -7,7 +7,7 @@ import { getSchedules, upsertSchedule } from './schedules'
 import { getCitations, upsertCitation, deleteCitationSilent } from './citations'
 import { getStatistics, saveStatistics } from './statistics'
 import { getTheme, saveTheme } from './theme'
-import { getLocalGroup } from './citationShare'
+import { getLocalGroup, setLocalGroup } from './citationShare'
 
 /**
  * Backfills all six KV namespaces into localStorage on app startup.
@@ -109,6 +109,21 @@ export async function syncFromCloud(): Promise<void> {
     if (getTheme() === null) {
       const prefs = await kvGet<{ theme: 'dark' | 'light' }>('prefs:global')
       if (prefs?.theme) saveTheme(prefs.theme)
+    }
+  } catch { /* silent */ }
+
+  // Citation sharing: restore group membership from KV if localStorage is stale
+  // This handles the case where localStorage was wiped but the user is still in a group in KV.
+  // Without this, kvGroupJoin returns 400 "Already in a group" when accepting a new invitation.
+  try {
+    if (getLocalGroup() === null) {
+      const groupId = await kvGet<string>('share:groupId')
+      if (groupId) {
+        const members = await kvGroupGetMembers(groupId)
+        if (members !== null && members.length > 0) {
+          setLocalGroup({ groupId, members, joinedAt: Date.now() })
+        }
+      }
     }
   } catch { /* silent */ }
 
