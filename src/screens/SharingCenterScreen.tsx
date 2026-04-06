@@ -36,6 +36,7 @@ export default function SharingCenterScreen() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [inviteCancelledBy, setInviteCancelledBy] = useState<string | null>(null)
+  const [acceptError, setAcceptError] = useState<string | null>(null)
   const [autoLeftMsg, setAutoLeftMsg] = useState(false)
 
   // Guest link
@@ -140,12 +141,18 @@ export default function SharingCenterScreen() {
 
   async function handleAccept() {
     if (!invitation) return
+    setAcceptError(null)
     const fromUsername = invitation.fromUsername
     setActionLoading(true)
     const result = await acceptGroupInvitation(invitation)
     if (result === 'cancelled') {
       setActionLoading(false)
       setInviteCancelledBy(fromUsername)
+      return
+    }
+    if (result === 'error') {
+      setActionLoading(false)
+      setAcceptError('שגיאה בהצטרפות לקבוצה — נסה שוב')
       return
     }
     // Sync fresh state from KV: check for notifications, refresh group members
@@ -314,6 +321,9 @@ export default function SharingCenterScreen() {
               דחה
             </button>
           </div>
+          {acceptError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{acceptError}</p>
+          )}
         </div>
       )}
 

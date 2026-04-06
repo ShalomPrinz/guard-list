@@ -28,6 +28,7 @@ import type { SharingGroup, GroupInvitation, GuestCitationSubmission } from '@/t
 const mockKvGet = vi.fn()
 const mockKvDel = vi.fn()
 const mockKvGroupGetMembers = vi.fn()
+const mockKvGroupJoin = vi.fn()
 const mockKvListGuestCitations = vi.fn<() => Promise<GuestCitationSubmission[]>>()
 const mockKvListGuestCitationsLatest = vi.fn<(limit?: number) => Promise<GuestCitationSubmission[]>>()
 const mockKvDeleteGuestCitation = vi.fn<(id: string) => Promise<void>>()
@@ -40,13 +41,13 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvGet: (...args: unknown[]) => mockKvGet(...args),
     kvDel: (...args: unknown[]) => mockKvDel(...args),
     kvGroupGetMembers: (...args: unknown[]) => mockKvGroupGetMembers(...args),
+    kvGroupJoin: (...args: unknown[]) => mockKvGroupJoin(...args),
     kvListGuestCitations: (...args: unknown[]) => mockKvListGuestCitations(...(args as [])),
     kvListGuestCitationsLatest: (...args: unknown[]) => mockKvListGuestCitationsLatest(...(args as [number | undefined])),
     kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
     kvInvitationCancel: (...args: unknown[]) => mockKvInvitationCancel(...(args as [string])),
     kvGroupLeave: vi.fn().mockResolvedValue(undefined),
     kvCrossSet: vi.fn().mockResolvedValue('ok'),
-    kvGroupJoin: vi.fn().mockResolvedValue('ok'),
     kvGroupCreate: vi.fn().mockResolvedValue({ groupId: 'new-group' }),
     kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
   }
@@ -81,6 +82,7 @@ beforeEach(() => {
   mockKvGet.mockResolvedValue(null)
   mockKvDel.mockResolvedValue(undefined)
   mockKvGroupGetMembers.mockResolvedValue(null)
+  mockKvGroupJoin.mockResolvedValue('ok')
   mockKvListGuestCitations.mockResolvedValue([])
   mockKvListGuestCitationsLatest.mockResolvedValue([])
   mockKvDeleteGuestCitation.mockResolvedValue(undefined)
@@ -788,6 +790,68 @@ describe('SharingCenterScreen — cancel outgoing invitation', () => {
     await waitFor(() => {
       expect(mockKvInvitationCancel).toHaveBeenCalledWith('charlie')
       expect(screen.queryByText(/charlie/)).toBeNull()
+    })
+  })
+})
+
+// ─── Accept invitation error handling ────────────────────────────────────────
+
+describe('SharingCenterScreen — accept invitation error handling', () => {
+  it('shows Hebrew error message when acceptGroupInvitation returns "error"', async () => {
+    const user = userEvent.setup()
+    const inv = makeInvitation({ fromUsername: 'alice' })
+    setLocalGroupInvitation(inv)
+
+    // KV invitation exists on load, but kvGroupJoin fails → acceptGroupInvitation returns 'error'
+    mockKvGroupJoin.mockResolvedValue('error')
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByRole('button', { name: 'אשר' }))
+    await user.click(screen.getByRole('button', { name: 'אשר' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeTruthy()
+    })
+    // Accept button must still be visible (not disabled) so user can retry
+    expect(screen.getByRole('button', { name: 'אשר' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('clears accept error when user clicks "אשר" again', async () => {
+    const user = userEvent.setup()
+    const inv = makeInvitation({ fromUsername: 'alice' })
+    setLocalGroupInvitation(inv)
+
+    // First call: fail → error shown; second call: succeed → join works
+    mockKvGroupJoin.mockResolvedValueOnce('error').mockResolvedValueOnce('ok')
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser', 'alice'])
+    let invCallCount = 0
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') {
+        invCallCount++
+        return Promise.resolve(invCallCount <= 3 ? inv : null)
+      }
+      return Promise.resolve(null)
+    })
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByRole('button', { name: 'אשר' }))
+    await user.click(screen.getByRole('button', { name: 'אשר' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeTruthy()
+    })
+
+    // Click again — error clears on retry attempt
+    await user.click(screen.getByRole('button', { name: 'אשר' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeNull()
     })
   })
 })
