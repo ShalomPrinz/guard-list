@@ -1,6 +1,7 @@
 import type { Citation } from '../types'
 import { kvSet, kvDel } from './cloudStorage'
 import { getLocalGroup, appendToDeleteLog } from './citationShare'
+import { getUsername } from './userStorage'
 
 const KEY = 'citations'
 
@@ -31,6 +32,10 @@ export function upsertCitation(citation: Citation, storage: Storage = window.loc
 }
 
 export function deleteCitation(id: string, storage: Storage = window.localStorage): void {
+  const citation = getCitations(storage).find(c => c.id === id)
+  if (citation?.createdByUsername && citation.createdByUsername !== getUsername()) {
+    return
+  }
   if (getLocalGroup(storage) !== null) {
     appendToDeleteLog(id, storage)
   }

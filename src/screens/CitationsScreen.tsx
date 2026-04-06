@@ -29,8 +29,15 @@ export default function CitationsScreen() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // Reset visibleCount when search changes
   useEffect(() => {
@@ -192,7 +199,11 @@ export default function CitationsScreen() {
               >
                 <div
                   role="button"
-                  onClick={() => selectionMode ? handleSelect(citation) : (canEditDelete ? openEdit(citation) : undefined)}
+                  onClick={() => {
+                    if (selectionMode) { handleSelect(citation); return }
+                    if (canEditDelete) { openEdit(citation); return }
+                    setToast('לא ניתן לערוך ציטוט שנוצר על ידי משתמש אחר')
+                  }}
                   className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${selectionMode || canEditDelete ? 'cursor-pointer active:bg-gray-50 dark:active:bg-gray-700' : 'cursor-default'}`}
                 >
                   <div className="min-w-0 flex-1">
@@ -317,6 +328,13 @@ export default function CitationsScreen() {
           onConfirm={() => handleDelete(confirmDeleteId)}
           onCancel={() => setConfirmDeleteId(null)}
         />
+      )}
+
+      {/* Ownership toast */}
+      {toast !== null && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-gray-900 px-5 py-3 text-sm text-white shadow-lg dark:bg-gray-700">
+          {toast}
+        </div>
       )}
     </div>
   )
