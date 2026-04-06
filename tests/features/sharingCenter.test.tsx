@@ -368,6 +368,61 @@ describe('SharingCenterScreen — invitation visible on mount (regression)', () 
   })
 })
 
+// ─── Fix: Invitation acceptance state sync (bug fix) ──────────────────────────
+
+describe('SharingCenterScreen — invitation acceptance state sync (bug fix)', () => {
+  it('button always shows "אשר" (no "מעבד..." message) — does not render loading text', async () => {
+    const inv = makeInvitation({ fromUsername: 'alice' })
+    setLocalGroupInvitation(inv)
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser', 'alice'])
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByText(/alice/))
+    const acceptButton = screen.getByRole('button', { name: 'אשר' })
+
+    // Button text should be exactly "אשר", never "מעבד..."
+    expect(acceptButton.textContent).toBe('אשר')
+  })
+
+  it('invitation card disappears and group card appears with fresh members after acceptance', async () => {
+    const user = userEvent.setup()
+    const inv = makeInvitation({ fromUsername: 'alice' })
+    setLocalGroupInvitation(inv)
+
+    // kvGet('share:groupInvitation') is called 3 times total:
+    //   call #1 — mount loadSharingCenterUpdates (local + remote both exist → no action)
+    //   call #2 — acceptGroupInvitation guard (remote exists → proceed with join)
+    //   call #3 — post-accept loadSharingCenterUpdates (local is now null, remote null → no cancellation)
+    let groupInvCallCount = 0
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') {
+        groupInvCallCount++
+        return Promise.resolve(groupInvCallCount <= 2 ? inv : null)
+      }
+      return Promise.resolve(null)
+    })
+    mockKvGroupGetMembers.mockResolvedValue(['currentuser', 'alice'])
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByRole('button', { name: 'אשר' }))
+    await user.click(screen.getByRole('button', { name: 'אשר' }))
+
+    await waitFor(() => {
+      // Invitation card must be gone
+      expect(screen.queryByRole('button', { name: 'דחה' })).toBeNull()
+      // Group card must appear with fresh members
+      expect(screen.getByText('קבוצת שיתוף ציטוטים')).toBeTruthy()
+      expect(screen.getByText('alice')).toBeTruthy()
+    })
+  })
+})
+
 // ─── Guest link section ───────────────────────────────────────────────────────
 
 function makeSubmission(id: string, overrides: Partial<GuestCitationSubmission> = {}): GuestCitationSubmission {

@@ -143,10 +143,20 @@ export default function SharingCenterScreen() {
     const fromUsername = invitation.fromUsername
     setActionLoading(true)
     const result = await acceptGroupInvitation(invitation)
-    refreshState()
-    setActionLoading(false)
     if (result === 'cancelled') {
+      setActionLoading(false)
       setInviteCancelledBy(fromUsername)
+      return
+    }
+    // Sync fresh state from KV: check for notifications, refresh group members
+    const sharingResult = await loadSharingCenterUpdates()
+    setGroup(getLocalGroup())
+    setInvitation(getLocalGroupInvitation())
+    setOutgoing(getOutgoingInvitation())
+    setActionLoading(false)
+    // Show success notification if there are any (acceptance of self or others)
+    if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
+      setNotification(sharingResult)
     }
   }
 
@@ -294,7 +304,7 @@ export default function SharingCenterScreen() {
               disabled={actionLoading}
               className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:active:bg-green-800"
             >
-              {actionLoading ? 'מעבד...' : 'אשר'}
+              אשר
             </button>
             <button
               onClick={handleDecline}
