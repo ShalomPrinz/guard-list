@@ -81,7 +81,7 @@ describe('ShortListStep2', () => {
     expect(minutesInput).toBeTruthy()
   })
 
-  it('displays available base members count correctly', async () => {
+  it('displays available base members count correctly without blocking constraints', async () => {
     const group = {
       id: 'group-456',
       name: 'Another Group',
@@ -114,9 +114,138 @@ describe('ShortListStep2', () => {
       expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
     })
 
-    // The "Number of Warriors" input should have max={3} (3 base members)
+    // The "Number of Warriors" input must NOT have min/max constraints so user can type freely
     const numberOfWarriorsInput = screen.getByDisplayValue('1') as HTMLInputElement
-    expect(numberOfWarriorsInput.max).toBe('3')
+    expect(numberOfWarriorsInput.min).toBe('')
+    expect(numberOfWarriorsInput.max).toBe('')
+  })
+
+  it('shows per-field error below numberOfWarriors when value is empty on submit', async () => {
+    const group = {
+      id: 'group-errors',
+      name: 'Test Group',
+      members: [
+        { id: '1', name: 'Alice', availability: 'base' as const, role: 'warrior' as const },
+        { id: '2', name: 'Bob', availability: 'base' as const, role: 'warrior' as const },
+      ],
+      createdAt: new Date().toISOString(),
+    }
+    upsertGroup(group)
+
+    const session: ShortListWizardSession = {
+      groupId: 'group-errors',
+      stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
+      startHour: 14,
+      minutesPerWarrior: 60,
+      numberOfWarriors: 1,
+    }
+
+    render(
+      <TestWrapper>
+        <SessionInitializer session={session} />
+        <ShortListStep2 />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
+    })
+
+    // Clear numberOfWarriors field and try to submit
+    const numberOfWarriorsInput = screen.getByDisplayValue('1') as HTMLInputElement
+    fireEvent.change(numberOfWarriorsInput, { target: { value: '' } })
+
+    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    fireEvent.click(createButton)
+
+    await waitFor(() => {
+      expect(screen.getByText('יש להזין לפחות חייל אחד לעמדה')).toBeTruthy()
+    })
+  })
+
+  it('shows per-field error below minutesPerWarrior when value is empty on submit', async () => {
+    const group = {
+      id: 'group-minutes-error',
+      name: 'Test Group',
+      members: [
+        { id: '1', name: 'Alice', availability: 'base' as const, role: 'warrior' as const },
+      ],
+      createdAt: new Date().toISOString(),
+    }
+    upsertGroup(group)
+
+    const session: ShortListWizardSession = {
+      groupId: 'group-minutes-error',
+      stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
+      startHour: 14,
+      minutesPerWarrior: 60,
+      numberOfWarriors: 1,
+    }
+
+    render(
+      <TestWrapper>
+        <SessionInitializer session={session} />
+        <ShortListStep2 />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
+    })
+
+    // Clear minutesPerWarrior field and try to submit
+    const minutesInput = screen.getByDisplayValue('60') as HTMLInputElement
+    fireEvent.change(minutesInput, { target: { value: '' } })
+
+    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    fireEvent.click(createButton)
+
+    await waitFor(() => {
+      expect(screen.getByText('יש להזין זמן שמירה תקין (לפחות דקה אחת)')).toBeTruthy()
+    })
+  })
+
+  it('shows per-field error when numberOfWarriors exceeds available members', async () => {
+    const group = {
+      id: 'group-exceed',
+      name: 'Test Group',
+      members: [
+        { id: '1', name: 'Alice', availability: 'base' as const, role: 'warrior' as const },
+        { id: '2', name: 'Bob', availability: 'base' as const, role: 'warrior' as const },
+      ],
+      createdAt: new Date().toISOString(),
+    }
+    upsertGroup(group)
+
+    const session: ShortListWizardSession = {
+      groupId: 'group-exceed',
+      stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
+      startHour: 14,
+      minutesPerWarrior: 60,
+      numberOfWarriors: 1,
+    }
+
+    render(
+      <TestWrapper>
+        <SessionInitializer session={session} />
+        <ShortListStep2 />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
+    })
+
+    // Set numberOfWarriors to exceed available count (2 base members, set to 5)
+    const numberOfWarriorsInput = screen.getByDisplayValue('1') as HTMLInputElement
+    fireEvent.change(numberOfWarriorsInput, { target: { value: '5' } })
+
+    const createButton = screen.getByRole('button', { name: /יצור רשימה/ })
+    fireEvent.click(createButton)
+
+    await waitFor(() => {
+      expect(screen.getByText(/סך הכל 5 חיילים נדרשים, אבל רק 2 זמינים/)).toBeTruthy()
+    })
   })
 
   it('removes gray helper text below field labels', async () => {
