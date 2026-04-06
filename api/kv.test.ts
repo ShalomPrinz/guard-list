@@ -528,6 +528,164 @@ describe('api/kv handler', () => {
     })
   })
 
+  // ── group actions ─────────────────────────────────────────────────────────
+  // These tests specifically verify the fix for FUNCTION_INVOCATION_FAILED:
+  // @upstash/redis auto-deserializes JSON on kv.get, so members are already
+  // a native string[] — never call JSON.parse on them.
+  describe('groupCreate action', () => {
+    it('returns 400 when user is already in a group', async () => {
+      kvMock.get.mockResolvedValue('grp_existing')
+      const res = await handler(makeReq({ action: 'groupCreate', username: 'alice' }))
+      expect(res.status).toBe(400)
+    })
+
+    it('creates group and stores members as native array (not JSON string)', async () => {
+      kvMock.get.mockResolvedValue(null) // not in a group
+      const res = await handler(makeReq({ action: 'groupCreate', username: 'alice' }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { groupId: string }
+      expect(typeof body.groupId).toBe('string')
+      // Must store a native array — never JSON.stringify
+      expect(kvMock.set).toHaveBeenCalledWith(
+        expect.stringMatching(/^group:grp_.*:members$/),
+        ['alice'],
+      )
+    })
+
+    it('stores share:groupId under username namespace', async () => {
+      kvMock.get.mockResolvedValue(null)
+      const res = await handler(makeReq({ action: 'groupCreate', username: 'alice' }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { groupId: string }
+      expect(kvMock.set).toHaveBeenCalledWith('alice:share:groupId', body.groupId)
+    })
+  })
+
+  describe('groupJoin action', () => {
+    it('returns 400 when groupId is missing', async () => {
+      const res = await handler(makeReq({ action: 'groupJoin', username: 'alice' }))
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when user is already in a group', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_1')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupJoin', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(400)
+      const body = await res.json() as { error: string }
+      expect(body.error).toBe('Already in a group')
+    })
+
+    it('returns 404 when group does not exist', async () => {
+      kvMock.get.mockResolvedValue(null) // not in a group and no members key
+      const res = await handler(makeReq({ action: 'groupJoin', username: 'alice', groupId: 'grp_missing' }))
+      expect(res.status).toBe(404)
+    })
+
+    it('appends user to members and returns ok — members stored as native array not JSON string', async () => {
+      // Upstash auto-deserializes: kv.get returns a native string[], not a JSON string
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve(null)
+        if (key === 'group:grp_1:members') return Promise.resolve(['bob'])
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupJoin', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(200)
+      // Must store native array — if JSON.parse were called on ['bob'] it would throw
+      expect(kvMock.set).toHaveBeenCalledWith('group:grp_1:members', ['bob', 'alice'])
+      expect(kvMock.set).toHaveBeenCalledWith('alice:share:groupId', 'grp_1')
+    })
+
+    it('handles Hebrew username in members array', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'שלום:share:groupId') return Promise.resolve(null)
+        if (key === 'group:grp_hebrew:members') return Promise.resolve(['בוב'])
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupJoin', username: 'שלום', groupId: 'grp_hebrew' }))
+      expect(res.status).toBe(200)
+      expect(kvMock.set).toHaveBeenCalledWith('group:grp_hebrew:members', ['בוב', 'שלום'])
+    })
+  })
+
+  describe('groupLeave action', () => {
+    it('returns 400 when groupId is missing', async () => {
+      const res = await handler(makeReq({ action: 'groupLeave', username: 'alice' }))
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 403 when user is not in the specified group', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_other')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupLeave', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(403)
+    })
+
+    it('removes user from members array and deletes groupId — members stored as native array', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_1')
+        if (key === 'group:grp_1:members') return Promise.resolve(['alice', 'bob'])
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupLeave', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(200)
+      // Must store native array without alice
+      expect(kvMock.set).toHaveBeenCalledWith('group:grp_1:members', ['bob'])
+      expect(kvMock.del).toHaveBeenCalledWith('alice:share:groupId')
+    })
+
+    it('succeeds even when group members key is missing', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_1')
+        return Promise.resolve(null) // no members key
+      })
+      const res = await handler(makeReq({ action: 'groupLeave', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(200)
+      expect(kvMock.del).toHaveBeenCalledWith('alice:share:groupId')
+    })
+  })
+
+  describe('groupGetMembers action', () => {
+    it('returns 400 when groupId is missing', async () => {
+      const res = await handler(makeReq({ action: 'groupGetMembers', username: 'alice' }))
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 403 when user is not in the specified group', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_other')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupGetMembers', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(403)
+    })
+
+    it('returns members array as-is from Upstash (auto-deserialized native array)', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_1')
+        if (key === 'group:grp_1:members') return Promise.resolve(['alice', 'bob', 'carol'])
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupGetMembers', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { members: string[] }
+      expect(body.members).toEqual(['alice', 'bob', 'carol'])
+    })
+
+    it('returns 404 when group members key is missing', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'alice:share:groupId') return Promise.resolve('grp_1')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq({ action: 'groupGetMembers', username: 'alice', groupId: 'grp_1' }))
+      expect(res.status).toBe(404)
+    })
+  })
+
   // ── unknown action ────────────────────────────────────────────────────────
   describe('unknown action', () => {
     it('returns 400 for unrecognized action', async () => {

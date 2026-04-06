@@ -425,6 +425,35 @@ describe('SharingCenterScreen — invitation acceptance state sync (bug fix)', (
   })
 })
 
+// ─── Decline invitation immediately updates UI ────────────────────────────────
+
+describe('SharingCenterScreen — decline invitation immediately updates UI', () => {
+  it('invitation card disappears and not-in-group section appears after declining', async () => {
+    // Regression: accept showed nothing because loadSharingCenterUpdates re-added the invitation.
+    // Decline must also immediately update the UI without requiring any extra KV round-trip.
+    const user = userEvent.setup()
+    const inv = makeInvitation({ fromUsername: 'inviter' })
+    setLocalGroupInvitation(inv)
+    mockKvGet.mockImplementation((key: string) => {
+      if (key === 'share:groupInvitation') return Promise.resolve(inv)
+      return Promise.resolve(null)
+    })
+
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByRole('button', { name: 'דחה' }))
+    await user.click(screen.getByRole('button', { name: 'דחה' }))
+
+    await waitFor(() => {
+      // Invitation card must be gone
+      expect(screen.queryByRole('button', { name: 'דחה' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'אשר' })).toBeNull()
+      // Not-in-group section must appear
+      expect(screen.getByText('אינך חלק מקבוצת שיתוף ציטוטים')).toBeTruthy()
+    })
+  })
+})
+
 // ─── Guest link section ───────────────────────────────────────────────────────
 
 function makeSubmission(id: string, overrides: Partial<GuestCitationSubmission> = {}): GuestCitationSubmission {

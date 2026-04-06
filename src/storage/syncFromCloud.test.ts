@@ -10,11 +10,12 @@ vi.mock('./cloudStorage', () => ({
   kvList: vi.fn().mockResolvedValue([]),
   kvMGet: vi.fn().mockResolvedValue([]),
   kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
+  kvGroupGetMembers: vi.fn().mockResolvedValue(null),
   kvGetNoBackup: vi.fn().mockResolvedValue(false),
   isKvAvailable: true,
 }))
 
-import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers } from './cloudStorage'
 import { syncFromCloud, pushLocalToCloud } from './syncFromCloud'
 
 const mockedKvList = vi.mocked(kvList)
@@ -22,6 +23,7 @@ const mockedKvGet = vi.mocked(kvGet)
 const mockedKvMGet = vi.mocked(kvMGet)
 const mockedKvSet = vi.mocked(kvSet)
 const mockedKvCrossReadGroupMember = vi.mocked(kvCrossReadGroupMember)
+const mockedKvGroupGetMembers = vi.mocked(kvGroupGetMembers)
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
@@ -46,6 +48,7 @@ describe('syncFromCloud', () => {
     mockedKvGet.mockResolvedValue(null)
     mockedKvMGet.mockResolvedValue([])
     mockedKvCrossReadGroupMember.mockResolvedValue(null)
+    mockedKvGroupGetMembers.mockResolvedValue(null)
   })
 
   it('skips entire sync body when synced flag is present in localStorage', async () => {
@@ -293,6 +296,72 @@ describe('syncFromCloud', () => {
     it('does not attempt cross-read when not in a group', async () => {
       await syncFromCloud()
       expect(mockedKvCrossReadGroupMember).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('share sync — group restoration from stale localStorage', () => {
+    // Regression: when localStorage is wiped but KV still has share:groupId,
+    // accepting a new invitation would fail with "Already in a group" from the server.
+    // Fix: syncFromCloud restores share:group from KV so the client reflects real state.
+
+    it('restores share:group when localStorage has no group but KV has share:groupId', async () => {
+      mockedKvGet.mockImplementation(async (key: string) => {
+        if (key === 'share:groupId') return 'grp_restored'
+        return null
+      })
+      mockedKvGroupGetMembers.mockResolvedValue(['testuser', 'bob'])
+
+      await syncFromCloud()
+
+      const stored = JSON.parse(storage.getItem('share:group') ?? 'null') as { groupId: string; members: string[] } | null
+      expect(stored?.groupId).toBe('grp_restored')
+      expect(stored?.members).toEqual(['testuser', 'bob'])
+    })
+
+    it('does not overwrite existing local group when one is already set', async () => {
+      storage.setItem('share:group', JSON.stringify({ groupId: 'grp_local', members: ['testuser'], joinedAt: 1000 }))
+      mockedKvGet.mockImplementation(async (key: string) => {
+        if (key === 'share:groupId') return 'grp_other'
+        return null
+      })
+      mockedKvGroupGetMembers.mockResolvedValue(['testuser', 'carol'])
+
+      await syncFromCloud()
+
+      const stored = JSON.parse(storage.getItem('share:group') ?? 'null') as { groupId: string } | null
+      expect(stored?.groupId).toBe('grp_local')
+    })
+
+    it('does not call kvGroupGetMembers when KV has no share:groupId', async () => {
+      // kvGet returns null for everything (default)
+      await syncFromCloud()
+
+      expect(mockedKvGroupGetMembers).not.toHaveBeenCalled()
+      expect(storage.getItem('share:group')).toBeNull()
+    })
+
+    it('does not restore group when kvGroupGetMembers returns null', async () => {
+      mockedKvGet.mockImplementation(async (key: string) => {
+        if (key === 'share:groupId') return 'grp_1'
+        return null
+      })
+      mockedKvGroupGetMembers.mockResolvedValue(null)
+
+      await syncFromCloud()
+
+      expect(storage.getItem('share:group')).toBeNull()
+    })
+
+    it('does not restore group when kvGroupGetMembers returns empty array', async () => {
+      mockedKvGet.mockImplementation(async (key: string) => {
+        if (key === 'share:groupId') return 'grp_1'
+        return null
+      })
+      mockedKvGroupGetMembers.mockResolvedValue([])
+
+      await syncFromCloud()
+
+      expect(storage.getItem('share:group')).toBeNull()
     })
   })
 })

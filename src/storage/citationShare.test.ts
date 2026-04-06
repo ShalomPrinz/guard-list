@@ -323,6 +323,14 @@ describe('citationShare storage', () => {
       expect(getLocalGroup(storage)).toBeNull()
     })
 
+    it('calls kvInvitationDecline after joining to prevent KV key from re-delivering invitation', async () => {
+      // Regression: without this call, loadSharingCenterUpdates sees local=null + KV key still present
+      // and restores the invitation, making the invitation card persist after acceptance.
+      mockedKvGroupGetMembers.mockResolvedValue(['bob', 'alice'])
+      await acceptGroupInvitation(invitation, storage)
+      expect(mockedKvInvitationDecline).toHaveBeenCalled()
+    })
+
     it('returns error when no username', async () => {
       mockedGetUsername.mockReturnValue(null)
       const result = await acceptGroupInvitation(invitation, storage)
