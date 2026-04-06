@@ -335,6 +335,20 @@ export async function kvInvitationCancel(targetUsername: string): Promise<void> 
 }
 
 /**
+ * Reject a pending group invitation by deleting the caller's own KV key.
+ * Idempotent — succeeds even if the key is already gone.
+ */
+export async function kvInvitationDecline(): Promise<void> {
+  const username = getUsername()
+  if (!username) return
+  try {
+    await callKv({ action: 'invitationDecline', username })
+  } catch (e) {
+    console.error('[kv] invitationDecline failed:', e)
+  }
+}
+
+/**
  * Delete a pending guest citation submission by id. Fire-and-forget.
  */
 export async function kvDeleteGuestCitation(id: string): Promise<void> {

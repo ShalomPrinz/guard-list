@@ -314,6 +314,19 @@ async function handleInvitationCancel(
   return json({ ok: true })
 }
 
+async function handleInvitationDecline(
+  body: Record<string, unknown>,
+  username: string
+): Promise<Response> {
+  // Invitee rejects their own pending invitation by deleting it.
+  // Idempotent — if key is already gone, still returns ok: true.
+  const existing = await kv.get(`${username}:share:groupInvitation`)
+  if (existing === null) return json({ ok: true })
+
+  await kv.del(`${username}:share:groupInvitation`)
+  return json({ ok: true })
+}
+
 async function handleListGuestCitations(
   body: Record<string, unknown>,
   ip: string,
@@ -433,6 +446,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === "groupLeave") return handleGroupLeave(body, username);
     if (action === "groupGetMembers") return handleGroupGetMembers(body, username);
     if (action === "invitationCancel") return handleInvitationCancel(body, username);
+    if (action === "invitationDecline") return handleInvitationDecline(body, username);
     if (action === "checkBackupSuspension") return handleCheckBackupSuspension(username);
     if (action === "clearUserData") return handleClearUserData(username);
 

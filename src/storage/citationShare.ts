@@ -184,7 +184,10 @@ export async function declineGroupInvitation(
   clearLocalGroupInvitation(storage)
   if (!currentUser) return
   try {
-    const { kvCrossSet } = await import('./cloudStorage')
+    const { kvCrossSet, kvInvitationDecline } = await import('./cloudStorage')
+    // Delete the invitation key server-side to prevent re-appearance on next load
+    await kvInvitationDecline()
+    // Notify the inviter of the rejection
     void kvCrossSet(invitation.fromUsername, 'share:rejectionNotification', {
       byUsername: currentUser,
       groupId: invitation.groupId,

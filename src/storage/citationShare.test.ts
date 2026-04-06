@@ -14,6 +14,7 @@ vi.mock('./cloudStorage', () => ({
   kvGroupJoin: vi.fn().mockResolvedValue('ok'),
   kvGroupLeave: vi.fn().mockResolvedValue('ok'),
   kvGroupGetMembers: vi.fn().mockResolvedValue(null),
+  kvInvitationDecline: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('./userStorage', () => ({
@@ -38,7 +39,7 @@ import {
   declineGroupInvitation,
   leaveGroup,
 } from './citationShare'
-import { kvCrossSet, kvDel, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvCrossReadGroupMember } from './cloudStorage'
+import { kvCrossSet, kvDel, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvCrossReadGroupMember, kvInvitationDecline } from './cloudStorage'
 import { getUsername } from './userStorage'
 
 const mockedKvCrossSet = vi.mocked(kvCrossSet)
@@ -47,6 +48,7 @@ const mockedKvGroupJoin = vi.mocked(kvGroupJoin)
 const mockedKvGroupLeave = vi.mocked(kvGroupLeave)
 const mockedKvGroupGetMembers = vi.mocked(kvGroupGetMembers)
 const mockedKvCrossReadGroupMember = vi.mocked(kvCrossReadGroupMember)
+const mockedKvInvitationDecline = vi.mocked(kvInvitationDecline)
 const mockedGetUsername = vi.mocked(getUsername)
 
 describe('citationShare storage', () => {
@@ -350,9 +352,10 @@ describe('citationShare storage', () => {
       expect(getLocalGroupInvitation(storage)).toBeNull()
     })
 
-    it('sends rejection notification to inviter', async () => {
+    it('sends rejection notification to inviter and deletes KV key', async () => {
       const invitation: GroupInvitation = { groupId: 'grp_1', fromUsername: 'bob', sentAt: 1000 }
       await declineGroupInvitation(invitation, storage)
+      expect(mockedKvInvitationDecline).toHaveBeenCalled()
       expect(mockedKvCrossSet).toHaveBeenCalledWith(
         'bob',
         'share:rejectionNotification',

@@ -277,3 +277,15 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Root cause:** New feature (short-list wizard) was built without referencing the existing shared time picker component.
 
 **Rule:** Always use the shared `TimePicker` component from `src/components/TimePicker.tsx` for any time input in the app, unless explicitly told otherwise and documented in a comment. Never build a custom time input or modify an existing one to diverge from the standard. `TimePicker` handles both mobile (native `<input type="time">`) and desktop (two numeric spinners) automatically — use it everywhere time is selected.
+
+---
+
+## E026 — Invitation Rejection Left Server-Side State Behind
+
+**What went wrong:** When a user rejected a group invitation via `declineGroupInvitation()` in `src/storage/citationShare.ts`, the function cleared `localStorage` via `clearLocalGroupInvitation(storage)` and sent a rejection notification to the inviter. However, it never deleted the server-side KV key `{username}:share:groupInvitation`. On the next app load, `loadSharingCenterUpdates()` fetched the KV key and repopulated the invitation in localStorage, causing it to reappear forever.
+
+**Root cause:** Incomplete state cleanup: local state was cleared but the corresponding server-side KV key was left behind. The KV key is the source of truth for whether an invitation exists; clearing local state alone is insufficient.
+
+**Rule:** When implementing rejection/decline flows for stateful KV operations: (1) Always clear local state first via a local helper (e.g. `clearLocalGroupInvitation`). (2) Always delete the corresponding server-side KV key immediately via a dedicated server action (e.g. `kvInvitationDecline` in `api/kv.ts`). (3) Make the server action idempotent — if the key is already gone, still return success. (4) The order matters: local state change is immediate feedback; server cleanup must happen to prevent re-appearance on reload. This pattern applies to any future KV-backed state that can be rejected or deleted — never assume clearing local state is sufficient.
+
+**Prevention:** In `src/storage/citationShare.ts`, `declineGroupInvitation()` now calls `await kvInvitationDecline()` before sending the notification. The `kvInvitationDecline()` helper is defined in `src/storage/cloudStorage.ts` and maps to the `invitationDecline` action in `api/kv.ts`.
