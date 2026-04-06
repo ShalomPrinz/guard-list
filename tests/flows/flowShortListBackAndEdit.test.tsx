@@ -154,7 +154,6 @@ describe('Short-list back navigation fix', () => {
               date: '2026-04-05',
               durationMinutes: 60,
               locked: false,
-              skipped: false,
             },
           ],
         },

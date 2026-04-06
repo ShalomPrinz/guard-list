@@ -26,7 +26,7 @@ export function shuffleArray<T>(arr: readonly T[]): T[] {
 
 /**
  * Build the timed list of ScheduledParticipants for a single time-based station.
- * Participants are expected to already be in their final order (skipped ones excluded).
+ * Participants are expected to already be in their final order.
  * startTime is "HH:MM"; absMinutes are accumulated to handle midnight crossover.
  */
 export function buildStationSchedule(
@@ -55,7 +55,6 @@ export function buildStationSchedule(
       date: addDaysToDate(startDate, dayOffset),
       durationMinutes: p.durationMinutes,
       locked: p.locked,
-      skipped: false,
     };
   });
 }

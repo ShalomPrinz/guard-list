@@ -53,7 +53,6 @@ function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {
             date: '2026-03-16',
             durationMinutes: 60,
             locked: false,
-            skipped: false,
           },
           {
             name: 'Bob',
@@ -62,7 +61,6 @@ function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {
             date: '2026-03-16',
             durationMinutes: 60,
             locked: false,
-            skipped: false,
           },
         ],
       },

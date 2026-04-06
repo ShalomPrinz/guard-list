@@ -100,11 +100,6 @@ describe('buildStationSchedule', () => {
     expect(result[1].locked).toBe(true)
   })
 
-  it('sets skipped = false for all entries', () => {
-    const result = buildStationSchedule(participants, '20:00', '2026-03-10')
-    expect(result.every(p => p.skipped === false)).toBe(true)
-  })
-
   it('preserves durationMinutes per participant', () => {
     const result = buildStationSchedule(participants, '20:00', '2026-03-10')
     expect(result[0].durationMinutes).toBe(90)
@@ -151,8 +146,8 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'Gate',
           stationType: 'time-based',
           participants: [
-            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
-            { name: 'Bob',   startTime: '21:30', endTime: '23:00', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
+            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
+            { name: 'Bob',   startTime: '21:30', endTime: '23:00', date: '2026-01-01', durationMinutes: 90, locked: false },
           ],
         },
       ],
@@ -187,7 +182,7 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'First Station',
           stationType: 'time-based',
           participants: [
-            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
+            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
           ],
         },
         {
@@ -195,7 +190,7 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'Second Station',
           stationType: 'time-based',
           participants: [
-            { name: 'Bob', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false, skipped: false },
+            { name: 'Bob', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
           ],
         },
       ],

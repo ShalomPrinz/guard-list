@@ -21,7 +21,7 @@ function buildSessionFromSchedule(schedule: Schedule): WizardSession {
     groupName: group?.name ?? schedule.name,
     stations: schedule.stations.map(st => ({
       config: { id: st.stationConfigId, name: st.stationName, type: 'time-based' as const },
-      participants: st.participants.map(p => ({ name: p.name, locked: p.locked, skipped: false })),
+      participants: st.participants.map(p => ({ name: p.name, locked: p.locked })),
       startTime: st.participants[0]?.startTime ?? startTime,
       startDate: st.participants[0]?.date ?? schedule.date,
     })),

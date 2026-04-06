@@ -40,7 +40,6 @@ interface ParticipantItem {
   id: string
   name: string
   locked: boolean
-  skipped: boolean
   availability: 'base' | 'home'
 }
 
@@ -94,14 +93,14 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
       return {
         stationConfigId: ws.config.id,
         stationName: ws.config.name,
-        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, skipped: false, availability: 'base' as const })),
+        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, availability: 'base' as const })),
       }
     })
   }
 
   const unassigned: ParticipantItem[] = allMembers
     .filter(m => !assignedNames.has(m.name))
-    .map(m => ({ id: crypto.randomUUID(), name: m.name, locked: false, skipped: false, availability: m.availability }))
+    .map(m => ({ id: crypto.randomUUID(), name: m.name, locked: false, availability: m.availability }))
 
   return { stations, unassigned }
 }
@@ -318,7 +317,7 @@ export default function Step3_Order() {
         const toIdx = (dst as { stationIdx: number }).stationIdx
         const targetParts = [...newStations[toIdx].participants]
         const dstPos = targetParts.findIndex(p => p.id === oId)
-        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, skipped: false, availability: 'base' }
+        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, availability: 'base' }
         if (dstPos >= 0) targetParts.splice(dstPos, 0, movedItem)
         else targetParts.push(movedItem)
         newStations = newStations.map((s, i) => i === toIdx ? { ...s, participants: targetParts } : s)
@@ -484,7 +483,7 @@ export default function Step3_Order() {
       const s = orderState.stations[si]
       return {
         ...ws,
-        participants: s.participants.map(({ name, locked, skipped }) => ({ name, locked, skipped })),
+        participants: s.participants.map(({ name, locked }) => ({ name, locked })),
       }
     })
     updateStations(updated)

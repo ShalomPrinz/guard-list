@@ -124,7 +124,7 @@ export function buildContinueRoundStations(
 
   return stations.map((ws, si) => ({
     ...ws,
-    participants: assigned[si].map((name): WizardParticipant => ({ name, locked: false, skipped: false })),
+    participants: assigned[si].map((name): WizardParticipant => ({ name, locked: false })),
   }))
 }
 

@@ -81,7 +81,7 @@ function recomputeTimes(items: ReviewItem[], startTime: string, startDate: strin
 
 function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['session']>): ReviewStation[] {
   const participantCounts = session.stations.map(
-    s => s.participants.filter(p => !p.skipped).length,
+    s => s.participants.length,
   )
 
   const globalDurations = calcStationDurations({
@@ -114,7 +114,6 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
     }
 
     const partsWithDuration = ws.participants
-      .filter(p => !p.skipped)
       .map(p => ({ name: p.name, durationMinutes, locked: p.locked }))
 
     const stStartTime = ws.startTime
@@ -719,7 +718,6 @@ export default function Step4_Review() {
         participants: rs.items.map(item => ({
           name: item.name,
           locked: item.locked,
-          skipped: false,
         })),
       }
     })
@@ -763,7 +761,6 @@ export default function Step4_Review() {
         date: item.date,
         durationMinutes: item.durationMinutes,
         locked: item.locked,
-        skipped: false,
       }))
       return {
         stationConfigId: st.stationConfigId,
@@ -828,7 +825,6 @@ export default function Step4_Review() {
         participants: rs.items.map(item => ({
           name: item.name,
           locked: item.locked,
-          skipped: false,
         })),
       }
     })
