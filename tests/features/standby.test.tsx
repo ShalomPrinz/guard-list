@@ -402,6 +402,133 @@ describe('StandbyScreen — note section', () => {
   })
 })
 
+// ─── Pencil-edit UX ──────────────────────────────────────────────────────────
+
+describe('StandbyScreen — pencil-edit WhatsApp preview', () => {
+  it('shows pencil button when hasOutput is true', () => {
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    expect(screen.getByRole('button', { name: 'ערוך טקסט' })).toBeTruthy()
+  })
+
+  it('clicking pencil opens textarea with current text', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    expect(textarea.value).toContain('כיתת כוננות')
+    expect(textarea.value).toContain('Alice')
+  })
+
+  it('confirms custom text and shows it in preview', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    await user.clear(textarea)
+    await user.type(textarea, 'טקסט מותאם אישית')
+
+    await user.click(screen.getByText('אשר'))
+
+    const pre = document.querySelector('pre')
+    expect(pre?.textContent?.trim()).toBe('טקסט מותאם אישית')
+  })
+
+  it('confirmed custom text is used for copy', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    await user.clear(textarea)
+    await user.type(textarea, 'העתק זה')
+    await user.click(screen.getByText('אשר'))
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).toBe('העתק זה')
+  })
+
+  it('"בטל" discards changes and restores previous display', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    await user.clear(textarea)
+    await user.type(textarea, 'שינוי שיבוטל')
+    await user.click(screen.getByText('בטל'))
+
+    const pre = document.querySelector('pre')
+    expect(pre?.textContent).toContain('Alice')
+    expect(pre?.textContent).not.toContain('שינוי שיבוטל')
+  })
+
+  it('"↩ חזור לטקסט המקורי" resets to auto-generated text', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderStandby()
+
+    // Edit and confirm
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    await user.clear(textarea)
+    await user.type(textarea, 'טקסט ידני')
+    await user.click(screen.getByText('אשר'))
+
+    // Revert button should appear
+    const revertBtn = screen.getByText('↩ חזור לטקסט המקורי')
+    await user.click(revertBtn)
+
+    // Auto-generated text restored
+    const pre = document.querySelector('pre')
+    expect(pre?.textContent).toContain('Alice')
+    expect(pre?.textContent).not.toContain('טקסט ידני')
+    // Revert button gone
+    expect(screen.queryByText('↩ חזור לטקסט המקורי')).toBeNull()
+  })
+
+  it('revert button restores auto-generated text for copy', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+
+    let clipboardText = ''
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (t: string) => { clipboardText = t } },
+    })
+
+    renderStandby()
+
+    // Edit, confirm, then revert
+    await user.click(screen.getByRole('button', { name: 'ערוך טקסט' }))
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    await user.clear(textarea)
+    await user.type(textarea, 'ידני')
+    await user.click(screen.getByText('אשר'))
+    await user.click(screen.getByText('↩ חזור לטקסט המקורי'))
+
+    await user.click(screen.getByText('📋 העתק לווטסאפ'))
+    expect(clipboardText).toContain('Alice')
+    expect(clipboardText).not.toContain('ידני')
+  })
+})
+
 // ─── Back navigation ──────────────────────────────────────────────────────────
 
 describe('StandbyScreen — back navigation', () => {

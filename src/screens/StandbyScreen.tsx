@@ -35,6 +35,9 @@ export default function StandbyScreen() {
   // Session-only availability overrides — does NOT modify saved group in localStorage
   const [localAvailabilityById, setLocalAvailabilityById] = useState<Record<string, 'base' | 'home'>>({})
   const [copied, setCopied] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+  const [customText, setCustomText] = useState<string | undefined>(undefined)
 
   // Note state — session-only
   const [noteEnabled, setNoteEnabled] = useState(true)
@@ -116,10 +119,11 @@ export default function StandbyScreen() {
 
   const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName, timeNote, freetextBody)
   const hasOutput = orderedSelectedWarriors.length > 0 || !!commanderName
+  const displayedText = customText ?? whatsappText
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(whatsappText)
+      await navigator.clipboard.writeText(displayedText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
@@ -128,7 +132,7 @@ export default function StandbyScreen() {
   }
 
   function handleWhatsApp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(displayedText)}`, '_blank')
   }
 
   return (
@@ -336,11 +340,59 @@ export default function StandbyScreen() {
 
       {/* WhatsApp preview */}
       {hasOutput && (
-        <div className="mb-4 rounded-2xl bg-gray-100 p-4 dark:bg-gray-800/80">
+        <div className="mb-4">
           <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">תצוגה מקדימה - כך זה ייראה בווטסאפ</p>
-          <pre dir="rtl" className="whitespace-pre-wrap break-words font-sans text-sm text-gray-800 dark:text-gray-200">
-            {whatsappText}
-          </pre>
+          <div className="relative">
+            {!isEditing && (
+              <button
+                onClick={() => { setEditDraft(displayedText); setIsEditing(true) }}
+                aria-label="ערוך טקסט"
+                className="absolute top-2 left-2 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-gray-200/80 text-lg active:bg-gray-300 dark:bg-gray-700/80 dark:active:bg-gray-600"
+              >
+                ✏️
+              </button>
+            )}
+            {isEditing ? (
+              <textarea
+                value={editDraft}
+                onChange={e => setEditDraft(e.target.value)}
+                dir="rtl"
+                className="w-full whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 min-h-[200px] outline-none ring-2 ring-blue-500 resize-none"
+              />
+            ) : (
+              <pre dir="rtl" className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 font-sans text-sm text-gray-800 dark:bg-gray-800/80 dark:text-gray-200">
+                {displayedText}
+              </pre>
+            )}
+          </div>
+
+          {/* Edit action buttons */}
+          {isEditing && (
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => { setCustomText(editDraft); setIsEditing(false) }}
+                className="flex-1 min-h-[44px] rounded-2xl bg-green-600 py-2.5 text-sm font-semibold text-white active:bg-green-700"
+              >
+                אשר
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="flex-1 min-h-[44px] rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+              >
+                בטל
+              </button>
+            </div>
+          )}
+
+          {/* Revert to original button */}
+          {!isEditing && customText !== undefined && (
+            <button
+              onClick={() => setCustomText(undefined)}
+              className="mt-2 min-h-[44px] w-full rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+            >
+              ↩ חזור לטקסט המקורי
+            </button>
+          )}
         </div>
       )}
 
