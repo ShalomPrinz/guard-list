@@ -232,7 +232,7 @@ async function handleGroupCreate(username: string): Promise<Response> {
     return json({ error: "Already in a group" }, 400);
   }
   const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  await kv.set(`group:${groupId}:members`, JSON.stringify([username]));
+  await kv.set(`group:${groupId}:members`, [username]);
   await kv.set(`${username}:share:groupId`, groupId);
   return json({ groupId });
 }
@@ -249,9 +249,9 @@ async function handleGroupJoin(
   }
   const membersRaw = await kv.get(`group:${groupId}:members`);
   if (membersRaw === null) return json({ error: "Group not found" }, 404);
-  const members: string[] = JSON.parse(membersRaw as string);
+  const members: string[] = membersRaw as string[];
   members.push(username);
-  await kv.set(`group:${groupId}:members`, JSON.stringify(members));
+  await kv.set(`group:${groupId}:members`, members);
   await kv.set(`${username}:share:groupId`, groupId);
   return json({ ok: true });
 }
@@ -268,9 +268,8 @@ async function handleGroupLeave(
   }
   const membersRaw = await kv.get(`group:${groupId}:members`);
   if (membersRaw !== null) {
-    const members: string[] = JSON.parse(membersRaw as string);
-    const updated = members.filter(m => m !== username);
-    await kv.set(`group:${groupId}:members`, JSON.stringify(updated));
+    const updated = (membersRaw as string[]).filter(m => m !== username);
+    await kv.set(`group:${groupId}:members`, updated);
   }
   await kv.del(`${username}:share:groupId`);
   return json({ ok: true });
@@ -368,8 +367,7 @@ async function handleGroupGetMembers(
   }
   const membersRaw = await kv.get(`group:${groupId}:members`);
   if (membersRaw === null) return json({ error: "Group not found" }, 404);
-  const members: string[] = JSON.parse(membersRaw as string);
-  return json({ members });
+  return json({ members: membersRaw as string[] });
 }
 
 export default async function handler(req: Request): Promise<Response> {
