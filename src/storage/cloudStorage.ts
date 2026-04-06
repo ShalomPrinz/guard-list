@@ -304,6 +304,23 @@ export async function kvListGuestCitations(): Promise<GuestCitationSubmission[]>
 }
 
 /**
+ * Fetch the latest guest citation submissions for the current user.
+ * Server-side sorting by submittedAt descending (newest first) and limiting.
+ * Returns [] on error or when no username is set.
+ */
+export async function kvListGuestCitationsLatest(limit: number = 5): Promise<GuestCitationSubmission[]> {
+  const username = getUsername()
+  if (!username) return []
+  try {
+    const data = (await callKv({ action: 'listGuestCitations', username, limit })) as { citations: GuestCitationSubmission[] }
+    return data.citations ?? []
+  } catch (e) {
+    console.error('[kv] listGuestCitations failed:', e)
+    return []
+  }
+}
+
+/**
  * Cancel an outgoing group invitation by deleting the target's KV key.
  * Only succeeds if the caller is the one who sent the invitation (verified server-side).
  */

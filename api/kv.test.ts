@@ -7,6 +7,7 @@ const kvMock = vi.hoisted(() => ({
   del: vi.fn(),
   keys: vi.fn(),
   scan: vi.fn(),
+  mget: vi.fn(),
 }))
 
 const ratelimitMock = vi.hoisted(() => ({
@@ -73,6 +74,7 @@ describe('api/kv handler', () => {
     kvMock.del.mockResolvedValue(1)
     kvMock.keys.mockResolvedValue([])
     kvMock.scan.mockResolvedValue([0, []])
+    kvMock.mget.mockResolvedValue([])
     ratelimitMock.limit.mockResolvedValue({ success: true })
   })
 
@@ -420,6 +422,109 @@ describe('api/kv handler', () => {
       // RAW_KEY_RE requires {1,128} chars after "device:", empty suffix fails
       const res = await handler(makeReq({ action: 'rawGet', key: 'device:' }))
       expect(res.status).toBe(400)
+    })
+  })
+
+  // ── listGuestCitations action ──────────────────────────────────────────────
+  describe('listGuestCitations action', () => {
+    it('returns citations sorted by submittedAt descending with limit', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'author1', submittedAt: 1000 }
+      const sub2 = { id: 'id2', text: 'quote2', author: 'author2', submittedAt: 2000 }
+      const sub3 = { id: 'id3', text: 'quote3', author: 'author3', submittedAt: 1500 }
+      kvMock.keys.mockResolvedValue(['alice:guestCitations:id1', 'alice:guestCitations:id2', 'alice:guestCitations:id3'])
+      kvMock.mget.mockResolvedValue([sub1, sub2, sub3])
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 5 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof sub1[] }
+      expect(body.citations).toEqual([sub2, sub3, sub1])
+    })
+
+    it('returns limited number of citations', async () => {
+      const submissions = Array.from({ length: 10 }, (_, i) => ({
+        id: `id${i}`,
+        text: `quote${i}`,
+        author: `author${i}`,
+        submittedAt: 10000 - i * 1000,
+      }))
+      kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
+      kvMock.mget.mockResolvedValue(submissions)
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 3 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof submissions[0][] }
+      expect(body.citations).toHaveLength(3)
+    })
+
+    it('returns default limit 5 when limit not provided', async () => {
+      const submissions = Array.from({ length: 10 }, (_, i) => ({
+        id: `id${i}`,
+        text: `quote${i}`,
+        author: `author${i}`,
+        submittedAt: 10000 - i * 1000,
+      }))
+      kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
+      kvMock.mget.mockResolvedValue(submissions)
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice' }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof submissions[0][] }
+      expect(body.citations).toHaveLength(5)
+    })
+
+    it('returns empty array when no keys found', async () => {
+      kvMock.keys.mockResolvedValue([])
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 5 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: unknown[] }
+      expect(body.citations).toEqual([])
+    })
+
+    it('filters out null values from mget', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'author1', submittedAt: 1000 }
+      const sub2 = { id: 'id2', text: 'quote2', author: 'author2', submittedAt: 2000 }
+      kvMock.keys.mockResolvedValue(['alice:guestCitations:id1', 'alice:guestCitations:id2', 'alice:guestCitations:id3'])
+      kvMock.mget.mockResolvedValue([sub1, sub2, null])
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 5 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof sub1[] }
+      expect(body.citations).toEqual([sub2, sub1])
+    })
+
+    it('enforces minimum limit of 1', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'author1', submittedAt: 1000 }
+      kvMock.keys.mockResolvedValue(['alice:guestCitations:id1'])
+      kvMock.mget.mockResolvedValue([sub1])
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 0 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof sub1[] }
+      expect(body.citations).toHaveLength(1)
+    })
+
+    it('enforces maximum limit of 100', async () => {
+      const submissions = Array.from({ length: 150 }, (_, i) => ({
+        id: `id${i}`,
+        text: `quote${i}`,
+        author: `author${i}`,
+        submittedAt: 150000 - i * 1000,
+      }))
+      kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
+      kvMock.mget.mockResolvedValue(submissions)
+
+      const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 500 }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { citations: typeof submissions[0][] }
+      expect(body.citations).toHaveLength(100)
     })
   })
 

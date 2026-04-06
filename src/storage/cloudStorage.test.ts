@@ -4,7 +4,7 @@ import { createLocalStorageMock } from '../tests/localStorageMock'
 // Un-mock cloudStorage so we test the real implementation.
 vi.unmock('./cloudStorage')
 
-import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadGroupMember, kvListGuestCitations, kvDeleteGuestCitation, kvMGet, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvGetBackupSuspension } from './cloudStorage'
+import { kvGet, kvSet, kvDel, kvList, kvGetRaw, kvSetRaw, isKvAvailable, kvCrossSet, kvCrossReadGroupMember, kvListGuestCitations, kvListGuestCitationsLatest, kvDeleteGuestCitation, kvMGet, kvGroupCreate, kvGroupJoin, kvGroupLeave, kvGroupGetMembers, kvGetBackupSuspension } from './cloudStorage'
 
 function mockFetch(responseBody: unknown, ok = true) {
   vi.stubGlobal(
@@ -611,6 +611,87 @@ describe('cloudStorage', () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const result = await kvListGuestCitations()
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('kvListGuestCitationsLatest', () => {
+    it('returns submissions sorted by submittedAt descending (newest first)', async () => {
+      const sub1 = { id: 'id1', text: 'quote1', author: 'א. בן', submittedAt: 1000 }
+      const sub2 = { id: 'id2', text: 'quote2', author: 'ב. גד', submittedAt: 2000 }
+      const sub3 = { id: 'id3', text: 'quote3', author: 'ג. דר', submittedAt: 1500 }
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ citations: [sub2, sub3, sub1] }),
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitationsLatest(5)
+
+      expect(result).toEqual([sub2, sub3, sub1])
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('listGuestCitations')
+      expect(body.limit).toBe(5)
+    })
+
+    it('returns limited number of submissions (default limit 5)', async () => {
+      const submissions = Array.from({ length: 10 }, (_, i) => ({
+        id: `id${i}`,
+        text: `quote${i}`,
+        author: `author${i}`,
+        submittedAt: 10000 - i * 1000,
+      }))
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ citations: submissions.slice(0, 5) }),
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitationsLatest()
+
+      expect(result).toHaveLength(5)
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.limit).toBe(5)
+    })
+
+    it('returns custom limit when provided', async () => {
+      const submissions = Array.from({ length: 3 }, (_, i) => ({
+        id: `id${i}`,
+        text: `quote${i}`,
+        author: `author${i}`,
+        submittedAt: 3000 - i * 1000,
+      }))
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ citations: submissions }),
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitationsLatest(3)
+
+      expect(result).toEqual(submissions)
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.limit).toBe(3)
+    })
+
+    it('returns empty array when username is null', async () => {
+      const noUsernameStorage = createLocalStorageMock()
+      vi.stubGlobal('localStorage', noUsernameStorage)
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+
+      const result = await kvListGuestCitationsLatest(5)
+
+      expect(result).toEqual([])
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('returns empty array on fetch error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+      const result = await kvListGuestCitationsLatest(5)
+
       expect(result).toEqual([])
     })
   })

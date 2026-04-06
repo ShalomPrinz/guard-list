@@ -12,7 +12,7 @@ import {
   loadSharingCenterUpdates,
 } from '../storage/citationShare'
 import { getUsername } from '../storage/userStorage'
-import { kvListGuestCitations, kvDeleteGuestCitation, kvInvitationCancel } from '../storage/cloudStorage'
+import { kvListGuestCitationsLatest, kvDeleteGuestCitation, kvInvitationCancel } from '../storage/cloudStorage'
 import { getGroups } from '../storage/groups'
 import { upsertCitation } from '../storage/citations'
 import { saveCitationAuthorLink } from '../storage/citationAuthorLinks'
@@ -97,7 +97,7 @@ export default function SharingCenterScreen() {
     setInboxLoading(true)
     setAcceptingId(null)
     setAcceptMemberIds({})
-    const submissions = await kvListGuestCitations()
+    const submissions = await kvListGuestCitationsLatest(5)
     setPendingGuest(submissions)
     setInboxLoading(false)
   }

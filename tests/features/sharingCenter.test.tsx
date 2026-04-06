@@ -29,6 +29,7 @@ const mockKvGet = vi.fn()
 const mockKvDel = vi.fn()
 const mockKvGroupGetMembers = vi.fn()
 const mockKvListGuestCitations = vi.fn<() => Promise<GuestCitationSubmission[]>>()
+const mockKvListGuestCitationsLatest = vi.fn<(limit?: number) => Promise<GuestCitationSubmission[]>>()
 const mockKvDeleteGuestCitation = vi.fn<(id: string) => Promise<void>>()
 const mockKvInvitationCancel = vi.fn<(targetUsername: string) => Promise<void>>()
 
@@ -40,6 +41,7 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvDel: (...args: unknown[]) => mockKvDel(...args),
     kvGroupGetMembers: (...args: unknown[]) => mockKvGroupGetMembers(...args),
     kvListGuestCitations: (...args: unknown[]) => mockKvListGuestCitations(...(args as [])),
+    kvListGuestCitationsLatest: (...args: unknown[]) => mockKvListGuestCitationsLatest(...(args as [number | undefined])),
     kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
     kvInvitationCancel: (...args: unknown[]) => mockKvInvitationCancel(...(args as [string])),
     kvGroupLeave: vi.fn().mockResolvedValue(undefined),
@@ -80,6 +82,7 @@ beforeEach(() => {
   mockKvDel.mockResolvedValue(undefined)
   mockKvGroupGetMembers.mockResolvedValue(null)
   mockKvListGuestCitations.mockResolvedValue([])
+  mockKvListGuestCitationsLatest.mockResolvedValue([])
   mockKvDeleteGuestCitation.mockResolvedValue(undefined)
   mockKvInvitationCancel.mockResolvedValue(undefined)
 })
@@ -424,7 +427,7 @@ describe('SharingCenterScreen — guest inbox', () => {
     const user = userEvent.setup()
     let resolve!: (v: GuestCitationSubmission[]) => void
     // openInbox call stays pending to observe loading state
-    mockKvListGuestCitations.mockReturnValueOnce(new Promise(r => { resolve = r }))
+    mockKvListGuestCitationsLatest.mockReturnValueOnce(new Promise(r => { resolve = r }))
     renderSharingCenter()
 
     await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
@@ -448,7 +451,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('shows pending submissions in the inbox', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1', { text: 'ציטוט מהמבקר', author: 'אורח' }),
     ])
     renderSharingCenter()
@@ -464,7 +467,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('shows "קבל הכל" only when more than one submission', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1'),
       makeSubmission('s2'),
     ])
@@ -480,7 +483,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('does not show "קבל הכל" when only one submission', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
+    mockKvListGuestCitationsLatest.mockResolvedValue([makeSubmission('s1')])
     renderSharingCenter()
 
     await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
@@ -493,7 +496,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('reject removes submission from list and calls kvDeleteGuestCitation', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1', { text: 'ציטוט לדחייה' }),
     ])
     renderSharingCenter()
@@ -513,7 +516,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('accept shows accept panel with אשר and ביטול buttons', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1')])
+    mockKvListGuestCitationsLatest.mockResolvedValue([makeSubmission('s1')])
     renderSharingCenter()
 
     await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
@@ -528,7 +531,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('ביטול in accept panel collapses without changes', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([makeSubmission('s1', { text: 'test-text' })])
+    mockKvListGuestCitationsLatest.mockResolvedValue([makeSubmission('s1', { text: 'test-text' })])
     renderSharingCenter()
 
     await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
@@ -547,7 +550,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('אשר saves citation to localStorage and removes from inbox', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1', { text: 'ציטוט שהתקבל', author: 'מחבר א' }),
     ])
     renderSharingCenter()
@@ -575,7 +578,7 @@ describe('SharingCenterScreen — guest inbox', () => {
       id: 'g1', name: 'מחלקה', createdAt: new Date().toISOString(),
       members: [{ id: 'm1', name: 'יוסי ישראלי', availability: 'base' }],
     })
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1', { text: 'ציטוט', author: 'מחבר' }),
     ])
     renderSharingCenter()
@@ -598,7 +601,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('קבל הכל accepts all submissions and clears inbox', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1', { text: 'ציטוט 1' }),
       makeSubmission('s2', { text: 'ציטוט 2' }),
     ])
@@ -620,7 +623,7 @@ describe('SharingCenterScreen — guest inbox', () => {
 
   it('badge count shows pending submissions count after opening inbox', async () => {
     const user = userEvent.setup()
-    mockKvListGuestCitations.mockResolvedValue([
+    mockKvListGuestCitationsLatest.mockResolvedValue([
       makeSubmission('s1'),
       makeSubmission('s2'),
       makeSubmission('s3'),

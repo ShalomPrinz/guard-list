@@ -314,6 +314,35 @@ async function handleInvitationCancel(
   return json({ ok: true })
 }
 
+async function handleListGuestCitations(
+  body: Record<string, unknown>,
+  ip: string,
+  username: string,
+  expectedPrefix: string,
+): Promise<Response> {
+  const limit = typeof body.limit === 'number' ? Math.max(1, Math.min(body.limit, 100)) : 5
+  const prefix = `${expectedPrefix}guestCitations:`
+
+  try {
+    // Fetch all guest citation keys
+    const allKeys = await kv.keys(`${prefix}*`)
+    if (allKeys.length === 0) return json({ citations: [] })
+
+    // Fetch all values in one mget call
+    const values = await kv.mget(...allKeys)
+
+    // Filter out nulls and sort by submittedAt descending (newest first)
+    const citations = values
+      .filter((v): v is { id: string; text: string; author: string; submittedAt: number } => v !== null)
+      .sort((a, b) => b.submittedAt - a.submittedAt)
+      .slice(0, limit)
+
+    return json({ citations })
+  } catch {
+    return json({ error: 'Internal server error' }, 500)
+  }
+}
+
 async function handleGroupGetMembers(
   body: Record<string, unknown>,
   username: string
@@ -396,6 +425,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === "del") return handleDel(body, ip, username, expectedPrefix);
     if (action === "list") return handleList(body, ip, username, expectedPrefix);
     if (action === "mget") return handleMget(body, ip, username, expectedPrefix);
+    if (action === "listGuestCitations") return handleListGuestCitations(body, ip, username, expectedPrefix);
     if (action === "crossSet") return handleCrossSet(body, username);
     if (action === "crossRead") return handleCrossRead(body, username);
     if (action === "groupCreate") return handleGroupCreate(username);
