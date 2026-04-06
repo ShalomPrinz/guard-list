@@ -40,6 +40,22 @@ export function updateScheduleName(id: string, name: string, storage: Storage = 
   if (updated) void kvSet('schedules:' + updated.groupId + ':' + id, updated)
 }
 
+export function updateScheduleCustomText(id: string, text: string | undefined, storage: Storage = window.localStorage): void {
+  const schedules = getSchedules(storage).map(s => {
+    if (s.id !== id) return s
+    const updated = { ...s }
+    if (text === undefined) {
+      delete updated.customWhatsAppText
+    } else {
+      updated.customWhatsAppText = text
+    }
+    return updated
+  })
+  saveSchedules(schedules, storage)
+  const updated = getScheduleById(id, storage)
+  if (updated) void kvSet('schedules:' + updated.groupId + ':' + id, updated)
+}
+
 export function upsertSchedule(schedule: Schedule, storage: Storage = window.localStorage): void {
   const schedules = getSchedules(storage)
   const idx = schedules.findIndex(s => s.id === schedule.id)

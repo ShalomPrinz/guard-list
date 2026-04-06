@@ -299,3 +299,20 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Root cause:** A wizard step that derives and mutates local state from the session must sync that state back to the session before any navigation — not only on the "forward/confirm" path.
 
 **Rule:** Any wizard step that holds local state derived from session data and allows the user to mutate it (reorder, rename, add/remove) must flush that local state back to the session via `updateStations()` or `updateSession()` before every navigation — both back and forward. In `Step4_Review`, the fix is `handleBack()`, which maps `ReviewStation[]` → `WizardStation[]` using the same pattern as `handleCreate` and calls `updateStations(updatedStations)` before `navigate('/schedule/new/step3')`. Apply this pattern to any future wizard step that maintains local-derived mutable state.
+
+---
+
+## E028 — TypeScript Doesn't Narrow useState Values Inside Closures
+
+**What went wrong:** `ResultScreen` was refactored to hold `schedule` in `useState<Schedule | undefined>`. An early `if (!schedule) return (...)` guard was added, but TypeScript still flagged uses of `schedule` inside inner functions (`handleAcceptEdit`, `doBack`, etc.) as "possibly undefined". All five type errors appeared in functions defined after the guard.
+
+**Root cause:** TypeScript narrows types for sequential code in the same scope, but closures (inner functions) capture the variable's declared type, not the narrowed type. An early return in the outer scope doesn't narrow the variable inside a closure — the closure could be called later when the state has reverted to `undefined`.
+
+**Rule:** When a component holds an optional value in `useState<T | undefined>` and uses an early return guard, add `if (!value) return` at the top of every inner function that uses that value. Do not rely on the outer guard narrowing the variable inside closures. Pattern for `ResultScreen`:
+```tsx
+function handleAcceptEdit() {
+  if (!schedule) return   // required — outer guard doesn't narrow here
+  updateScheduleCustomText(schedule.id, editDraft)
+  ...
+}
+```

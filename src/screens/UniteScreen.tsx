@@ -7,6 +7,9 @@ export default function UniteScreen() {
   const { scheduleId, targetScheduleId } = useParams<{ scheduleId: string; targetScheduleId: string }>()
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+  const [customText, setCustomText] = useState<string | undefined>(undefined)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
@@ -33,10 +36,11 @@ export default function UniteScreen() {
 
   const unified = uniteSchedules(earlier, later)
   const whatsappText = formatUnifiedScheduleForWhatsApp(unified)
+  const displayedText = customText ?? whatsappText
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(whatsappText)
+      await navigator.clipboard.writeText(displayedText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
@@ -45,7 +49,7 @@ export default function UniteScreen() {
   }
 
   function handleWhatsApp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(displayedText)}`, '_blank')
   }
 
   return (
@@ -65,9 +69,59 @@ export default function UniteScreen() {
       </div>
 
       {/* WhatsApp preview */}
-      <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 mb-6" dir="rtl">
-        {whatsappText}
-      </pre>
+      <div className="mb-4">
+        <div className="relative">
+          {!isEditing && (
+            <button
+              onClick={() => { setEditDraft(displayedText); setIsEditing(true) }}
+              aria-label="ערוך טקסט"
+              className="absolute top-2 left-2 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-gray-200/80 text-lg active:bg-gray-300 dark:bg-gray-700/80 dark:active:bg-gray-600"
+            >
+              ✏️
+            </button>
+          )}
+          {isEditing ? (
+            <textarea
+              value={editDraft}
+              onChange={e => setEditDraft(e.target.value)}
+              dir="rtl"
+              className="w-full whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 min-h-[200px] outline-none ring-2 ring-blue-500 resize-none"
+            />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 mb-6" dir="rtl">
+              {displayedText}
+            </pre>
+          )}
+        </div>
+
+        {/* Edit action buttons */}
+        {isEditing && (
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => { setCustomText(editDraft); setIsEditing(false) }}
+              className="flex-1 min-h-[44px] rounded-2xl bg-green-600 py-2.5 text-sm font-semibold text-white active:bg-green-700"
+            >
+              אשר
+            </button>
+            <button
+              onClick={() => setIsEditing(false)}
+              className="flex-1 min-h-[44px] rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+            >
+              בטל
+            </button>
+          </div>
+        )}
+
+        {/* Revert to original button */}
+        {!isEditing && customText !== undefined && (
+          <button
+            onClick={() => setCustomText(undefined)}
+            className="mt-2 min-h-[44px] w-full rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+          >
+            ↩ חזור לטקסט המקורי
+          </button>
+        )}
+      </div>
 
       {/* Quote */}
       {unified.quote && (

@@ -52,6 +52,7 @@ export interface Schedule {
   unevenDistributionMode: 'equal-duration' | 'equal-endtime';
   quote?: string;
   quoteAuthor?: string;
+  customWhatsAppText?: string;
 }
 
 // ─── Citations ────────────────────────────────────────────────────────────────

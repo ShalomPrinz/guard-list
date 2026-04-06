@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getScheduleById, updateScheduleName } from '../storage/schedules'
+import { getScheduleById, updateScheduleName, updateScheduleCustomText } from '../storage/schedules'
 import { getGroupById } from '../storage/groups'
 import { getStationsConfig } from '../storage/stationsConfig'
 import { formatScheduleForWhatsApp } from '../logic/generateSchedule'
@@ -74,15 +74,23 @@ export default function ResultScreen() {
   const { session, initSession } = useWizard()
   const { session: shortListSession, setSession: setShortListSession } = useShortListWizard()
 
-  const schedule = scheduleId ? getScheduleById(scheduleId) : undefined
-
+  const [schedule, setSchedule] = useState<Schedule | undefined>(() =>
+    scheduleId ? getScheduleById(scheduleId) : undefined
+  )
   const [name, setName] = useState(schedule?.name ?? '')
   const [editingName, setEditingName] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showUniteModal, setShowUniteModal] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+  const [showBackGuardModal, setShowBackGuardModal] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  function refresh() {
+    if (scheduleId) setSchedule(getScheduleById(scheduleId))
+  }
 
   if (!schedule) {
     return (
@@ -101,6 +109,7 @@ export default function ResultScreen() {
   // Build WhatsApp text using current (possibly edited) name
   const displaySchedule = { ...schedule, name }
   const whatsappText = formatScheduleForWhatsApp(displaySchedule)
+  const displayedText = schedule.customWhatsAppText ?? whatsappText
 
   function commitName() {
     if (!schedule) return
@@ -112,9 +121,26 @@ export default function ResultScreen() {
     }
   }
 
+  function handleAcceptEdit() {
+    if (!schedule) return
+    updateScheduleCustomText(schedule.id, editDraft)
+    setIsEditing(false)
+    refresh()
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false)
+  }
+
+  function handleRevertToOriginal() {
+    if (!schedule) return
+    updateScheduleCustomText(schedule.id, undefined)
+    refresh()
+  }
+
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(whatsappText)
+      await navigator.clipboard.writeText(displayedText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
@@ -123,7 +149,32 @@ export default function ResultScreen() {
   }
 
   function handleWhatsApp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(displayedText)}`, '_blank')
+  }
+
+  function handleBack() {
+    if (!schedule) return
+    if (schedule.customWhatsAppText) {
+      setShowBackGuardModal(true)
+      return
+    }
+    doBack()
+  }
+
+  function doBack() {
+    if (!schedule) return
+    if (shortListSession || schedule.createdFromShortList) {
+      if (!shortListSession) {
+        const shortListSess = buildShortListSessionFromSchedule(schedule)
+        if (shortListSess) {
+          setShortListSession(shortListSess)
+        }
+      }
+      navigate('/short-list/step2')
+    } else {
+      if (!session) initSession(buildSessionFromSchedule(schedule))
+      navigate('/schedule/new/step4')
+    }
   }
 
   return (
@@ -153,11 +204,59 @@ export default function ResultScreen() {
       </div>
 
       {/* WhatsApp preview */}
-      <div className="mb-6">
+      <div className="mb-4">
         <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">תצוגה מקדימה - כך זה ייראה בווטסאפ</p>
-        <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200" dir="rtl">
-          {whatsappText}
-        </pre>
+        <div className="relative">
+          {!isEditing && (
+            <button
+              onClick={() => { setEditDraft(displayedText); setIsEditing(true) }}
+              aria-label="ערוך טקסט"
+              className="absolute top-2 left-2 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-gray-200/80 text-lg active:bg-gray-300 dark:bg-gray-700/80 dark:active:bg-gray-600"
+            >
+              ✏️
+            </button>
+          )}
+          {isEditing ? (
+            <textarea
+              value={editDraft}
+              onChange={e => setEditDraft(e.target.value)}
+              dir="rtl"
+              className="w-full whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200 min-h-[200px] outline-none ring-2 ring-blue-500 resize-none"
+            />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words rounded-2xl bg-gray-100 p-4 text-sm font-sans text-gray-800 dark:bg-gray-800/80 dark:text-gray-200" dir="rtl">
+              {displayedText}
+            </pre>
+          )}
+        </div>
+
+        {/* Edit action buttons */}
+        {isEditing && (
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={handleAcceptEdit}
+              className="flex-1 min-h-[44px] rounded-2xl bg-green-600 py-2.5 text-sm font-semibold text-white active:bg-green-700"
+            >
+              אשר
+            </button>
+            <button
+              onClick={handleCancelEdit}
+              className="flex-1 min-h-[44px] rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+            >
+              בטל
+            </button>
+          </div>
+        )}
+
+        {/* Revert to original button */}
+        {!isEditing && schedule.customWhatsAppText && (
+          <button
+            onClick={handleRevertToOriginal}
+            className="mt-2 min-h-[44px] w-full rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+          >
+            ↩ חזור לטקסט המקורי
+          </button>
+        )}
       </div>
 
       {/* WhatsApp buttons */}
@@ -232,28 +331,36 @@ export default function ResultScreen() {
 
       {/* Back — navigates based on how the schedule was created */}
       <button
-        onClick={() => {
-          if (shortListSession || schedule.createdFromShortList) {
-            // Short-list flow: reconstruct session if needed, then go back to Step2
-            // Don't clear here — Step2's cancel button handles cleanup when navigating home
-            if (!shortListSession) {
-              // Reconstruct session from schedule if it doesn't exist
-              const shortListSess = buildShortListSessionFromSchedule(schedule)
-              if (shortListSess) {
-                setShortListSession(shortListSess)
-              }
-            }
-            navigate('/short-list/step2')
-          } else {
-            // Regular wizard: reconstruct and go to Step4
-            if (!session) initSession(buildSessionFromSchedule(schedule))
-            navigate('/schedule/new/step4')
-          }
-        }}
+        onClick={handleBack}
         className="w-full rounded-2xl border border-gray-300 py-3 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
       >
         ← חזרה לעריכה
       </button>
+
+      {/* Back guard modal — shown when custom text exists */}
+      {showBackGuardModal && (
+        <Modal onClose={() => setShowBackGuardModal(false)} title="עריכת רשימה שנערכה ידנית">
+          <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
+            ערכת את הרשימה ידנית ולא ניתן להשתמש בגרסה זו לעריכת הרשימה. מה אתה מעדיף?
+          </p>
+          <button
+            onClick={() => setShowBackGuardModal(false)}
+            className="mb-2 min-h-[44px] w-full rounded-2xl border border-gray-300 py-2.5 text-sm text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
+          >
+            אני רוצה להישאר עם הטקסט שערכתי
+          </button>
+          <button
+            onClick={() => {
+              updateScheduleCustomText(schedule.id, undefined)
+              setShowBackGuardModal(false)
+              doBack()
+            }}
+            className="min-h-[44px] w-full rounded-2xl bg-red-600 py-2.5 text-sm font-semibold text-white active:bg-red-700"
+          >
+            מעדיף למחוק את השינויים שלי ולערוך את הרשימה
+          </button>
+        </Modal>
+      )}
     </div>
   )
 }
