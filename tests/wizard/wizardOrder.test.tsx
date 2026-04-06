@@ -91,21 +91,7 @@ describe('Step3_Order — participant distribution', () => {
   })
 })
 
-describe('Step3_Order — lock toggle', () => {
-  it('locks a participant by clicking the lock button', async () => {
-    const user = userEvent.setup()
-    upsertGroup(makeGroup())
-    renderApp()
-    await navigateToStep3(user)
 
-    // Each participant row has a lock/unlock button
-    const lockButtons = screen.getAllByText('🔓')
-    await user.click(lockButtons[0])
-
-    // Should now show a locked icon for that participant
-    expect(screen.getAllByText('🔒').length).toBeGreaterThanOrEqual(1)
-  })
-})
 
 describe('Step3_Order — availability toggle', () => {
   it('toggling Base → Home in station moves participant to לא משובצים', async () => {

@@ -70,7 +70,6 @@ export function generateShortListSchedule(
       warriors.map(w => ({
         name: w.name,
         durationMinutes: minutesPerWarrior,
-        locked: false,
       })),
       startTimeStr,
       today,

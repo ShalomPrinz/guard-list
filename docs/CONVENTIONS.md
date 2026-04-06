@@ -56,6 +56,7 @@ Decisions already made in this codebase. Do not re-decide these. Apply them cons
 - Headcount station type: `stationType`, `headcountRequired`, `headcountParticipants` are gone. All stations are time-based. Zero occurrences must remain.
 - Read-only mode: `isReadOnly`, `viewOnly`, `readOnly` props on ResultScreen. ResultScreen is always editable. Never add these back.
 - RecalculateScreen: deleted. End time editing lives directly in Step4_Review as an editable field per station header.
+- Participant lock: `locked: boolean` is removed from `WizardParticipant`, `ScheduledParticipant`, and all local interfaces (`ParticipantItem` in Step3_Order, `ReviewItem` in Step4_Review). The lock button (🔒/🔓) and `onToggleLock` prop are gone from Step3_Order. Shuffle logic in Step3_Order treats all participants as unlockable. Never reintroduce `locked` on any participant type.
 
 ---
 

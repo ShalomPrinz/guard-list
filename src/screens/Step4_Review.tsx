@@ -48,7 +48,6 @@ interface ReviewItem {
   startTime: string
   endTime: string
   date: string
-  locked: boolean
 }
 
 interface ReviewStation {
@@ -114,7 +113,7 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
     }
 
     const partsWithDuration = ws.participants
-      .map(p => ({ name: p.name, durationMinutes, locked: p.locked }))
+      .map(p => ({ name: p.name, durationMinutes }))
 
     const stStartTime = ws.startTime
     const stStartDate = ws.startDate
@@ -131,7 +130,6 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
         startTime: sp.startTime,
         endTime: sp.endTime,
         date: sp.date,
-        locked: sp.locked,
       })),
       startTime: stStartTime,
       startDate: stStartDate,
@@ -536,7 +534,7 @@ export default function Step4_Review() {
       if (st.stationConfigId !== stationId) return st
       const resolvedRounding = config.roundingAlgorithm ?? st.roundingAlgorithm
       const newStartTime = config.startTime ?? st.startTime
-      const parts = st.items.map(it => ({ name: it.name, locked: it.locked }))
+      const parts = st.items.map(it => ({ name: it.name }))
       if (parts.length === 0) return { ...st, roundingAlgorithm: resolvedRounding, startTime: newStartTime }
 
       if (config.endTime) {
@@ -548,7 +546,6 @@ export default function Step4_Review() {
           startTime: sp.startTime,
           endTime: sp.endTime,
           date: sp.date,
-          locked: sp.locked,
         }))
         return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding, endTimeOverride: config.endTime }
       }
@@ -576,7 +573,6 @@ export default function Step4_Review() {
         startTime: '',
         endTime: '',
         date: st.startDate,
-        locked: false,
       }
       const newItems = recomputeTimes([...st.items, newItem], st.startTime, st.startDate)
       return { ...st, items: newItems }
@@ -682,7 +678,7 @@ export default function Step4_Review() {
     setStations(reordered.map((st, idx) => {
       if (st.endTimeOverride && st.items.length > 0) {
         // Station has a user-set end time — preserve it by recalculating from that end time.
-        const parts = st.items.map(it => ({ name: it.name, locked: it.locked }))
+        const parts = st.items.map(it => ({ name: it.name }))
         const recalculated = recalculateStation(parts, st.startTime, st.startDate, st.endTimeOverride, st.roundingAlgorithm)
         const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
           id: st.items[j]?.id ?? `${st.stationConfigId}-drag-${j}`,
@@ -691,7 +687,6 @@ export default function Step4_Review() {
           startTime: sp.startTime,
           endTime: sp.endTime,
           date: sp.date,
-          locked: sp.locked,
         }))
         return { ...st, items: newItems }
       }
@@ -717,7 +712,6 @@ export default function Step4_Review() {
         ...ws,
         participants: rs.items.map(item => ({
           name: item.name,
-          locked: item.locked,
         })),
       }
     })
@@ -760,7 +754,6 @@ export default function Step4_Review() {
         endTime: item.endTime,
         date: item.date,
         durationMinutes: item.durationMinutes,
-        locked: item.locked,
       }))
       return {
         stationConfigId: st.stationConfigId,
@@ -824,7 +817,6 @@ export default function Step4_Review() {
         ...ws,
         participants: rs.items.map(item => ({
           name: item.name,
-          locked: item.locked,
         })),
       }
     })

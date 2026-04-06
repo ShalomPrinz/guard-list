@@ -134,7 +134,7 @@ export function calcStationDurations(params: {
  * Handles midnight crossover: if endTime <= startTime in minutes, adds 24h to endTime.
  */
 export function recalculateStation(
-  participants: Array<{ name: string; locked: boolean }>,
+  participants: Array<{ name: string }>,
   startTime: string,
   startDate: string,
   endTime: string,

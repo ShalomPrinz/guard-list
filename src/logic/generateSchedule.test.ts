@@ -61,9 +61,9 @@ describe('shuffleArray', () => {
 
 describe('buildStationSchedule', () => {
   const participants = [
-    { name: 'Alice', durationMinutes: 90, locked: false },
-    { name: 'Bob',   durationMinutes: 90, locked: true  },
-    { name: 'Carol', durationMinutes: 60, locked: false },
+    { name: 'Alice', durationMinutes: 90 },
+    { name: 'Bob',   durationMinutes: 90 },
+    { name: 'Carol', durationMinutes: 60 },
   ]
 
   it('assigns correct sequential start and end times', () => {
@@ -83,8 +83,8 @@ describe('buildStationSchedule', () => {
 
   it('advances date when schedule crosses midnight', () => {
     const late = [
-      { name: 'Alice', durationMinutes: 120, locked: false },
-      { name: 'Bob',   durationMinutes: 120, locked: false },
+      { name: 'Alice', durationMinutes: 120 },
+      { name: 'Bob',   durationMinutes: 120 },
     ]
     const result = buildStationSchedule(late, '23:00', '2026-03-10')
     expect(result[0].date).toBe('2026-03-10')
@@ -92,12 +92,6 @@ describe('buildStationSchedule', () => {
     expect(result[0].endTime).toBe('01:00')
     expect(result[1].date).toBe('2026-03-11')
     expect(result[1].startTime).toBe('01:00')
-  })
-
-  it('preserves locked flag', () => {
-    const result = buildStationSchedule(participants, '20:00', '2026-03-10')
-    expect(result[0].locked).toBe(false)
-    expect(result[1].locked).toBe(true)
   })
 
   it('preserves durationMinutes per participant', () => {
@@ -146,8 +140,8 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'Gate',
           stationType: 'time-based',
           participants: [
-            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
-            { name: 'Bob',   startTime: '21:30', endTime: '23:00', date: '2026-01-01', durationMinutes: 90, locked: false },
+            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, },
+            { name: 'Bob',   startTime: '21:30', endTime: '23:00', date: '2026-01-01', durationMinutes: 90, },
           ],
         },
       ],
@@ -182,7 +176,7 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'First Station',
           stationType: 'time-based',
           participants: [
-            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
+            { name: 'Alice', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, },
           ],
         },
         {
@@ -190,7 +184,7 @@ describe('formatScheduleForWhatsApp', () => {
           stationName: 'Second Station',
           stationType: 'time-based',
           participants: [
-            { name: 'Bob', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, locked: false },
+            { name: 'Bob', startTime: '20:00', endTime: '21:30', date: '2026-01-01', durationMinutes: 90, },
           ],
         },
       ],

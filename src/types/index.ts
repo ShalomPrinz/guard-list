@@ -30,7 +30,6 @@ export interface ScheduledParticipant {
   endTime: string;         // "HH:MM"
   date: string;            // YYYY-MM-DD
   durationMinutes: number;
-  locked: boolean;
 }
 
 export interface ScheduleStation {
@@ -147,7 +146,6 @@ export interface TimeConfig {
 
 export interface WizardParticipant {
   name: string;
-  locked: boolean;
 }
 
 export interface WizardStation {

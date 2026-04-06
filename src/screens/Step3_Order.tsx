@@ -39,7 +39,6 @@ import AvailabilityToggle from '../components/AvailabilityToggle'
 interface ParticipantItem {
   id: string
   name: string
-  locked: boolean
   availability: 'base' | 'home'
 }
 
@@ -93,14 +92,14 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
       return {
         stationConfigId: ws.config.id,
         stationName: ws.config.name,
-        participants: mine.map(name => ({ id: crypto.randomUUID(), name, locked: false, availability: 'base' as const })),
+        participants: mine.map(name => ({ id: crypto.randomUUID(), name, availability: 'base' as const })),
       }
     })
   }
 
   const unassigned: ParticipantItem[] = allMembers
     .filter(m => !assignedNames.has(m.name))
-    .map(m => ({ id: crypto.randomUUID(), name: m.name, locked: false, availability: m.availability }))
+    .map(m => ({ id: crypto.randomUUID(), name: m.name, availability: m.availability }))
 
   return { stations, unassigned }
 }
@@ -109,12 +108,10 @@ function initOrderState(session: WizardSession, allMembers: Member[], previousSc
 
 function SortableRow({
   item,
-  onToggleLock,
   onToggleAvailability,
   onRemove,
 }: {
   item: ParticipantItem
-  onToggleLock: () => void
   onToggleAvailability: (status: 'base' | 'home') => void
   onRemove: () => void
 }) {
@@ -132,13 +129,6 @@ function SortableRow({
       <span className="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-gray-100">
         {item.name}
       </span>
-
-      <button
-        onClick={onToggleLock}
-        className={`shrink-0 rounded-lg px-2 py-0.5 text-xs ${item.locked ? 'bg-yellow-700/80 text-yellow-100' : 'text-gray-400 active:text-yellow-600 dark:text-gray-500 dark:active:text-yellow-300'}`}
-      >
-        {item.locked ? '🔒' : '🔓'}
-      </button>
 
       <AvailabilityToggle status={item.availability} onChange={onToggleAvailability} />
 
@@ -317,7 +307,7 @@ export default function Step3_Order() {
         const toIdx = (dst as { stationIdx: number }).stationIdx
         const targetParts = [...newStations[toIdx].participants]
         const dstPos = targetParts.findIndex(p => p.id === oId)
-        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, locked: false, availability: 'base' }
+        const movedItem: ParticipantItem = { id: activeItem.id, name: activeItem.name, availability: 'base' }
         if (dstPos >= 0) targetParts.splice(dstPos, 0, movedItem)
         else targetParts.push(movedItem)
         newStations = newStations.map((s, i) => i === toIdx ? { ...s, participants: targetParts } : s)
@@ -385,55 +375,24 @@ export default function Step3_Order() {
   function shuffleStation(si: number) {
     setOrderState(prev => {
       const s = prev.stations[si]
-      const unlockedIdx = s.participants.map((p, i) => (p.locked ? -1 : i)).filter(i => i >= 0)
-      const shuffled = shuffleArray(s.participants.filter(p => !p.locked))
-      const next = [...s.participants]
-      unlockedIdx.forEach((idx, k) => { next[idx] = shuffled[k] })
-      return { ...prev, stations: prev.stations.map((st, i) => (i === si ? { ...st, participants: next } : st)) }
+      return { ...prev, stations: prev.stations.map((st, i) => (i === si ? { ...st, participants: shuffleArray(s.participants) } : st)) }
     })
   }
 
   function reLottery() {
     setOrderState(prev => {
-      const allUnlocked: ParticipantItem[] = []
-      const lockedByStation = new Map<number, { idx: number; item: ParticipantItem }[]>()
-
-      prev.stations.forEach((s, si) => {
-        const locked: { idx: number; item: ParticipantItem }[] = []
-        s.participants.forEach((p, pi) => {
-          if (p.locked) locked.push({ idx: pi, item: p })
-          else allUnlocked.push(p)
-        })
-        lockedByStation.set(si, locked)
-      })
-
-      const pool = shuffleArray(allUnlocked)
+      const all: ParticipantItem[] = prev.stations.flatMap(s => s.participants)
+      const pool = shuffleArray(all)
       let poolIdx = 0
-
-      const newStations = prev.stations.map((s, si) => {
-        const locked = lockedByStation.get(si) ?? []
-        const result: ParticipantItem[] = Array(s.participants.length).fill(null)
-        locked.forEach(({ idx, item }) => { result[idx] = item })
-        for (let i = 0; i < result.length; i++) {
-          if (!result[i]) result[i] = pool[poolIdx++]
-        }
-        return { ...s, participants: result.filter(Boolean) }
-      })
-
+      const newStations = prev.stations.map(s => ({
+        ...s,
+        participants: s.participants.map(() => pool[poolIdx++]),
+      }))
       return { ...prev, stations: newStations }
     })
   }
 
   // ── Participant mutations ─────────────────────────────────────────────────
-
-  function patchParticipant(si: number, id: string, patch: Partial<ParticipantItem>) {
-    setOrderState(prev => ({
-      ...prev,
-      stations: prev.stations.map((s, i) =>
-        i === si ? { ...s, participants: s.participants.map(p => (p.id === id ? { ...p, ...patch } : p)) } : s
-      ),
-    }))
-  }
 
   function removeFromStation(si: number, id: string) {
     setOrderState(prev => {
@@ -483,7 +442,7 @@ export default function Step3_Order() {
       const s = orderState.stations[si]
       return {
         ...ws,
-        participants: s.participants.map(({ name, locked }) => ({ name, locked })),
+        participants: s.participants.map(({ name }) => ({ name })),
       }
     })
     updateStations(updated)
@@ -553,7 +512,6 @@ export default function Step3_Order() {
                       <SortableRow
                         key={item.id}
                         item={item}
-                        onToggleLock={() => patchParticipant(si, item.id, { locked: !item.locked })}
                         onToggleAvailability={(newStatus) => {
                           if (newStatus === 'home') toggleAvailabilityInStation(si, item.id)
                           // Base is the default for station items; no-op if toggling to 'base'

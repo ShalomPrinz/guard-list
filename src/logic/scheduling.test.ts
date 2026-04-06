@@ -210,9 +210,9 @@ describe('distributeParticipants', () => {
 
 describe('recalculateStation', () => {
   const participants = [
-    { name: 'Alice', locked: false },
-    { name: 'Bob', locked: false },
-    { name: 'Charlie', locked: false },
+    { name: 'Alice' },
+    { name: 'Bob' },
+    { name: 'Charlie' },
   ]
 
   it('returns empty array when no participants', () => {
@@ -239,8 +239,8 @@ describe('recalculateStation', () => {
   it('handles midnight crossover: endTime < startTime adds 24h', () => {
     // 23:00 → 01:00 = 120 min, 2 participants → 60 min each
     const twoParticipants = [
-      { name: 'Alice', locked: false },
-      { name: 'Bob', locked: false },
+      { name: 'Alice' },
+      { name: 'Bob' },
     ]
     const result = recalculateStation(twoParticipants, '23:00', '2026-01-01', '01:00', 'round-nearest')
     expect(result).toHaveLength(2)
@@ -250,20 +250,15 @@ describe('recalculateStation', () => {
     expect(result[1].date).toBe('2026-01-02')
   })
 
-  it('preserves participant names and locked flags', () => {
-    const lockedParticipants = [
-      { name: 'Alice', locked: true },
-      { name: 'Bob', locked: false },
-    ]
-    const result = recalculateStation(lockedParticipants, '20:00', '2026-01-01', '22:00', 'round-nearest')
+  it('preserves participant names', () => {
+    const twoParticipants = [{ name: 'Alice' }, { name: 'Bob' }]
+    const result = recalculateStation(twoParticipants, '20:00', '2026-01-01', '22:00', 'round-nearest')
     expect(result[0].name).toBe('Alice')
-    expect(result[0].locked).toBe(true)
     expect(result[1].name).toBe('Bob')
-    expect(result[1].locked).toBe(false)
   })
 
   it('single participant gets the full duration', () => {
-    const one = [{ name: 'Solo', locked: false }]
+    const one = [{ name: 'Solo' }]
     const result = recalculateStation(one, '08:00', '2026-01-01', '10:00', 'round-nearest')
     expect(result[0].durationMinutes).toBe(120)
     expect(result[0].startTime).toBe('08:00')

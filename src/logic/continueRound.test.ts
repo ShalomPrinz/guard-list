@@ -3,7 +3,7 @@ import { uniteSchedules, datetimeToSortKey, buildContinueRoundQueue } from './co
 import type { Schedule } from '../types'
 
 function makeParticipant(name: string, startTime: string, endTime: string, date: string) {
-  return { name, startTime, endTime, date, durationMinutes: 60, locked: false }
+  return { name, startTime, endTime, date, durationMinutes: 60 }
 }
 
 function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {

@@ -52,11 +52,11 @@ function makeSchedule(): Schedule {
         participants: [
           {
             name: 'Alice', startTime: '20:00', endTime: '21:00',
-            date: '2026-03-16', durationMinutes: 60, locked: false,
+            date: '2026-03-16', durationMinutes: 60,
           },
           {
             name: 'Bob', startTime: '21:00', endTime: '22:00',
-            date: '2026-03-16', durationMinutes: 60, locked: false,
+            date: '2026-03-16', durationMinutes: 60,
           },
         ],
       },

@@ -35,7 +35,7 @@ function makeParticipant(name: string, startTime: string, endTime: string) {
     endTime,
     date: '2024-01-01',
     durationMinutes: 60,
-    locked: false,
+    
   }
 }
 

@@ -33,7 +33,6 @@ export function buildStationSchedule(
   participants: ReadonlyArray<{
     name: string;
     durationMinutes: number;
-    locked: boolean;
   }>,
   startTime: string,
   startDate: string,
@@ -54,7 +53,6 @@ export function buildStationSchedule(
       endTime: pEndTime,
       date: addDaysToDate(startDate, dayOffset),
       durationMinutes: p.durationMinutes,
-      locked: p.locked,
     };
   });
 }
