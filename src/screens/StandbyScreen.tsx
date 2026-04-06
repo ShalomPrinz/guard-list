@@ -10,10 +10,14 @@ export function formatStandbyText(
   selectedNames: string[],
   commanderName?: string,
   note?: string,
+  freetextBody?: string,
 ): string {
   const boldTitle = `*${title}*`
   const titleLine = note ? `${boldTitle} - ${note}` : boldTitle
   const parts: string[] = [titleLine, '']
+  if (freetextBody) {
+    parts.push(`> ${freetextBody}`, '')
+  }
   if (commanderName) {
     parts.push(`מפקד: ${commanderName}`, '')
   }
@@ -107,13 +111,10 @@ export default function StandbyScreen() {
     ? allMembers.find(m => m.id === selectedCommanderId)?.name
     : undefined
 
-  function computeNote(): string | undefined {
-    if (!noteEnabled) return undefined
-    if (noteMode === 'time') return `החל מהשעה ${noteTime}`
-    return noteText || undefined
-  }
+  const timeNote = noteEnabled && noteMode === 'time' ? `החל מהשעה ${noteTime}` : undefined
+  const freetextBody = noteEnabled && noteMode === 'freetext' && noteText ? noteText : undefined
 
-  const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName, computeNote())
+  const whatsappText = formatStandbyText(title, orderedSelectedWarriors, commanderName, timeNote, freetextBody)
   const hasOutput = orderedSelectedWarriors.length > 0 || !!commanderName
 
   async function handleCopy() {

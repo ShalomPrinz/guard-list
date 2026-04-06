@@ -74,9 +74,14 @@ describe('formatStandbyText', () => {
     expect(text).toBe('*כיתת כוננות* - החל מהשעה 22:00\n\n1. Alice')
   })
 
-  it('appends freetext note after dash', () => {
-    const text = formatStandbyText('כיתת כוננות', ['Alice'], undefined, 'הכנה לאימון')
-    expect(text).toBe('*כיתת כוננות* - הכנה לאימון\n\n1. Alice')
+  it('renders freetext body as quote block below title when freetextBody provided', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], undefined, undefined, 'הכנה לאימון')
+    expect(text).toBe('*כיתת כוננות*\n\n> הכנה לאימון\n\n1. Alice')
+  })
+
+  it('freetext quote block appears before commander line', () => {
+    const text = formatStandbyText('כיתת כוננות', ['Alice'], 'Bob', undefined, 'הכנה לאימון')
+    expect(text).toBe('*כיתת כוננות*\n\n> הכנה לאימון\n\nמפקד: Bob\n\n1. Alice')
   })
 
   it('no dash when note is undefined', () => {
@@ -373,7 +378,8 @@ describe('StandbyScreen — note section', () => {
     await user.type(textInput, 'בדיקה')
 
     await user.click(screen.getByText('📋 העתק לווטסאפ'))
-    expect(clipboardText).toContain('*כיתת כוננות* - בדיקה')
+    expect(clipboardText).not.toContain(' - ')
+    expect(clipboardText).toContain('> בדיקה')
   })
 
   it('freetext mode with empty input produces no note (no dash)', async () => {
