@@ -155,16 +155,9 @@ export default function SharingCenterScreen() {
       setAcceptError('שגיאה בהצטרפות לקבוצה — נסה שוב')
       return
     }
-    // Sync fresh state from KV: check for notifications, refresh group members
-    const sharingResult = await loadSharingCenterUpdates()
-    setGroup(getLocalGroup())
-    setInvitation(getLocalGroupInvitation())
-    setOutgoing(getOutgoingInvitation())
+    // localStorage is already up to date from acceptGroupInvitation — just re-read it
+    refreshState()
     setActionLoading(false)
-    // Show success notification if there are any (acceptance of self or others)
-    if (sharingResult.acceptedBy || sharingResult.rejectedBy) {
-      setNotification(sharingResult)
-    }
   }
 
   async function handleDecline() {

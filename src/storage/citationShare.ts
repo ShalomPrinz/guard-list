@@ -132,7 +132,7 @@ export async function acceptGroupInvitation(
     return 'cancelled'
   }
 
-  const { kvGroupJoin, kvGroupGetMembers, kvCrossSet, kvCrossReadGroupMember } = await import('./cloudStorage')
+  const { kvGroupJoin, kvGroupGetMembers, kvCrossSet, kvCrossReadGroupMember, kvInvitationDecline } = await import('./cloudStorage')
 
   const joinResult = await kvGroupJoin(invitation.groupId)
   if (joinResult !== 'ok') return 'error'
@@ -143,6 +143,8 @@ export async function acceptGroupInvitation(
   }
 
   clearLocalGroupInvitation(storage)
+  // Delete the KV invitation key so loadSharingCenterUpdates doesn't re-add it
+  await kvInvitationDecline()
 
   void kvCrossSet(invitation.fromUsername, 'share:acceptNotification', {
     byUsername: currentUser,
