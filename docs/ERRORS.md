@@ -289,3 +289,13 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 **Rule:** When implementing rejection/decline flows for stateful KV operations: (1) Always clear local state first via a local helper (e.g. `clearLocalGroupInvitation`). (2) Always delete the corresponding server-side KV key immediately via a dedicated server action (e.g. `kvInvitationDecline` in `api/kv.ts`). (3) Make the server action idempotent — if the key is already gone, still return success. (4) The order matters: local state change is immediate feedback; server cleanup must happen to prevent re-appearance on reload. This pattern applies to any future KV-backed state that can be rejected or deleted — never assume clearing local state is sufficient.
 
 **Prevention:** In `src/storage/citationShare.ts`, `declineGroupInvitation()` now calls `await kvInvitationDecline()` before sending the notification. The `kvInvitationDecline()` helper is defined in `src/storage/cloudStorage.ts` and maps to the `invitationDecline` action in `api/kv.ts`.
+
+---
+
+## E027 — Step4 Reordering Not Persisted on Back Navigation
+
+**What went wrong:** `Step4_Review` derives a local `stations: ReviewStation[]` state from the wizard session on mount and allows the user to reorder participants via drag-and-drop. The "Create Schedule" button (`handleCreate`) already synced this local state back to the session via `updateStations()`. The back button (`← חזרה`) did not — it called `navigate('/schedule/new/step3')` directly. Step3's `initOrderState` restores from session, so navigating back showed the old (pre-reorder) ordering instead of what was visible in Step4.
+
+**Root cause:** A wizard step that derives and mutates local state from the session must sync that state back to the session before any navigation — not only on the "forward/confirm" path.
+
+**Rule:** Any wizard step that holds local state derived from session data and allows the user to mutate it (reorder, rename, add/remove) must flush that local state back to the session via `updateStations()` or `updateSession()` before every navigation — both back and forward. In `Step4_Review`, the fix is `handleBack()`, which maps `ReviewStation[]` → `WizardStation[]` using the same pattern as `handleCreate` and calls `updateStations(updatedStations)` before `navigate('/schedule/new/step3')`. Apply this pattern to any future wizard step that maintains local-derived mutable state.

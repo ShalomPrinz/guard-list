@@ -707,6 +707,26 @@ export default function Step4_Review() {
     stationsSnapshotRef.current = null
   }
 
+  // ── Back navigation ────────────────────────────────────────────────────────
+
+  function handleBack() {
+    if (!session) return
+    const updatedStations: typeof session.stations = session.stations.map(ws => {
+      const rs = stations.find(s => s.stationConfigId === ws.config.id)
+      if (!rs) return ws
+      return {
+        ...ws,
+        participants: rs.items.map(item => ({
+          name: item.name,
+          locked: item.locked,
+          skipped: false,
+        })),
+      }
+    })
+    updateStations(updatedStations)
+    navigate('/schedule/new/step3')
+  }
+
   // ── Create schedule ────────────────────────────────────────────────────────
 
   function handleCreate() {
@@ -1069,7 +1089,7 @@ export default function Step4_Review() {
       {/* Navigation */}
       <div className="flex gap-3">
         <button
-          onClick={() => navigate('/schedule/new/step3')}
+          onClick={handleBack}
           className="flex-1 rounded-2xl border border-gray-300 py-3 text-sm font-medium text-gray-700 active:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-800"
         >
           ← חזרה

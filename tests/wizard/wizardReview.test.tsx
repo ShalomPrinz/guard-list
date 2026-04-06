@@ -155,6 +155,39 @@ describe('Step4_Review — schedule creation', () => {
 
 })
 
+describe('Step4_Review — back button ordering persistence', () => {
+  it('saves current participant ordering to session when clicking back', async () => {
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
+
+    // Confirm Step4 is shown with all participants
+    expect(screen.getByText('סקירה ועריכה')).toBeTruthy()
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('Bob')).toBeTruthy()
+    expect(screen.getByText('Charlie')).toBeTruthy()
+
+    // Click back button — should navigate to Step3 and persist ordering
+    await user.click(screen.getByText('← חזרה'))
+
+    // Step3 should now be shown
+    await waitFor(() => {
+      expect(screen.getByText('סדר שומרים')).toBeTruthy()
+    })
+
+    // Navigate forward again to Step4 — participants should still be present
+    await user.click(screen.getByText('הבא →'))
+
+    await waitFor(() => {
+      expect(screen.getByText('סקירה ועריכה')).toBeTruthy()
+      expect(screen.getByText('Alice')).toBeTruthy()
+      expect(screen.getByText('Bob')).toBeTruthy()
+      expect(screen.getByText('Charlie')).toBeTruthy()
+    })
+  })
+})
+
 describe('Step4_Review — timing config modal', () => {
   it('shows a gear button for each station', async () => {
     const user = userEvent.setup()
