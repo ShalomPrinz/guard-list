@@ -98,7 +98,6 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
 }
 
 export async function kvDel(key: string): Promise<void> {
-  if (localStorage.getItem('noBackup')) return
   const username = getUsername()
   const prefixed = scopedKey(key)
   if (!prefixed || !username) {

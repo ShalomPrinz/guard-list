@@ -211,6 +211,22 @@ describe('cloudStorage', () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
       await expect(kvDel('groups:g1')).resolves.not.toThrow()
     })
+
+    it('still calls fetch when noBackup is set (deletions always propagate to cloud)', async () => {
+      // Regression test: noBackup must NOT guard kvDel.
+      // Without this fix, share:rejectionNotification was never deleted from KV,
+      // causing the rejection notification to reappear on every SharingCenterScreen mount.
+      localStorage.setItem('noBackup', '1')
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await kvDel('share:rejectionNotification')
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+      expect(body.action).toBe('del')
+      expect(body.key).toBe('testuser:share:rejectionNotification')
+    })
   })
 
   describe('kvGetRaw / kvSetRaw', () => {
