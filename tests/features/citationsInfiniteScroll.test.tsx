@@ -43,7 +43,7 @@ describe('Citations Infinite Scroll', () => {
     vi.clearAllMocks()
   })
 
-  it('search mode: renders only first PAGE_SIZE items when there are more citations', async () => {
+  it('search mode: renders only first SECTION_INITIAL items per section when there are more matching citations', async () => {
     const storage = createLocalStorageMock()
     storage.setItem('citations', JSON.stringify(mockCitations))
     storage.setItem('username', 'testuser')
@@ -51,23 +51,23 @@ describe('Citations Infinite Scroll', () => {
 
     renderCitations()
 
-    // Type a search term to enter flat list mode
+    // Type a search term — sections remain, filtered per section
     const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
     fireEvent.change(searchInput, { target: { value: 'Quote text' } })
 
-    // Wait for first citation to appear in flat list
+    // Wait for first citation to appear
     await waitFor(() => {
       expect(screen.getByText(/Quote text 0/)).toBeTruthy()
     })
 
-    // Check that items in the first PAGE_SIZE are rendered (spot check)
+    // First 3 items visible (SECTION_INITIAL=3)
     expect(screen.getByText(/Quote text 0/)).toBeTruthy()
-    expect(screen.getByText(/Quote text 10/)).toBeTruthy()
-    expect(screen.getByText(/Quote text 19/)).toBeTruthy()
+    expect(screen.getByText(/Quote text 1/)).toBeTruthy()
+    expect(screen.getByText(/Quote text 2/)).toBeTruthy()
 
-    // Check that items beyond PAGE_SIZE are not rendered
-    const beyond20 = screen.queryByText((content: string) => content === 'Quote text 20')
-    expect(beyond20).toBeNull()
+    // Items beyond SECTION_INITIAL are not rendered
+    const beyond3 = screen.queryByText((content: string) => content === 'Quote text 3')
+    expect(beyond3).toBeNull()
 
     const beyond49 = screen.queryByText((content: string) => content === 'Quote text 49')
     expect(beyond49).toBeNull()

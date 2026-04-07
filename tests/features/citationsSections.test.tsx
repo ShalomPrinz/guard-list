@@ -187,12 +187,14 @@ describe('Citations Sections by Creator', () => {
     expect(screen.queryByText('bob')).toBeNull()
   })
 
-  it('shows flat list when search is active instead of sections', async () => {
+  it('filters within each section when search is active (both sections remain visible with matching citations)', async () => {
     const storage = createLocalStorageMock()
     storage.setItem('username', 'alice')
     const citations: Citation[] = [
       makeCitation('1', { text: 'ציטוט מיוחד', createdByUsername: undefined }),
-      makeCitation('2', { createdByUsername: 'bob', text: 'ציטוט של בוב' }),
+      makeCitation('2', { text: 'ציטוט רגיל', createdByUsername: undefined }),
+      makeCitation('3', { text: 'ציטוט מיוחד של בוב', createdByUsername: 'bob' }),
+      makeCitation('4', { text: 'ציטוט אחר של בוב', createdByUsername: 'bob' }),
     ]
     storage.setItem('citations', JSON.stringify(citations))
     renderCitations(storage)
@@ -201,15 +203,97 @@ describe('Citations Sections by Creator', () => {
       expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
     })
 
-    // Type a search term
     const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
     fireEvent.change(searchInput, { target: { value: 'מיוחד' } })
 
     await waitFor(() => {
-      // Sections should be gone
-      expect(screen.queryByText('הציטוטים שלי')).toBeNull()
-      // Matching citation should be visible
+      // Both sections still visible
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+      expect(screen.getByText('bob')).toBeTruthy()
+      // Only matching citations visible
       expect(screen.getByText('ציטוט מיוחד')).toBeTruthy()
+      expect(screen.getByText('ציטוט מיוחד של בוב')).toBeTruthy()
+      // Non-matching citations hidden
+      expect(screen.queryByText('ציטוט רגיל')).toBeNull()
+      expect(screen.queryByText('ציטוט אחר של בוב')).toBeNull()
+    })
+  })
+
+  it('hides a section with no matches during search', async () => {
+    const storage = createLocalStorageMock()
+    storage.setItem('username', 'alice')
+    const citations: Citation[] = [
+      makeCitation('1', { text: 'ציטוט מיוחד', createdByUsername: undefined }),
+      makeCitation('2', { text: 'ציטוט של בוב', createdByUsername: 'bob' }),
+    ]
+    storage.setItem('citations', JSON.stringify(citations))
+    renderCitations(storage)
+
+    await waitFor(() => {
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+    })
+
+    const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
+    fireEvent.change(searchInput, { target: { value: 'מיוחד' } })
+
+    await waitFor(() => {
+      // Alice's section still visible (has a match)
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+      // Bob's section is hidden (no matches)
+      expect(screen.queryByText('bob')).toBeNull()
+    })
+  })
+
+  it('shows global empty state when no section has matches during search', async () => {
+    const storage = createLocalStorageMock()
+    storage.setItem('username', 'alice')
+    const citations: Citation[] = [
+      makeCitation('1', { text: 'ציטוט רגיל', createdByUsername: undefined }),
+    ]
+    storage.setItem('citations', JSON.stringify(citations))
+    renderCitations(storage)
+
+    await waitFor(() => {
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+    })
+
+    const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
+    fireEvent.change(searchInput, { target: { value: 'אין תוצאה' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('אין תוצאות לחיפוש זה.')).toBeTruthy()
+    })
+  })
+
+  it('resets each section back to showing 3 items when search query changes', async () => {
+    const storage = createLocalStorageMock()
+    storage.setItem('username', 'alice')
+    // 5 citations that all match 'ציטוט'
+    const citations: Citation[] = Array.from({ length: 5 }, (_, i) =>
+      makeCitation(`a${i}`, { text: `ציטוט alice ${i}`, createdByUsername: undefined })
+    )
+    storage.setItem('citations', JSON.stringify(citations))
+    renderCitations(storage)
+
+    await waitFor(() => {
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+    })
+
+    // Load more to see all 5
+    fireEvent.click(screen.getByText('טען עוד ציטוטים'))
+    await waitFor(() => {
+      expect(screen.getByText('ציטוט alice 4')).toBeTruthy()
+    })
+
+    // Now type a search — section should reset to 3 visible
+    const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
+    fireEvent.change(searchInput, { target: { value: 'ציטוט' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('ציטוט alice 0')).toBeTruthy()
+      expect(screen.getByText('ציטוט alice 2')).toBeTruthy()
+      expect(screen.queryByText('ציטוט alice 3')).toBeNull()
+      expect(screen.queryByText('ציטוט alice 4')).toBeNull()
     })
   })
 

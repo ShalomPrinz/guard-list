@@ -11,7 +11,6 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
 import type { Citation, Member } from '../types'
 
-const PAGE_SIZE = 20
 const SECTION_INITIAL = 3
 const SECTION_LOAD_MORE = 10
 
@@ -32,7 +31,6 @@ export default function CitationsScreen() {
   const [citations, setCitations] = useState<Citation[]>(() => getCitations())
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -41,9 +39,6 @@ export default function CitationsScreen() {
   const [sectionVisible, setSectionVisible] = useState<Record<string, number>>({})
   const [sectionLoadMoreClicked, setSectionLoadMoreClicked] = useState<Record<string, boolean>>({})
   const sentinelRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
-
-  // Flat list sentinel for search mode
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
@@ -82,9 +77,10 @@ export default function CitationsScreen() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  // Reset visibleCount when search changes
+  // Reset section visible counts when search changes
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
+    setSectionVisible({})
+    setSectionLoadMoreClicked({})
   }, [search])
 
   const allMembers: Member[] = getGroups().flatMap(g => g.members)
@@ -101,17 +97,18 @@ export default function CitationsScreen() {
   )]
 
   function getSectionItems(key: string): Citation[] {
-    if (key === ME_KEY) return myCitations
-    return citations.filter(c => c.createdByUsername === key)
+    const base = key === ME_KEY
+      ? myCitations
+      : citations.filter(c => c.createdByUsername === key)
+    return base.filter(c => !search || c.text.includes(search) || c.author.includes(search))
   }
 
   function getSectionVisible(key: string): number {
     return sectionVisible[key] ?? SECTION_INITIAL
   }
 
-  // IntersectionObserver per section (only when search is empty)
+  // IntersectionObserver per section
   useEffect(() => {
-    if (search) return
     const observers: IntersectionObserver[] = []
     sentinelRefs.current.forEach((el, key) => {
       if (!el || !sectionLoadMoreClicked[key]) return
@@ -130,25 +127,6 @@ export default function CitationsScreen() {
     return () => observers.forEach(o => o.disconnect())
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionVisible, sectionLoadMoreClicked, citations.length, search])
-
-  // --- Search (flat list) ---
-  const filtered = citations.filter(c =>
-    c.text.includes(search) || c.author.includes(search)
-  )
-  const visible = filtered.slice(0, visibleCount)
-
-  // IntersectionObserver for flat list (search mode)
-  useEffect(() => {
-    const el = sentinelRef.current
-    if (!el || !search) return
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && visibleCount < filtered.length) {
-        setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filtered.length))
-      }
-    }, { threshold: 0.1 })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [filtered.length, visibleCount, search])
 
   function resolveLinkedMemberId(author: string): string {
     const link = authorLinks[author]
@@ -280,15 +258,13 @@ export default function CitationsScreen() {
     )
   }
 
-  // Sections for non-search mode
+  // Build sections (search filter applied inside getSectionItems)
+  const allSectionKeys = [ME_KEY, ...otherUsernames]
   const sections: Array<{ key: string; label: string; items: Citation[] }> = []
-  if (myCitations.length > 0) {
-    sections.push({ key: ME_KEY, label: 'הציטוטים שלי', items: myCitations })
-  }
-  for (const username of otherUsernames) {
-    const items = getSectionItems(username)
+  for (const key of allSectionKeys) {
+    const items = getSectionItems(key)
     if (items.length > 0) {
-      sections.push({ key: username, label: username, items })
+      sections.push({ key, label: key === ME_KEY ? 'הציטוטים שלי' : key, items })
     }
   }
 
@@ -339,22 +315,12 @@ export default function CitationsScreen() {
         <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
           אין ציטוטים עדיין.
         </p>
-      ) : search ? (
-        // When search is active, flat list is shown; sections appear only when search is empty
-        <>
-          {filtered.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
-              אין תוצאות לחיפוש זה.
-            </p>
-          ) : (
-            <ul className="mb-4 flex flex-col gap-2">
-              {visible.map(citation => renderCitationCard(citation))}
-              <div ref={sentinelRef} className="h-4" />
-            </ul>
-          )}
-        </>
+      ) : sections.length === 0 && search ? (
+        <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
+          אין תוצאות לחיפוש זה.
+        </p>
       ) : (
-        // Sectioned view (no search)
+        // Sectioned view (search filter applied per-section)
         <div className="mb-4">
           {sections.map(({ key: sectionKey, label, items: sectionItems }) => {
             const visCount = getSectionVisible(sectionKey)
