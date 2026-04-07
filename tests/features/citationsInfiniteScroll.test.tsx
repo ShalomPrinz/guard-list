@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import CitationsScreen from '@/screens/CitationsScreen'
 import { createLocalStorageMock } from '@/tests/localStorageMock'
@@ -43,7 +43,7 @@ describe('Citations Infinite Scroll', () => {
     vi.clearAllMocks()
   })
 
-  it('renders only first PAGE_SIZE items when there are more citations', async () => {
+  it('search mode: renders only first PAGE_SIZE items when there are more citations', async () => {
     const storage = createLocalStorageMock()
     storage.setItem('citations', JSON.stringify(mockCitations))
     storage.setItem('username', 'testuser')
@@ -51,7 +51,11 @@ describe('Citations Infinite Scroll', () => {
 
     renderCitations()
 
-    // Wait for first citation to appear
+    // Type a search term to enter flat list mode
+    const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
+    fireEvent.change(searchInput, { target: { value: 'Quote text' } })
+
+    // Wait for first citation to appear in flat list
     await waitFor(() => {
       expect(screen.getByText(/Quote text 0/)).toBeTruthy()
     })
@@ -62,7 +66,6 @@ describe('Citations Infinite Scroll', () => {
     expect(screen.getByText(/Quote text 19/)).toBeTruthy()
 
     // Check that items beyond PAGE_SIZE are not rendered
-    // Use the exact match to avoid ambiguity
     const beyond20 = screen.queryByText((content: string) => content === 'Quote text 20')
     expect(beyond20).toBeNull()
 
@@ -80,17 +83,12 @@ describe('Citations Infinite Scroll', () => {
 
     renderCitations()
 
-    // Wait for initial render
+    // Wait for sections view to appear (no search)
     await waitFor(() => {
-      expect(screen.getByText(/Quote text 0/)).toBeTruthy()
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
     })
 
-    // Verify first 20 items are shown initially (spot check a few)
-    expect(screen.getByText(/Quote text 0/)).toBeTruthy()
-    expect(screen.getByText(/Quote text 5/)).toBeTruthy()
-    expect(screen.getByText(/Quote text 19/)).toBeTruthy()
-
-    // Search for citations containing "Author 0"
+    // Search for citations containing "Author 0" — switches to flat list
     const searchInput = screen.getByPlaceholderText('חיפוש לפי טקסט או מחבר...')
     await user.type(searchInput, 'Author 0')
 
@@ -107,6 +105,29 @@ describe('Citations Infinite Scroll', () => {
     }
   })
 
+  it('sections mode: shows only first 3 items per section initially', async () => {
+    const storage = createLocalStorageMock()
+    storage.setItem('citations', JSON.stringify(mockCitations))
+    storage.setItem('username', 'testuser')
+    vi.stubGlobal('localStorage', storage)
+
+    renderCitations()
+
+    // Wait for sections view
+    await waitFor(() => {
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
+    })
+
+    // First 3 items should be visible
+    expect(screen.getByText(/Quote text 0/)).toBeTruthy()
+    expect(screen.getByText(/Quote text 1/)).toBeTruthy()
+    expect(screen.getByText(/Quote text 2/)).toBeTruthy()
+
+    // 4th item should not be visible yet
+    expect(screen.queryByText((content: string) => content === 'Quote text 3')).toBeNull()
+    expect(screen.queryByText((content: string) => content === 'Quote text 49')).toBeNull()
+  })
+
   it('keeps all filtered items in data even if not all rendered', async () => {
     const storage = createLocalStorageMock()
     storage.setItem('citations', JSON.stringify(mockCitations))
@@ -117,26 +138,22 @@ describe('Citations Infinite Scroll', () => {
 
     // Wait for initial render
     await waitFor(() => {
-      expect(screen.getByText(/Quote text 0/)).toBeTruthy()
+      expect(screen.getByText('הציטוטים שלי')).toBeTruthy()
     })
 
     // Verify that the total number of citations is correct (50)
-    // by checking that we have exactly 50 citations in localStorage
     const stored = storage.getItem('citations')
     const citations = JSON.parse(stored || '[]') as Citation[]
     expect(citations).toHaveLength(50)
 
-    // Verify that only 20 are rendered initially
-    const listItems = screen.getAllByRole('button')
-    // Each citation has one role="button" div for the main content
-    // We expect approximately 20 (the exact count depends on other buttons in the page)
-    const citationButtons = listItems.filter(btn =>
+    // Verify that only 3 are rendered initially in sections mode
+    const citationButtons = screen.getAllByRole('button').filter(btn =>
       btn.textContent?.includes('Quote text')
     )
-    expect(citationButtons.length).toBeLessThanOrEqual(20)
+    expect(citationButtons.length).toBeLessThanOrEqual(3)
 
-    // Verify items beyond 20 exist but are not rendered
-    expect(screen.queryByText(/Quote text 30/)).toBeNull()
+    // Verify items beyond 3 exist in storage but are not rendered
+    expect(screen.queryByText(/Quote text 3/)).toBeNull()
     expect(screen.queryByText(/Quote text 49/)).toBeNull()
   })
 })

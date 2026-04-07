@@ -12,6 +12,8 @@ import Modal from '../components/Modal'
 import type { Citation, Member } from '../types'
 
 const PAGE_SIZE = 20
+const SECTION_INITIAL = 3
+const SECTION_LOAD_MORE = 10
 
 interface EditState {
   id: string | null // null = new citation
@@ -26,6 +28,7 @@ export default function CitationsScreen() {
   const selectionMode = (location.state as { selectionMode?: boolean } | null)?.selectionMode ?? false
 
   const currentUsername = getUsername()
+  const ME_KEY = currentUsername ?? '__me__'
   const [citations, setCitations] = useState<Citation[]>(() => getCitations())
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -33,7 +36,15 @@ export default function CitationsScreen() {
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Per-section state for sectioned view
+  const [sectionVisible, setSectionVisible] = useState<Record<string, number>>({})
+  const [sectionLoadMoreClicked, setSectionLoadMoreClicked] = useState<Record<string, boolean>>({})
+  const sentinelRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+
+  // Flat list sentinel for search mode
   const sentinelRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   // Sync group members' citations on mount
@@ -79,16 +90,57 @@ export default function CitationsScreen() {
   const allMembers: Member[] = getGroups().flatMap(g => g.members)
   const [authorLinks, setAuthorLinks] = useState(() => getCitationAuthorLinks())
 
+  // --- Section computation ---
+  const myCitations = citations.filter(
+    c => !c.createdByUsername || c.createdByUsername === currentUsername
+  )
+  const otherUsernames = [...new Set(
+    citations
+      .filter(c => c.createdByUsername && c.createdByUsername !== currentUsername)
+      .map(c => c.createdByUsername!)
+  )]
+
+  function getSectionItems(key: string): Citation[] {
+    if (key === ME_KEY) return myCitations
+    return citations.filter(c => c.createdByUsername === key)
+  }
+
+  function getSectionVisible(key: string): number {
+    return sectionVisible[key] ?? SECTION_INITIAL
+  }
+
+  // IntersectionObserver per section (only when search is empty)
+  useEffect(() => {
+    if (search) return
+    const observers: IntersectionObserver[] = []
+    sentinelRefs.current.forEach((el, key) => {
+      if (!el || !sectionLoadMoreClicked[key]) return
+      const sectionItems = getSectionItems(key)
+      const observer = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting && getSectionVisible(key) < sectionItems.length) {
+          setSectionVisible(prev => ({
+            ...prev,
+            [key]: Math.min((prev[key] ?? SECTION_INITIAL) + SECTION_LOAD_MORE, sectionItems.length),
+          }))
+        }
+      }, { threshold: 0.1 })
+      observer.observe(el)
+      observers.push(observer)
+    })
+    return () => observers.forEach(o => o.disconnect())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionVisible, sectionLoadMoreClicked, citations.length, search])
+
+  // --- Search (flat list) ---
   const filtered = citations.filter(c =>
     c.text.includes(search) || c.author.includes(search)
   )
-
   const visible = filtered.slice(0, visibleCount)
 
-  // IntersectionObserver for infinite scroll
+  // IntersectionObserver for flat list (search mode)
   useEffect(() => {
     const el = sentinelRef.current
-    if (!el) return
+    if (!el || !search) return
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && visibleCount < filtered.length) {
         setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filtered.length))
@@ -96,7 +148,7 @@ export default function CitationsScreen() {
     }, { threshold: 0.1 })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [filtered.length, visibleCount])
+  }, [filtered.length, visibleCount, search])
 
   function resolveLinkedMemberId(author: string): string {
     const link = authorLinks[author]
@@ -179,6 +231,67 @@ export default function CitationsScreen() {
   const formattedPreview = editing ? formatAuthorName(editing.author) : ''
   const showPreview = editing !== null && editing.author.trim().split(/\s+/).length > 1
 
+  function renderCitationCard(citation: Citation) {
+    const currentLinkedMemberId = resolveLinkedMemberId(citation.author)
+    const canEditDelete = !citation.createdByUsername || citation.createdByUsername === currentUsername
+    return (
+      <li
+        key={citation.id}
+        className="rounded-2xl bg-white dark:bg-gray-800"
+      >
+        <div
+          role="button"
+          onClick={() => {
+            if (selectionMode) { handleSelect(citation); return }
+            if (canEditDelete) { openEdit(citation); return }
+            setToast('לא ניתן לערוך ציטוט שנוצר על ידי משתמש אחר')
+          }}
+          className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${selectionMode || canEditDelete ? 'cursor-pointer active:bg-gray-50 dark:active:bg-gray-700' : 'cursor-default'}`}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+              {citation.text}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {citation.author ? `— ${citation.author}` : ''}
+            </p>
+          </div>
+          {citation.usedInListIds.length > 0 && (
+            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              נוצל
+            </span>
+          )}
+        </div>
+        {citation.author && allMembers.length > 0 && (
+          <div className="px-4 pb-3" onClick={e => e.stopPropagation()}>
+            <select
+              value={currentLinkedMemberId}
+              onChange={e => handleInlineWarriorChange(citation, e.target.value)}
+              className="w-full rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 outline-none dark:bg-gray-700 dark:text-gray-300"
+            >
+              <option value="">ללא לוחם מקושר</option>
+              {allMembers.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </li>
+    )
+  }
+
+  // Sections for non-search mode
+  const sections: Array<{ key: string; label: string; items: Citation[] }> = []
+  if (myCitations.length > 0) {
+    sections.push({ key: ME_KEY, label: 'הציטוטים שלי', items: myCitations })
+  }
+  for (const username of otherUsernames) {
+    const items = getSectionItems(username)
+    if (items.length > 0) {
+      sections.push({ key: username, label: username, items })
+    }
+  }
+
   return (
     <div className="animate-fadein mx-auto max-w-lg px-4 py-6">
       {/* Header */}
@@ -222,62 +335,56 @@ export default function CitationsScreen() {
       )}
 
       {/* Citations list */}
-      {filtered.length === 0 ? (
+      {citations.length === 0 && !loading ? (
         <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
-          {citations.length === 0 ? 'אין ציטוטים עדיין.' : 'אין תוצאות לחיפוש זה.'}
+          אין ציטוטים עדיין.
         </p>
+      ) : search ? (
+        // When search is active, flat list is shown; sections appear only when search is empty
+        <>
+          {filtered.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500">
+              אין תוצאות לחיפוש זה.
+            </p>
+          ) : (
+            <ul className="mb-4 flex flex-col gap-2">
+              {visible.map(citation => renderCitationCard(citation))}
+              <div ref={sentinelRef} className="h-4" />
+            </ul>
+          )}
+        </>
       ) : (
-        <ul className="mb-4 flex flex-col gap-2">
-          {visible.map(citation => {
-            const currentLinkedMemberId = resolveLinkedMemberId(citation.author)
-            const canEditDelete = !citation.createdByUsername || citation.createdByUsername === currentUsername
+        // Sectioned view (no search)
+        <div className="mb-4">
+          {sections.map(({ key: sectionKey, label, items: sectionItems }) => {
+            const visCount = getSectionVisible(sectionKey)
             return (
-              <li
-                key={citation.id}
-                className="rounded-2xl bg-white dark:bg-gray-800"
-              >
-                <div
-                  role="button"
-                  onClick={() => {
-                    if (selectionMode) { handleSelect(citation); return }
-                    if (canEditDelete) { openEdit(citation); return }
-                    setToast('לא ניתן לערוך ציטוט שנוצר על ידי משתמש אחר')
-                  }}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${selectionMode || canEditDelete ? 'cursor-pointer active:bg-gray-50 dark:active:bg-gray-700' : 'cursor-default'}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {citation.text}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {citation.author ? `— ${citation.author}` : ''}
-                    </p>
-                  </div>
-                  {citation.usedInListIds.length > 0 && (
-                    <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                      נוצל
-                    </span>
-                  )}
-                </div>
-                {citation.author && allMembers.length > 0 && (
-                  <div className="px-4 pb-3" onClick={e => e.stopPropagation()}>
-                    <select
-                      value={currentLinkedMemberId}
-                      onChange={e => handleInlineWarriorChange(citation, e.target.value)}
-                      className="w-full rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 outline-none dark:bg-gray-700 dark:text-gray-300"
-                    >
-                      <option value="">ללא לוחם מקושר</option>
-                      {allMembers.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
+              <section key={sectionKey} className="mb-6">
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  {label}
+                </h2>
+                <ul className="mb-2 flex flex-col gap-2">
+                  {sectionItems.slice(0, visCount).map(citation => renderCitationCard(citation))}
+                  <div
+                    ref={el => { sentinelRefs.current.set(sectionKey, el) }}
+                    className="h-4"
+                  />
+                </ul>
+                {sectionItems.length > visCount && (
+                  <button
+                    onClick={() => {
+                      setSectionVisible(prev => ({ ...prev, [sectionKey]: (prev[sectionKey] ?? SECTION_INITIAL) + SECTION_LOAD_MORE }))
+                      setSectionLoadMoreClicked(prev => ({ ...prev, [sectionKey]: true }))
+                    }}
+                    className="mb-4 min-h-[44px] w-full rounded-2xl border border-gray-300 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
+                  >
+                    טען עוד ציטוטים
+                  </button>
                 )}
-              </li>
+              </section>
             )
           })}
-          <div ref={sentinelRef} className="h-4" />
-        </ul>
+        </div>
       )}
 
       {/* Add button (non-selection mode only) */}
