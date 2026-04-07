@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { getCitations, upsertCitation, deleteCitation } from '../storage/citations'
+import { getCitations, upsertCitation, deleteCitation, deleteCitationSilent } from '../storage/citations'
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
 import { getUsername } from '../storage/userStorage'
 import { getGroups } from '../storage/groups'
+import { getLocalGroup } from '../storage/citationShare'
+import { kvCrossReadGroupMember } from '../storage/cloudStorage'
 import { formatAuthorName } from '../logic/citations'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
@@ -25,6 +27,7 @@ export default function CitationsScreen() {
 
   const currentUsername = getUsername()
   const [citations, setCitations] = useState<Citation[]>(() => getCitations())
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -32,6 +35,35 @@ export default function CitationsScreen() {
   const [toast, setToast] = useState<string | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  // Sync group members' citations on mount
+  useEffect(() => {
+    async function syncGroupCitations() {
+      const group = getLocalGroup()
+      if (!group) return
+      setLoading(true)
+      const currentUser = getUsername()
+      const others = group.members.filter(m => m !== currentUser)
+      try {
+        for (const member of others) {
+          const result = await kvCrossReadGroupMember(member)
+          if (result === null) continue
+          const localIds = new Set(getCitations().map(c => c.id))
+          for (const citation of result.citations) {
+            if (!localIds.has(citation.id)) upsertCitation(citation)
+          }
+          const updatedIds = new Set(getCitations().map(c => c.id))
+          for (const deletedId of result.deleteLog) {
+            if (updatedIds.has(deletedId)) deleteCitationSilent(deletedId)
+          }
+        }
+      } finally {
+        setCitations(getCitations())
+        setLoading(false)
+      }
+    }
+    void syncGroupCitations()
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -180,6 +212,13 @@ export default function CitationsScreen() {
         >
           🤝 מרכז השיתוף
         </button>
+      )}
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="mb-2 text-center text-xs text-gray-400 dark:text-gray-500">
+          מסנכרן ציטוטים...
+        </div>
       )}
 
       {/* Citations list */}
