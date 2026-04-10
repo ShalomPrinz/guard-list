@@ -125,7 +125,7 @@ export default function CitationsScreen() {
       observers.push(observer)
     })
     return () => observers.forEach(o => o.disconnect())
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sentinelRefs is a stable ref container; its .current mutations must not re-trigger the IntersectionObserver setup
   }, [sectionVisible, sectionLoadMoreClicked, citations.length, search])
 
   function resolveLinkedMemberId(author: string): string {

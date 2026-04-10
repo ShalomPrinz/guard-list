@@ -115,7 +115,7 @@ export default function Step1_Stations() {
       })
       return [...prev, ...extra]
     })
-  }, [stationCount]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stationCount]) // eslint-disable-line react-hooks/exhaustive-deps -- intentional: effect only reacts to stationCount changes; setStations is a stable setter and prev state is accessed via functional update
 
   // ── Count selector helpers ─────────────────────────────────────────────────
 

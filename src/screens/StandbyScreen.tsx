@@ -66,7 +66,7 @@ export default function StandbyScreen() {
       .filter(m => (m.role ?? 'warrior') === 'warrior' && m.availability === 'base')
       .map(m => m.name)
     setSelectedNames(new Set(baseWarriorNames))
-  }, [selectedGroupId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedGroupId]) // eslint-disable-line react-hooks/exhaustive-deps -- intentional: effect resets selection only when group changes; getGroupById is a stable import, not a reactive value
 
   function toggleMember(name: string) {
     setSelectedNames(prev => {

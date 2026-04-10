@@ -23,11 +23,10 @@ export default function Header() {
   const [noBackup, setNoBackup] = useState(() => !!localStorage.getItem('noBackup'))
   const [suspendedUntil, setSuspendedUntil] = useState<number | null>(null)
 
-  // Runs once on mount to fetch backup suspension status when backup is disabled
   useEffect(() => {
     if (!noBackup) return
     void kvGetBackupSuspension().then(setSuspendedUntil)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- intentional: effect must run only on mount to fetch backup suspension status once; re-running on noBackup change would cause redundant KV fetches
 
   function handleHome() {
     resetSession()

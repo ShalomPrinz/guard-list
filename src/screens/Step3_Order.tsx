@@ -197,10 +197,10 @@ export default function Step3_Order() {
   const navigate = useNavigate()
   const { session, updateStations } = useWizard()
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- intentional: hook is called unconditionally before the session guard; ESLint static analysis incorrectly flags the early return that follows
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- intentional: hook is called unconditionally before the session guard; ESLint static analysis incorrectly flags the early return that follows
   useEffect(() => { if (!session) navigate('/fallback') }, [session, navigate])
   if (!session) return null
 

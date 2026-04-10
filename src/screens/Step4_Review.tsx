@@ -442,7 +442,7 @@ export default function Step4_Review() {
     if (shouldClearState) {
       navigate(location.pathname, { replace: true, state: null })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect must run only on mount to clear navigation state; adding navigate/location.state would cause a navigation loop
   }, [])
 
   const defaultName = 'רשימת שמירה'
