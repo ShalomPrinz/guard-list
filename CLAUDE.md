@@ -23,7 +23,7 @@ Mobile-first React + TypeScript web app for managing military/team guard duty ro
 
 ## Docs
 
-@docs/business-logic.md
+@docs/LOGIC.md
 @docs/CONVENTIONS.md
 @docs/ERRORS.md
 
