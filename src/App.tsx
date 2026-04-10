@@ -42,7 +42,7 @@ function AuthenticatedApp() {
 
   return (
     <>
-      <ToastContainer position="bottom-center" rtl={true} theme="colored" />
+      <ToastContainer position="top-right" rtl={true} theme="colored" closeOnClick />
       <WizardProvider>
         <ShortListWizardProvider>
           <Routes>
