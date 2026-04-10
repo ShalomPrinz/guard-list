@@ -213,6 +213,18 @@ describe('citationShare storage', () => {
       expect(result).toBe('target_has_pending')
     })
 
+    it('returns target_not_found when crossSet returns target_not_found', async () => {
+      mockedKvCrossSet.mockResolvedValue('target_not_found')
+      const result = await sendGroupInvitation('bob', storage)
+      expect(result).toBe('target_not_found')
+    })
+
+    it('returns target_in_group when crossSet returns target_in_group', async () => {
+      mockedKvCrossSet.mockResolvedValue('target_in_group')
+      const result = await sendGroupInvitation('bob', storage)
+      expect(result).toBe('target_in_group')
+    })
+
     it('returns error when crossSet returns error', async () => {
       mockedKvCrossSet.mockResolvedValue('error')
       const result = await sendGroupInvitation('bob', storage)

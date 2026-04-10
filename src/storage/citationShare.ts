@@ -82,7 +82,7 @@ export function clearDeleteLog(storage: Storage = window.localStorage): void {
 export async function sendGroupInvitation(
   targetUsername: string,
   storage: Storage = window.localStorage,
-): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'own_namespace' | 'error'> {
+): Promise<'sent' | 'already_have_outgoing' | 'target_has_pending' | 'own_namespace' | 'target_not_found' | 'target_in_group' | 'error'> {
   if (getOutgoingInvitation(storage) !== null) return 'already_have_outgoing'
 
   const currentUser = getUsername()
@@ -112,6 +112,8 @@ export async function sendGroupInvitation(
     sentAt,
   })
 
+  if (result === 'target_not_found') return 'target_not_found'
+  if (result === 'target_in_group') return 'target_in_group'
   if (result === 'already_pending') return 'target_has_pending'
   if (result === 'error') return 'error'
 

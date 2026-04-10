@@ -185,6 +185,10 @@ export default function SharingCenterScreen() {
       setInviteError('כבר קיימת הזמנה ממתינה')
     } else if (result === 'target_has_pending') {
       setInviteError('למשתמש זה כבר יש הזמנה ממתינה')
+    } else if (result === 'target_not_found') {
+      setInviteError('לא קיים משתמש בשם זה — בדוק שהשם מאויית נכון')
+    } else if (result === 'target_in_group') {
+      setInviteError('משתמש זה כבר שייך לקבוצת שיתוף — בקש ממנו להזמין אותך כדי לשתף איתו ציטוטים')
     } else {
       setInviteError('שגיאה — נסה שוב')
     }

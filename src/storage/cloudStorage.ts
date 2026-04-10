@@ -164,16 +164,20 @@ export async function kvList(prefix: string): Promise<string[]> {
  * Write a cross-user key into another user's namespace.
  * Allowed sub-keys: 'share:groupInvitation', 'share:acceptNotification', 'share:rejectionNotification'.
  * Returns 'already_pending' if the target already has an open groupInvitation.
+ * Returns 'target_not_found' if the target user does not exist.
+ * Returns 'target_in_group' if the target user is already in a sharing group.
  */
 export async function kvCrossSet(
   targetUsername: string,
   key: 'share:groupInvitation' | 'share:acceptNotification' | 'share:rejectionNotification',
   value: unknown,
-): Promise<'ok' | 'already_pending' | 'error'> {
+): Promise<'ok' | 'already_pending' | 'target_not_found' | 'target_in_group' | 'error'> {
   const username = getUsername()
   if (!username) return 'error'
   try {
     const res = await callKvRaw({ action: 'crossSet', username, targetUsername, key, value })
+    if (res.status === 404) return 'target_not_found'
+    if (res.status === 422) return 'target_in_group'
     if (res.status === 409) return 'already_pending'
     if (!res.ok) {
       const body = await res.text()

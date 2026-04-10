@@ -686,6 +686,56 @@ describe('api/kv handler', () => {
     })
   })
 
+  // ── crossSet action — groupInvitation checks ─────────────────────────────
+  describe('crossSet action — groupInvitation checks', () => {
+    const crossSetBody = (overrides: Record<string, unknown> = {}) => ({
+      action: 'crossSet',
+      username: 'alice',
+      targetUsername: 'bob',
+      key: 'share:groupInvitation',
+      value: { groupId: 'grp_1', fromUsername: 'alice', sentAt: 1000 },
+      ...overrides,
+    })
+
+    it('returns 404 when target user has no device key', async () => {
+      kvMock.keys.mockResolvedValue([]) // no device key for bob
+      const res = await handler(makeReq(crossSetBody()))
+      expect(res.status).toBe(404)
+      const body = await res.json() as { error: string }
+      expect(body.error).toBe('User not found')
+    })
+
+    it('returns 422 when target user is already in a group', async () => {
+      kvMock.keys.mockResolvedValue(['device:bob']) // user exists
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'bob:share:groupId') return Promise.resolve('grp_existing')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq(crossSetBody()))
+      expect(res.status).toBe(422)
+      const body = await res.json() as { error: string }
+      expect(body.error).toBe('Target already in a group')
+    })
+
+    it('returns 409 when target already has a pending invitation', async () => {
+      kvMock.keys.mockResolvedValue(['device:bob'])
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'bob:share:groupId') return Promise.resolve(null)
+        if (key === 'bob:share:groupInvitation') return Promise.resolve({ fromUsername: 'carol' })
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq(crossSetBody()))
+      expect(res.status).toBe(409)
+    })
+
+    it('returns 200 when target exists, not in group, no pending invitation', async () => {
+      kvMock.keys.mockResolvedValue(['device:bob'])
+      kvMock.get.mockResolvedValue(null) // no groupId, no pending invitation
+      const res = await handler(makeReq(crossSetBody()))
+      expect(res.status).toBe(200)
+    })
+  })
+
   // ── unknown action ────────────────────────────────────────────────────────
   describe('unknown action', () => {
     it('returns 400 for unrecognized action', async () => {

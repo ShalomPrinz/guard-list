@@ -192,6 +192,16 @@ async function handleCrossSet(
   }
   // Enforce one-open-invitation-at-a-time rule for groupInvitation key.
   if (key === "share:groupInvitation") {
+    // Check if target user exists (has a registered device key).
+    const deviceKeys = await kv.keys(`device:${targetUsername}`);
+    if (deviceKeys.length === 0) {
+      return json({ error: "User not found" }, 404);
+    }
+    // Check if target is already a member of a sharing group.
+    const existingGroupId = await kv.get(`${targetUsername}:share:groupId`);
+    if (existingGroupId !== null) {
+      return json({ error: "Target already in a group" }, 422);
+    }
     const existing = await kv.get(`${targetUsername}:share:groupInvitation`);
     if (existing !== null) {
       return json({ error: "Target already has a pending invitation" }, 409);
