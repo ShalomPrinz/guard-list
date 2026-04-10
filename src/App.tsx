@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
 import { WizardProvider } from './context/WizardContext'
 import { ShortListWizardProvider } from './context/ShortListWizardContext'
 import { syncFromCloud } from './storage/syncFromCloud'
@@ -41,6 +42,7 @@ function AuthenticatedApp() {
 
   return (
     <>
+      <ToastContainer position="bottom-center" rtl={true} theme="colored" />
       <WizardProvider>
         <ShortListWizardProvider>
           <Routes>

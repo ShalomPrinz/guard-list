@@ -58,6 +58,17 @@ Always fix the underlying issue first. Only suppress a rule if fixing is genuine
 
 ---
 
+## Toasts & User Notifications
+
+- All non-inline user notifications use `react-toastify`. Import `{ toast }` from `'react-toastify'` and call `toast.error(...)` or `toast.success(...)` directly — no state, no timer, no JSX.
+- `<ToastContainer>` is rendered once in `AuthenticatedApp` in `src/App.tsx`, outside `<Routes>`, with `position="bottom-center"`, `rtl={true}`, `theme="colored"`.
+- `ReactToastify.css` is imported once in `src/main.tsx`, after `./index.css`.
+- Never build a custom floating toast using `useState` + `setTimeout` + a `fixed` `<div>`. That pattern is removed from `CitationsScreen` and must not return.
+- Never use inline `<p>` error state (e.g. `inviteError`, `acceptError`) for async-action results in screens. Use `toast.error()` instead. Inline error elements are only permitted for synchronous form validation.
+- When testing a component that calls `toast.error` / `toast.success`, mock `react-toastify` at the top of the test file and assert against the mocked function: `expect(toast.error).toHaveBeenCalledWith('...')`. Do not query the DOM for toast text — `<ToastContainer>` is not rendered in unit tests.
+
+---
+
 ## Removed Features — Never Reintroduce
 
 - Headcount station type: `stationType`, `headcountRequired`, `headcountParticipants` are gone. All stations are time-based. Zero occurrences must remain.

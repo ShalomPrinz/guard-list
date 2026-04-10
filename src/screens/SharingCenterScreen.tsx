@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import {
   getLocalGroup,
   getLocalGroupInvitation,
@@ -32,11 +33,9 @@ export default function SharingCenterScreen() {
   const [outgoing, setOutgoing] = useState<{ toUsername: string } | null>(null)
   const [showInviteInput, setShowInviteInput] = useState(false)
   const [inviteTarget, setInviteTarget] = useState('')
-  const [inviteError, setInviteError] = useState<string | null>(null)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [inviteCancelledBy, setInviteCancelledBy] = useState<string | null>(null)
-  const [acceptError, setAcceptError] = useState<string | null>(null)
   const [autoLeftMsg, setAutoLeftMsg] = useState(false)
 
   // Guest link
@@ -141,7 +140,6 @@ export default function SharingCenterScreen() {
 
   async function handleAccept() {
     if (!invitation) return
-    setAcceptError(null)
     const fromUsername = invitation.fromUsername
     setActionLoading(true)
     const result = await acceptGroupInvitation(invitation)
@@ -152,7 +150,7 @@ export default function SharingCenterScreen() {
     }
     if (result === 'error') {
       setActionLoading(false)
-      setAcceptError('שגיאה בהצטרפות לקבוצה — נסה שוב')
+      toast.error('שגיאה בהצטרפות לקבוצה — נסה שוב')
       return
     }
     // localStorage is already up to date from acceptGroupInvitation — just re-read it
@@ -171,7 +169,6 @@ export default function SharingCenterScreen() {
   async function handleSendInvite() {
     const target = inviteTarget.trim()
     if (!target) return
-    setInviteError(null)
     setActionLoading(true)
     const result = await sendGroupInvitation(target)
     setActionLoading(false)
@@ -179,18 +176,19 @@ export default function SharingCenterScreen() {
       setShowInviteInput(false)
       setInviteTarget('')
       refreshState()
+      toast.success('ההזמנה נשלחה בהצלחה')
     } else if (result === 'own_namespace') {
-      setInviteError('לא ניתן להזמין את עצמך')
+      toast.error('לא ניתן להזמין את עצמך')
     } else if (result === 'already_have_outgoing') {
-      setInviteError('כבר קיימת הזמנה ממתינה')
+      toast.error('כבר קיימת הזמנה ממתינה')
     } else if (result === 'target_has_pending') {
-      setInviteError('למשתמש זה כבר יש הזמנה ממתינה')
+      toast.error('למשתמש זה כבר יש הזמנה ממתינה')
     } else if (result === 'target_not_found') {
-      setInviteError('לא קיים משתמש בשם זה — בדוק שהשם מאויית נכון')
+      toast.error('לא קיים משתמש בשם זה — בדוק שהשם מאויית נכון')
     } else if (result === 'target_in_group') {
-      setInviteError('משתמש זה כבר שייך לקבוצת שיתוף — בקש ממנו להזמין אותך כדי לשתף איתו ציטוטים')
+      toast.error('משתמש זה כבר שייך לקבוצת שיתוף — בקש ממנו להזמין אותך כדי לשתף איתו ציטוטים')
     } else {
-      setInviteError('שגיאה — נסה שוב')
+      toast.error('שגיאה — נסה שוב')
     }
   }
 
@@ -318,9 +316,6 @@ export default function SharingCenterScreen() {
               דחה
             </button>
           </div>
-          {acceptError && (
-            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{acceptError}</p>
-          )}
         </div>
       )}
 
@@ -368,7 +363,7 @@ export default function SharingCenterScreen() {
             )}
 
             <button
-              onClick={() => { setShowInviteInput(v => !v); setInviteError(null) }}
+              onClick={() => setShowInviteInput(v => !v)}
               className="min-h-[44px] w-full rounded-2xl border border-gray-300 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:active:bg-gray-700"
             >
               הזמן משתמש
@@ -379,13 +374,10 @@ export default function SharingCenterScreen() {
                 <input
                   dir="rtl"
                   value={inviteTarget}
-                  onChange={e => { setInviteTarget(e.target.value); setInviteError(null) }}
+                  onChange={e => setInviteTarget(e.target.value)}
                   placeholder="שם משתמש..."
                   className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
                 />
-                {inviteError && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{inviteError}</p>
-                )}
                 <button
                   onClick={handleSendInvite}
                   disabled={actionLoading || !inviteTarget.trim()}
@@ -412,7 +404,7 @@ export default function SharingCenterScreen() {
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">אינך חלק מקבוצת שיתוף ציטוטים</p>
 
           <button
-            onClick={() => { setShowInviteInput(v => !v); setInviteError(null) }}
+            onClick={() => setShowInviteInput(v => !v)}
             className="min-h-[44px] w-full rounded-2xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700"
           >
             הזמן חבר לשיתוף אוסף ציטוטים
@@ -423,13 +415,10 @@ export default function SharingCenterScreen() {
               <input
                 dir="rtl"
                 value={inviteTarget}
-                onChange={e => { setInviteTarget(e.target.value); setInviteError(null) }}
+                onChange={e => setInviteTarget(e.target.value)}
                 placeholder="שם משתמש..."
                 className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
               />
-              {inviteError && (
-                <p className="text-xs text-red-600 dark:text-red-400">{inviteError}</p>
-              )}
               <button
                 onClick={handleSendInvite}
                 disabled={actionLoading || !inviteTarget.trim()}

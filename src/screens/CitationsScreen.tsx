@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { getCitations, upsertCitation, deleteCitation, deleteCitationSilent } from '../storage/citations'
 import { getCitationAuthorLinks, saveCitationAuthorLink, clearCitationAuthorLink } from '../storage/citationAuthorLinks'
 import { getUsername } from '../storage/userStorage'
@@ -33,7 +34,6 @@ export default function CitationsScreen() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<EditState | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   // Per-section state for sectioned view
   const [sectionVisible, setSectionVisible] = useState<Record<string, number>>({})
@@ -70,12 +70,6 @@ export default function CitationsScreen() {
     }
     void syncGroupCitations()
   }, [])
-
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 2500)
-    return () => clearTimeout(timer)
-  }, [toast])
 
   // Reset section visible counts when search changes
   useEffect(() => {
@@ -222,7 +216,7 @@ export default function CitationsScreen() {
           onClick={() => {
             if (selectionMode) { handleSelect(citation); return }
             if (canEditDelete) { openEdit(citation); return }
-            setToast('לא ניתן לערוך ציטוט שנוצר על ידי משתמש אחר')
+            toast.error('לא ניתן לערוך ציטוט שנוצר על ידי משתמש אחר')
           }}
           className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${selectionMode || canEditDelete ? 'cursor-pointer active:bg-gray-50 dark:active:bg-gray-700' : 'cursor-default'}`}
         >
@@ -442,12 +436,6 @@ export default function CitationsScreen() {
         />
       )}
 
-      {/* Ownership toast */}
-      {toast !== null && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-gray-900 px-5 py-3 text-sm text-white shadow-lg dark:bg-gray-700">
-          {toast}
-        </div>
-      )}
     </div>
   )
 }

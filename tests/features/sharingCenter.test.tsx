@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import SharingCenterScreen from '@/screens/SharingCenterScreen'
 import { createLocalStorageMock } from '@/tests/localStorageMock'
 import {
@@ -22,6 +23,13 @@ import { getCitationAuthorLinks } from '@/storage/citationAuthorLinks'
 import { upsertGroup } from '@/storage/groups'
 import { setUsername } from '@/storage/userStorage'
 import type { SharingGroup, GroupInvitation, GuestCitationSubmission } from '@/types'
+
+// ─── react-toastify mock ─────────────────────────────────────────────────────
+
+vi.mock('react-toastify', () => ({
+  toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }),
+  ToastContainer: () => null,
+}))
 
 // ─── Cloud storage mock ───────────────────────────────────────────────────────
 
@@ -826,7 +834,7 @@ describe('SharingCenterScreen — cancel outgoing invitation', () => {
 // ─── Accept invitation error handling ────────────────────────────────────────
 
 describe('SharingCenterScreen — accept invitation error handling', () => {
-  it('shows Hebrew error message when acceptGroupInvitation returns "error"', async () => {
+  it('shows Hebrew error toast when acceptGroupInvitation returns "error"', async () => {
     const user = userEvent.setup()
     const inv = makeInvitation({ fromUsername: 'alice' })
     setLocalGroupInvitation(inv)
@@ -844,18 +852,18 @@ describe('SharingCenterScreen — accept invitation error handling', () => {
     await user.click(screen.getByRole('button', { name: 'אשר' }))
 
     await waitFor(() => {
-      expect(screen.getByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeTruthy()
+      expect(toast.error).toHaveBeenCalledWith('שגיאה בהצטרפות לקבוצה — נסה שוב')
     })
     // Accept button must still be visible (not disabled) so user can retry
     expect(screen.getByRole('button', { name: 'אשר' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('clears accept error when user clicks "אשר" again', async () => {
+  it('fires toast.error on first fail and toast is not re-fired unless clicked again', async () => {
     const user = userEvent.setup()
     const inv = makeInvitation({ fromUsername: 'alice' })
     setLocalGroupInvitation(inv)
 
-    // First call: fail → error shown; second call: succeed → join works
+    // First call: fail; second call: succeed → join works
     mockKvGroupJoin.mockResolvedValueOnce('error').mockResolvedValueOnce('ok')
     mockKvGroupGetMembers.mockResolvedValue(['currentuser', 'alice'])
     let invCallCount = 0
@@ -873,15 +881,17 @@ describe('SharingCenterScreen — accept invitation error handling', () => {
     await user.click(screen.getByRole('button', { name: 'אשר' }))
 
     await waitFor(() => {
-      expect(screen.getByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeTruthy()
+      expect(toast.error).toHaveBeenCalledWith('שגיאה בהצטרפות לקבוצה — נסה שוב')
     })
+    expect(toast.error).toHaveBeenCalledTimes(1)
 
-    // Click again — error clears on retry attempt
+    // Click again — succeeds, no additional error toast
     await user.click(screen.getByRole('button', { name: 'אשר' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('שגיאה בהצטרפות לקבוצה — נסה שוב')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'אשר' })).toBeNull()
     })
+    expect(toast.error).toHaveBeenCalledTimes(1)
   })
 })
 
