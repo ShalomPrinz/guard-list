@@ -340,21 +340,16 @@ function ReviewStationCard({
             {/* Rounding */}
             <div className="mb-6">
               <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">עיגול משמרת:</label>
-              <div className="flex flex-col gap-2">
+              <select
+                value={draftRounding}
+                onChange={e => setDraftRounding(e.target.value as RoundingAlgorithm)}
+                className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+                style={{ minHeight: 44 }}
+              >
                 {ROUNDING_OPTIONS.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-3 min-h-[44px] cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`rounding-${station.stationConfigId}`}
-                      value={opt.value}
-                      checked={draftRounding === opt.value}
-                      onChange={() => setDraftRounding(opt.value)}
-                      className="h-4 w-4 accent-blue-600"
-                    />
-                    <span className="text-sm text-gray-800 dark:text-gray-200">{opt.label}</span>
-                  </label>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </div>
+              </select>
             </div>
 
             {/* Buttons */}
