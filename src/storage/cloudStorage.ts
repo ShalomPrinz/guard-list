@@ -287,26 +287,6 @@ export async function kvMGet<T>(keys: string[]): Promise<(T | null)[]> {
 }
 
 /**
- * Fetch all pending guest citation submissions for the current user.
- * Scans {username}:guestCitations:* and returns values sorted by submittedAt ascending.
- * Returns [] on error or when no username is set.
- */
-export async function kvListGuestCitations(): Promise<GuestCitationSubmission[]> {
-  const username = getUsername()
-  if (!username) return []
-  try {
-    const keys = await kvList('guestCitations:')
-    if (keys.length === 0) return []
-    const results = await kvMGet<GuestCitationSubmission>(keys)
-    return results
-      .filter((s): s is GuestCitationSubmission => s !== null)
-      .sort((a, b) => a.submittedAt - b.submittedAt)
-  } catch {
-    return []
-  }
-}
-
-/**
  * Fetch the latest guest citation submissions for the current user.
  * Server-side sorting by submittedAt descending (newest first) and limiting.
  * Returns [] on error or when no username is set.

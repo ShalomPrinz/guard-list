@@ -49,7 +49,7 @@ Always fix the underlying issue first. Only suppress a rule if fixing is genuine
 
 - `Member` has: `id`, `name`, `availability: "base" | "home"`, `role: "commander" | "warrior"` (default `"warrior"`).
 - `Citation` has: `id`, `text`, `author` (formatted string), `usedInListIds: string[]`, `createdByUsername?: string` (undefined = legacy, treated as owned by current user).
-- `GuestCitationSubmission` has: `id`, `text`, `author`, `submittedAt` (ms timestamp). Stored in KV at `{username}:guestCitations:{id}`. Never in localStorage — fetched on demand via `kvListGuestCitations()`.
+- `GuestCitationSubmission` has: `id`, `text`, `author`, `submittedAt` (ms timestamp). Stored in KV at `{username}:guestCitations:{id}`. Never in localStorage — fetched on demand via `kvListGuestCitationsLatest()` when the user opens the inbox in `SharingCenterScreen`.
 - `citationAuthorLinks` in localStorage maps `authorString → memberId` for statistics attribution.
 - `Schedule` has `parentScheduleId?: string` when it is a continued round, `createdFromShortList?: boolean` when generated via short-list wizard, and `customWhatsAppText?: string` when the user has manually edited the WhatsApp preview text in ResultScreen. The `createdFromShortList` flag enables ResultScreen back button to reconstruct the short-list session from a schedule opened from history — allowing users to edit and regenerate short-list schedules seamlessly.
 - `ScheduledParticipant` has `note?: string` (optional per-warrior note, never shown in WhatsApp output).

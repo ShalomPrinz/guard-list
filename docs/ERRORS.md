@@ -219,7 +219,7 @@ The synchronous `return null` prevents rendering the guarded content; the `useEf
 
 **What went wrong:** The mount `useEffect` used `void Promise.all([...]).then(...)`. If any promise in the array hung (slow network, KV timeout), `.then()` was never reached and `setLoading(false)` never fired. The screen remained stuck on "טוען..." indefinitely.
 
-**Root cause:** `void` discards the returned promise entirely — errors and hangs are silently swallowed. Additionally, `kvListGuestCitations` was called eagerly on mount, and its slow KV response was the likely cause of the hang in production.
+**Root cause:** `void` discards the returned promise entirely — errors and hangs are silently swallowed. Additionally, eager KV calls on mount (fetching data not immediately needed) can cause hangs. Guest citations are now fetched on demand via `kvListGuestCitationsLatest` only when the user opens the inbox — never on mount.
 
 **Rule:** Never use `void promise.then(setState)` in a `useEffect` for loading state. Always use a named async function with `try/finally`:
 ```ts
@@ -316,3 +316,22 @@ function handleAcceptEdit() {
   ...
 }
 ```
+
+---
+
+## E029 — Guest Citations Inbox Empty Despite Data in KV
+
+**What went wrong:** `kvListGuestCitationsLatest` returned `[]` even when guest citations existed in Redis. The loading spinner appeared and disappeared, but the inbox showed zero items.
+
+**Root cause:** `handleListGuestCitations` in `api/kv.ts` called `kv.mget(...allKeys)` — spreading a `string[]` returned by `kv.keys()` into the SDK's variadic `mget`. In Upstash Redis SDK v1.x on Vercel Edge Runtime, spreading a runtime-computed array into `mget` is unreliable: the SDK's signature expects `[key: string, ...keys: string[]]` (a non-empty tuple), and spreading a plain `string[]` can cause the call to fail or return unexpected results. The resulting 500 was caught client-side by `kvListGuestCitationsLatest` which silently returned `[]`.
+
+**Fix:** Replace `kv.mget(...allKeys)` with `kv.pipeline()` — a single HTTP request that batches explicit per-key `GET` commands. This avoids the spread entirely and is deterministic regardless of how the keys array was constructed:
+```ts
+const pipeline = kv.pipeline()
+for (const key of allKeys) {
+  pipeline.get<GuestCitationSubmission>(key)
+}
+const values = (await pipeline.exec()) as (GuestCitationSubmission | null)[]
+```
+
+**Rule:** Never use `kv.mget(...dynamicArray)` when the array comes from a runtime source (e.g. `kv.keys()`). Use `kv.pipeline()` instead — it sends one HTTP request, avoids spread, and is safe with any array length. Also: every `catch` block in `api/kv.ts` must log via `console.error` before returning 500, so failures appear in Vercel logs rather than masquerading as empty results at the client.

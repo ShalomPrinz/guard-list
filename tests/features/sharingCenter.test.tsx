@@ -37,7 +37,6 @@ const mockKvGet = vi.fn()
 const mockKvDel = vi.fn()
 const mockKvGroupGetMembers = vi.fn()
 const mockKvGroupJoin = vi.fn()
-const mockKvListGuestCitations = vi.fn<() => Promise<GuestCitationSubmission[]>>()
 const mockKvListGuestCitationsLatest = vi.fn<(limit?: number) => Promise<GuestCitationSubmission[]>>()
 const mockKvDeleteGuestCitation = vi.fn<(id: string) => Promise<void>>()
 const mockKvInvitationCancel = vi.fn<(targetUsername: string) => Promise<void>>()
@@ -50,7 +49,6 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvDel: (...args: unknown[]) => mockKvDel(...args),
     kvGroupGetMembers: (...args: unknown[]) => mockKvGroupGetMembers(...args),
     kvGroupJoin: (...args: unknown[]) => mockKvGroupJoin(...args),
-    kvListGuestCitations: (...args: unknown[]) => mockKvListGuestCitations(...(args as [])),
     kvListGuestCitationsLatest: (...args: unknown[]) => mockKvListGuestCitationsLatest(...(args as [number | undefined])),
     kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
     kvInvitationCancel: (...args: unknown[]) => mockKvInvitationCancel(...(args as [string])),
@@ -91,7 +89,6 @@ beforeEach(() => {
   mockKvDel.mockResolvedValue(undefined)
   mockKvGroupGetMembers.mockResolvedValue(null)
   mockKvGroupJoin.mockResolvedValue('ok')
-  mockKvListGuestCitations.mockResolvedValue([])
   mockKvListGuestCitationsLatest.mockResolvedValue([])
   mockKvDeleteGuestCitation.mockResolvedValue(undefined)
   mockKvInvitationCancel.mockResolvedValue(undefined)

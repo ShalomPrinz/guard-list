@@ -179,9 +179,9 @@ Quick schedule generation flow without the full wizard. Route: `/short-list/step
 - All KV access goes through `src/storage/cloudStorage.ts`. Never import Upstash Redis directly from components or logic.
 - KV is fire-and-forget backup only. KV failure is always silent. localStorage is always the source of truth.
 - All KV keys scoped by username: `{username}:{namespace}:{id}` — helpers add the prefix automatically, callers never include it.
-- Fetch from KV only what is needed immediately. Do not preload data required only after a user action. `kvListGuestCitations()` on mount is the canonical example of what NOT to do.
+- Fetch from KV only what is needed immediately. Do not preload data required only after a user action. Eagerly calling guest-citations KV on mount is the canonical example of what NOT to do — guest citations are fetched only when the user opens the inbox.
 - Never use `kv.scan` — use `kv.keys(pattern)` (one Redis command regardless of database size). Never write a cursor loop against Redis.
-- `kvMGet<T>(keys: string[])` batch-fetches multiple keys in one request. Server validates all keys start with `{username}:` and array is 1–100 elements. Returns `(T | null)[]`. Used in `syncFromCloud.ts` for all 5 namespaces and in `kvListGuestCitations`. Never revert to per-item `kvGet` loops.
+- `kvMGet<T>(keys: string[])` batch-fetches multiple keys in one request. Server validates all keys start with `{username}:` and array is 1–100 elements. Returns `(T | null)[]`. Used in `syncFromCloud.ts` for all 5 namespaces. Never revert to per-item `kvGet` loops.
 - `syncFromCloud()` skips if `localStorage.getItem('synced')` is truthy. Sets `'synced'` only after all namespace blocks complete. The `synced` key is a control flag — accessed directly via `localStorage`, not through a typed helper.
 - `kvSet` and `kvDel` silently bail when `localStorage.getItem('noBackup')` is truthy. Any KV write in the backup-removal flow must be called **before** `localStorage.setItem('noBackup', '1')`.
 - Tamper-sensitive timestamps (e.g. `backupSuspendedUntil`) must live in KV, not localStorage. Always re-fetch from KV inside guarded actions — never trust React state.
@@ -191,6 +191,6 @@ Quick schedule generation flow without the full wizard. Route: `/short-list/step
 - Group actions (`groupCreate`, `groupJoin`, `groupLeave`, `groupGetMembers`) manage `group:{groupId}:members` as a raw KV key. Client helpers: `kvGroupCreate`, `kvGroupJoin`, `kvGroupLeave`, `kvGroupGetMembers`.
 - `invitationCancel` action deletes `{targetUsername}:share:groupInvitation` after verifying the caller is the sender. Idempotent. Always await `kvInvitationCancel` before `clearOutgoingInvitation()`.
 - The `guestSubmit` action bypasses the origin check (guests arrive from external URLs). Handled before the origin check block, applies `guestRatelimit` (20 req/min/IP). Future public-facing actions must follow this same pattern.
-- `kvListGuestCitations` uses exactly 2 requests: one `list` + one `mget`. Never revert to N+1 `kvGet` calls.
+- `kvListGuestCitationsLatest(limit)` uses the `listGuestCitations` server action — a single HTTP request; server does `kv.keys()` to find matching keys, then `kv.pipeline()` to batch-fetch all values in one HTTP request, then sorts by `submittedAt` descending and slices to `limit`. Never use `kv.mget(...dynamicArray)` here — see E029. The catch block logs via `console.error` so failures surface in Vercel logs.
 - Origin check uses a `Set<string>` from `ALLOWED_ORIGIN`, `VERCEL_URL`, and `VERCEL_PROJECT_PRODUCTION_URL`. If empty (local dev), no restriction. Never revert to single-origin check.
 - `callKvRaw` in `cloudStorage.ts` exposes the raw `Response` object. Exists solely for `kvCrossSet` to inspect the 409 status. Do not use it for any other purpose.

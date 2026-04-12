@@ -350,8 +350,15 @@ async function handleListGuestCitations(
     const allKeys = await kv.keys(`${prefix}*`)
     if (allKeys.length === 0) return json({ citations: [] })
 
-    // Fetch all values in one mget call
-    const values = await kv.mget(...allKeys)
+    // Fetch all values via pipeline — a single HTTP request to Upstash.
+    // We avoid kv.mget(...allKeys) spread because the SDK's mget signature requires a
+    // non-empty tuple [string, ...string[]] and spreading a plain string[] from kv.keys()
+    // is unreliable in Upstash SDK v1.x on Edge Runtime when the array is computed at runtime.
+    const pipeline = kv.pipeline()
+    for (const key of allKeys) {
+      pipeline.get<{ id: string; text: string; author: string; submittedAt: number }>(key)
+    }
+    const values = (await pipeline.exec()) as ({ id: string; text: string; author: string; submittedAt: number } | null)[]
 
     // Filter out nulls and sort by submittedAt descending (newest first)
     const citations = values
@@ -360,7 +367,10 @@ async function handleListGuestCitations(
       .slice(0, limit)
 
     return json({ citations })
-  } catch {
+  } catch (e) {
+    // Root cause fix: log server-side errors so KV failures surface in Vercel logs
+    // instead of being silently swallowed (causing kvListGuestCitationsLatest to return []).
+    console.error('[kv] handleListGuestCitations error:', e)
     return json({ error: 'Internal server error' }, 500)
   }
 }

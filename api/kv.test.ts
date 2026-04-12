@@ -8,6 +8,7 @@ const kvMock = vi.hoisted(() => ({
   keys: vi.fn(),
   scan: vi.fn(),
   mget: vi.fn(),
+  pipeline: vi.fn(),
 }))
 
 const ratelimitMock = vi.hoisted(() => ({
@@ -75,6 +76,7 @@ describe('api/kv handler', () => {
     kvMock.keys.mockResolvedValue([])
     kvMock.scan.mockResolvedValue([0, []])
     kvMock.mget.mockResolvedValue([])
+    kvMock.pipeline.mockReturnValue({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue([]) })
     ratelimitMock.limit.mockResolvedValue({ success: true })
   })
 
@@ -432,7 +434,7 @@ describe('api/kv handler', () => {
       const sub2 = { id: 'id2', text: 'quote2', author: 'author2', submittedAt: 2000 }
       const sub3 = { id: 'id3', text: 'quote3', author: 'author3', submittedAt: 1500 }
       kvMock.keys.mockResolvedValue(['alice:guestCitations:id1', 'alice:guestCitations:id2', 'alice:guestCitations:id3'])
-      kvMock.mget.mockResolvedValue([sub1, sub2, sub3])
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue([sub1, sub2, sub3]) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 5 }))
 
@@ -449,7 +451,7 @@ describe('api/kv handler', () => {
         submittedAt: 10000 - i * 1000,
       }))
       kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
-      kvMock.mget.mockResolvedValue(submissions)
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue(submissions) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 3 }))
 
@@ -466,7 +468,7 @@ describe('api/kv handler', () => {
         submittedAt: 10000 - i * 1000,
       }))
       kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
-      kvMock.mget.mockResolvedValue(submissions)
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue(submissions) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice' }))
 
@@ -485,11 +487,11 @@ describe('api/kv handler', () => {
       expect(body.citations).toEqual([])
     })
 
-    it('filters out null values from mget', async () => {
+    it('filters out null values from pipeline results', async () => {
       const sub1 = { id: 'id1', text: 'quote1', author: 'author1', submittedAt: 1000 }
       const sub2 = { id: 'id2', text: 'quote2', author: 'author2', submittedAt: 2000 }
       kvMock.keys.mockResolvedValue(['alice:guestCitations:id1', 'alice:guestCitations:id2', 'alice:guestCitations:id3'])
-      kvMock.mget.mockResolvedValue([sub1, sub2, null])
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue([sub1, sub2, null]) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 5 }))
 
@@ -501,7 +503,7 @@ describe('api/kv handler', () => {
     it('enforces minimum limit of 1', async () => {
       const sub1 = { id: 'id1', text: 'quote1', author: 'author1', submittedAt: 1000 }
       kvMock.keys.mockResolvedValue(['alice:guestCitations:id1'])
-      kvMock.mget.mockResolvedValue([sub1])
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue([sub1]) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 0 }))
 
@@ -518,7 +520,7 @@ describe('api/kv handler', () => {
         submittedAt: 150000 - i * 1000,
       }))
       kvMock.keys.mockResolvedValue(submissions.map((_, i) => `alice:guestCitations:id${i}`))
-      kvMock.mget.mockResolvedValue(submissions)
+      kvMock.pipeline.mockReturnValueOnce({ get: vi.fn().mockReturnThis(), exec: vi.fn().mockResolvedValue(submissions) })
 
       const res = await handler(makeReq({ action: 'listGuestCitations', username: 'alice', limit: 500 }))
 
