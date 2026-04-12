@@ -85,7 +85,7 @@ export default function SharingCenterScreen() {
   function handleCopyGuestLink() {
     const username = getUsername()
     if (!username) return
-    const url = `${window.location.origin}/guest/${username}`
+    const url = `${window.location.origin}/guest/${encodeURIComponent(username)}`
     void navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)
@@ -271,7 +271,7 @@ export default function SharingCenterScreen() {
             onClick={() => {
               const username = getUsername()
               if (!username) return
-              const url = `${window.location.origin}/guest/${username}`
+              const url = `${window.location.origin}/guest/${encodeURIComponent(username)}`
               window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank')
             }}
             className="min-h-[44px] flex-1 rounded-2xl bg-green-600 py-3 text-sm font-semibold text-white active:bg-green-700"

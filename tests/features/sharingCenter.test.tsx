@@ -490,6 +490,27 @@ describe('SharingCenterScreen — guest link section', () => {
     })
   })
 
+  it('encodes username with spaces in guest link URL', async () => {
+    // Regression: usernames with spaces (e.g. "יהונתן כהן") produced an invalid URL
+    // with a literal space, causing WhatsApp/browsers to truncate after the first word.
+    // Citations were then stored under "יהונתן" instead of "יהונתן כהן", so the inbox returned empty.
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    setUsername('יהונתן כהן')
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByRole('button', { name: '📋 העתק קישור' }))
+    await user.click(screen.getByRole('button', { name: '📋 העתק קישור' }))
+
+    await waitFor(() => {
+      const url: string = writeText.mock.calls[0][0] as string
+      expect(url).toContain('%20')          // space must be percent-encoded
+      expect(url).not.toMatch(/ /)          // no literal space in URL
+      expect(url).toContain(encodeURIComponent('יהונתן כהן'))
+    })
+  })
+
   it('"העתק קישור" shows "הועתק!" after clipboard write', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
