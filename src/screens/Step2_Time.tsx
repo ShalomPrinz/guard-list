@@ -333,7 +333,7 @@ export default function Step2_Time() {
       {/* Live preview */}
       {durations.length > 0 && (
         <div className="mb-5 rounded-2xl bg-gray-100 p-4 dark:bg-gray-800">
-          <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">תצוגה מקדימה</p>
+          <p className="mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400">זמן שמירה בכל עמדה</p>
           <div className="flex flex-col gap-2">
             {session.stations.map((station, i) => {
               const d = durations[i]
