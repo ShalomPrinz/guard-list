@@ -262,35 +262,16 @@ export default function Step2_Time() {
       {/* Rounding algorithm */}
       <div className="mb-5">
         <label className="mb-2 block text-sm text-gray-500 dark:text-gray-400">עיגול משך המשמרת</label>
-        <div className="flex flex-col gap-2">
-          {(
-            [
-              { value: 'round-up-10', label: 'עיגול למעלה ל-10 דקות', recommended: true },
-              { value: 'round-up-5', label: 'עיגול למעלה ל-5 דקות', recommended: false },
-              { value: 'round-nearest', label: 'עיגול לדקה הקרובה', recommended: false },
-            ] as const
-          ).map(opt => (
-            <label
-              key={opt.value}
-              className="flex cursor-pointer items-center gap-3 rounded-xl bg-gray-100 px-4 py-3 dark:bg-gray-800"
-            >
-              <input
-                type="radio"
-                name="rounding"
-                value={opt.value}
-                checked={rounding === opt.value}
-                onChange={() => setRounding(opt.value)}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-gray-900 dark:text-gray-100">{opt.label}</span>
-              {opt.recommended && (
-                <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
-                  מומלץ
-                </span>
-              )}
-            </label>
-          ))}
-        </div>
+        <select
+          value={rounding}
+          onChange={e => setRounding(e.target.value as RoundingAlgorithm)}
+          className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+          style={{ minHeight: 44 }}
+        >
+          <option value="round-up-10">עיגול למעלה ל-10 דקות (מומלץ)</option>
+          <option value="round-up-5">עיגול למעלה ל-5 דקות</option>
+          <option value="round-nearest">עיגול לדקה הקרובה</option>
+        </select>
       </div>
 
       {/* Uneven distribution mode — only shown when relevant */}

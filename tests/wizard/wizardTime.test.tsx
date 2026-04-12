@@ -146,16 +146,16 @@ describe('Step2_Time — duration preview', () => {
 })
 
 describe('Step2_Time — rounding algorithm', () => {
-  it('round-up-5 radio can be selected', async () => {
+  it('round-up-5 option can be selected via dropdown', async () => {
     const user = userEvent.setup()
     upsertGroup(makeGroup())
     renderApp()
     await navigateToStep2(user)
 
-    await user.click(screen.getByLabelText('עיגול למעלה ל-5 דקות'))
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    await userEvent.selectOptions(select, 'round-up-5')
 
-    const radio = screen.getByLabelText('עיגול למעלה ל-5 דקות') as HTMLInputElement
-    expect(radio.checked).toBe(true)
+    expect(select.value).toBe('round-up-5')
   })
 })
 

@@ -213,8 +213,13 @@ async function navigateToStep3WithEndTime(
   await user.tab()
 
   // Select rounding mode if needed
-  if (roundingMode === 'nearest-minute') {
-    await user.click(screen.getByLabelText('עיגול לדקה הקרובה'))
+  if (roundingMode !== 'round-up-10') {
+    const roundingValues = {
+      'nearest-minute': 'round-nearest',
+      'round-up-5': 'round-up-5',
+    } as const
+    const selectValue = roundingValues[roundingMode as 'nearest-minute' | 'round-up-5']
+    await userEvent.selectOptions(screen.getByRole('combobox'), selectValue)
   }
 
   await user.click(screen.getByText('הבא →'))
