@@ -920,3 +920,49 @@ describe('SharingCenterScreen — cancelled invitation banner', () => {
     })
   })
 })
+
+// ─── Guest citation acceptance attribution ────────────────────────────────────
+
+describe('SharingCenterScreen — guest citation createdByUsername attribution', () => {
+  it('handleAcceptOne saves citation with createdByUsername equal to current username', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitationsLatest.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט חשוב', author: 'אורח א' }),
+    ])
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+
+    await waitFor(() => screen.getByText('קבל'))
+    await user.click(screen.getByText('קבל'))
+    await user.click(screen.getByText('אשר'))
+
+    await waitFor(() => {
+      const saved = getCitations()
+      expect(saved).toHaveLength(1)
+      expect(saved[0].createdByUsername).toBe('currentuser')
+    })
+  })
+
+  it('handleAcceptAll saves all citations with createdByUsername equal to current username', async () => {
+    const user = userEvent.setup()
+    mockKvListGuestCitationsLatest.mockResolvedValue([
+      makeSubmission('s1', { text: 'ציטוט 1', author: 'אורח א' }),
+      makeSubmission('s2', { text: 'ציטוט 2', author: 'אורח ב' }),
+    ])
+    renderSharingCenter()
+
+    await waitFor(() => screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+    await user.click(screen.getByText('לבחירת ציטוטים שהתקבלו מהטופס'))
+
+    await waitFor(() => screen.getByText('קבל הכל'))
+    await user.click(screen.getByText('קבל הכל'))
+
+    await waitFor(() => {
+      const saved = getCitations()
+      expect(saved).toHaveLength(2)
+      expect(saved.every(c => c.createdByUsername === 'currentuser')).toBe(true)
+    })
+  })
+})

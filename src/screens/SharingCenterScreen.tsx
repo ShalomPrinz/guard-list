@@ -114,6 +114,7 @@ export default function SharingCenterScreen() {
       text: submission.text,
       author: submission.author,
       usedInListIds: [],
+      createdByUsername: currentUser || undefined,
     }
     upsertCitation(newCitation)
     if (memberId) saveCitationAuthorLink(submission.author, memberId)
@@ -130,6 +131,7 @@ export default function SharingCenterScreen() {
         text: submission.text,
         author: submission.author,
         usedInListIds: [],
+        createdByUsername: currentUser || undefined,
       }
       upsertCitation(newCitation)
       kvDeleteGuestCitation(submission.id)
