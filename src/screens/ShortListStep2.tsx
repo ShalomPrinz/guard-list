@@ -9,7 +9,7 @@ import TimePicker from '../components/TimePicker'
 
 export default function ShortListStep2() {
   const navigate = useNavigate()
-  const { session, clearSession, setStartHour: setContextStartHour, setMinutesPerWarrior: setContextMinutesPerWarrior, setNumberOfWarriors: setContextNumberOfWarriors } = useShortListWizard()
+  const { session, clearSession, setStartTime: setContextStartTime, setMinutesPerWarrior: setContextMinutesPerWarrior, setNumberOfWarriors: setContextNumberOfWarriors } = useShortListWizard()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -26,6 +26,7 @@ export default function ShortListStep2() {
   const availableCount = group ? group.members.filter(m => m.availability === 'base').length : 0
 
   const startHour = session?.startHour ?? 14
+  const startMinute = session?.startMinute ?? 0
   const [minutesPerWarriorStr, setMinutesPerWarriorStr] = useState(String(session?.minutesPerWarrior ?? 60))
   const [numberOfWarriorsStr, setNumberOfWarriorsStr] = useState(String(session?.numberOfWarriors ?? 1))
   const [minutesError, setMinutesError] = useState('')
@@ -33,11 +34,13 @@ export default function ShortListStep2() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const startTime = `${String(startHour).padStart(2, '0')}:00`
+  const startTime = `${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`
 
   function handleSetStartTime(time: string) {
-    const hour = parseInt(time.split(':')[0], 10)
-    setContextStartHour(hour)
+    const parts = time.split(':')
+    const hour = parseInt(parts[0], 10)
+    const minute = parseInt(parts[1] ?? '0', 10)
+    setContextStartTime(hour, minute)
   }
 
   function handleSetMinutesPerWarrior(raw: string) {
@@ -95,7 +98,7 @@ export default function ShortListStep2() {
     const schedule = generateShortListSchedule(
       session.groupId,
       session.stations,
-      startHour,
+      startTime,
       parsedMinutes,
       parsedWarriors,
       session.name,

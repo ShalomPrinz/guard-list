@@ -46,9 +46,11 @@ function buildShortListSessionFromSchedule(schedule: Schedule): ShortListWizardS
 
   if (stations.length === 0) return null
 
-  // Reconstruct startHour from first participant
+  // Reconstruct startHour and startMinute from first participant
   const firstParticipant = schedule.stations[0]?.participants[0]
-  const startHour = firstParticipant ? parseInt(firstParticipant.startTime.split(':')[0], 10) : 14
+  const startTimeParts = firstParticipant?.startTime.split(':') ?? ['14', '0']
+  const startHour = parseInt(startTimeParts[0] ?? '14', 10)
+  const startMinute = parseInt(startTimeParts[1] ?? '0', 10)
 
   // Reconstruct minutesPerWarrior from first participant's duration
   const minutesPerWarrior = firstParticipant?.durationMinutes ?? 60
@@ -62,6 +64,7 @@ function buildShortListSessionFromSchedule(schedule: Schedule): ShortListWizardS
     groupId: schedule.groupId,
     stations,
     startHour,
+    startMinute,
     minutesPerWarrior,
     numberOfWarriors,
     name: schedule.name,

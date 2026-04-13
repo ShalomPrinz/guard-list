@@ -15,7 +15,7 @@ import { buildStationSchedule } from './generateSchedule'
 export function generateShortListSchedule(
   groupId: string,
   stations: StationConfig[],
-  startHour: number,
+  startTime: string,
   minutesPerWarrior: number,
   numberOfWarriors: number,
   nameOrStorage?: string | Storage,
@@ -62,7 +62,7 @@ export function generateShortListSchedule(
 
   // Build schedule for each station
   const today = new Date().toISOString().split('T')[0]
-  const startTimeStr = `${String(startHour).padStart(2, '0')}:00`
+  const startTimeStr = startTime
 
   const scheduleStations = stations.map(station => {
     const warriors = stationParticipants.get(station.id) ?? []

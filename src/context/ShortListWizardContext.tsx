@@ -5,7 +5,7 @@ interface ShortListWizardContextValue {
   session: ShortListWizardSession | null
   setSession: (session: ShortListWizardSession | null) => void
   clearSession: () => void
-  setStartHour: (hour: number) => void
+  setStartTime: (hour: number, minute: number) => void
   setMinutesPerWarrior: (minutes: number) => void
   setNumberOfWarriors: (count: number) => void
 }
@@ -16,9 +16,9 @@ export function ShortListWizardProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<ShortListWizardSession | null>(null)
   const clearSession = () => setSession(null)
 
-  const setStartHour = (hour: number) => {
+  const setStartTime = (hour: number, minute: number) => {
     if (session) {
-      setSession({ ...session, startHour: hour })
+      setSession({ ...session, startHour: hour, startMinute: minute })
     }
   }
 
@@ -35,7 +35,7 @@ export function ShortListWizardProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ShortListWizardContext.Provider value={{ session, setSession, clearSession, setStartHour, setMinutesPerWarrior, setNumberOfWarriors }}>
+    <ShortListWizardContext.Provider value={{ session, setSession, clearSession, setStartTime, setMinutesPerWarrior, setNumberOfWarriors }}>
       {children}
     </ShortListWizardContext.Provider>
   )
@@ -49,7 +49,7 @@ export function useShortListWizard(): ShortListWizardContextValue {
       session: null,
       setSession: () => {},
       clearSession: () => {},
-      setStartHour: () => {},
+      setStartTime: () => {},
       setMinutesPerWarrior: () => {},
       setNumberOfWarriors: () => {},
     }

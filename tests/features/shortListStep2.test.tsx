@@ -57,6 +57,7 @@ describe('ShortListStep2', () => {
         { id: 'station-1', name: 'עמדה 1', type: 'time-based' },
       ],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 2,
     }
@@ -99,6 +100,7 @@ describe('ShortListStep2', () => {
       groupId: 'group-456',
       stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1,
     }
@@ -136,6 +138,7 @@ describe('ShortListStep2', () => {
       groupId: 'group-errors',
       stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1,
     }
@@ -178,6 +181,7 @@ describe('ShortListStep2', () => {
       groupId: 'group-minutes-error',
       stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1,
     }
@@ -221,6 +225,7 @@ describe('ShortListStep2', () => {
       groupId: 'group-exceed',
       stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1,
     }
@@ -263,6 +268,7 @@ describe('ShortListStep2', () => {
       groupId: 'group-789',
       stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1,
     }
@@ -305,6 +311,7 @@ describe('ShortListStep2', () => {
         { id: 'st2', name: 'עמדה 2', type: 'time-based' },
       ],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 1, // 1 per station = 2 total
       name: 'רשימת שמירה',
@@ -363,6 +370,7 @@ describe('ShortListStep2', () => {
         { id: 'st3', name: 'עמדה 3', type: 'time-based' },
       ],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 2, // 2 per station = 6 total
     }
@@ -406,6 +414,7 @@ describe('ShortListStep2', () => {
         { id: 'st3', name: 'עמדה 3', type: 'time-based' },
       ],
       startHour: 14,
+      startMinute: 0,
       minutesPerWarrior: 60,
       numberOfWarriors: 3, // 3 per station = 9 total
       name: 'רשימת שמירה',
@@ -429,5 +438,59 @@ describe('ShortListStep2', () => {
     // Note: the text is split across multiple nodes, so we just check for the paragraph existence
     const paragraphs = screen.getAllByText(/סך הכל:/)
     expect(paragraphs.length).toBeGreaterThan(0)
+  })
+
+  it('regression: setting minutes to 30 produces a schedule starting at 14:30, not 14:00', async () => {
+    const group = {
+      id: 'group-minutes-regression',
+      name: 'Test Group',
+      members: [
+        { id: '1', name: 'Alice', availability: 'base' as const, role: 'warrior' as const },
+        { id: '2', name: 'Bob', availability: 'base' as const, role: 'warrior' as const },
+      ],
+      createdAt: new Date().toISOString(),
+    }
+    upsertGroup(group)
+
+    // Session initialized with startMinute: 0; we'll change it via TimePicker
+    const session: ShortListWizardSession = {
+      groupId: 'group-minutes-regression',
+      stations: [{ id: 'st1', name: 'עמדה 1', type: 'time-based' }],
+      startHour: 14,
+      startMinute: 0,
+      minutesPerWarrior: 60,
+      numberOfWarriors: 1,
+    }
+
+    render(
+      <TestWrapper>
+        <SessionInitializer session={session} />
+        <ShortListStep2 />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('הגדרת רשימה קצרה')).toBeTruthy()
+    })
+
+    // Change the minutes spinner in the TimePicker to 30 (aria-label="דקות")
+    const minutesSpinner = screen.getByRole('textbox', { name: 'דקות' })
+    fireEvent.change(minutesSpinner, { target: { value: '30' } })
+    fireEvent.blur(minutesSpinner)
+
+    // Click "✓ צור רשימה"
+    const createButton = screen.getByRole('button', { name: /✓ צור רשימה/ })
+    fireEvent.click(createButton)
+
+    // Assert the created schedule has first participant starting at 14:30
+    await waitFor(() => {
+      const schedules = mockStorage.getItem('schedules')
+      expect(schedules).toBeTruthy()
+      if (schedules) {
+        const parsed = JSON.parse(schedules)
+        const createdSchedule = Object.values(parsed)[0] as any
+        expect(createdSchedule.stations[0].participants[0].startTime).toBe('14:30')
+      }
+    })
   })
 })

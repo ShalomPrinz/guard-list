@@ -123,6 +123,7 @@ export interface ShortListWizardSession {
   groupId: string;
   stations: StationConfig[];
   startHour: number;
+  startMinute: number;
   minutesPerWarrior: number;
   numberOfWarriors: number;
   name?: string;

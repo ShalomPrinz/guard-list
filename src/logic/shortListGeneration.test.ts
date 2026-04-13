@@ -29,7 +29,7 @@ describe('generateShortListSchedule', () => {
   ]
 
   it('returns null if group not found', () => {
-    const result = generateShortListSchedule('nonexistent', mockStations, 14, 60, 5, mockStorage)
+    const result = generateShortListSchedule('nonexistent', mockStations, '14:00', 60, 5, mockStorage)
     expect(result).toBeNull()
   })
 
@@ -37,7 +37,7 @@ describe('generateShortListSchedule', () => {
     const group = createMockGroup(5, 3)
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 5, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 5, mockStorage)
     expect(result).toBeNull()
   })
 
@@ -45,7 +45,7 @@ describe('generateShortListSchedule', () => {
     const group = createMockGroup(10, 8)
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, mockStorage)
     expect(result).not.toBeNull()
     expect(result!.name).toBe('רשימת שמירה') // default name
     expect(result!.groupId).toBe(group.id)
@@ -57,7 +57,7 @@ describe('generateShortListSchedule', () => {
     const group = createMockGroup(10, 8)
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 2, 'Custom Schedule Name', mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, 'Custom Schedule Name', mockStorage)
     expect(result).not.toBeNull()
     expect(result!.name).toBe('Custom Schedule Name')
   })
@@ -67,7 +67,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=2 per station with 2 stations = 4 total
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, mockStorage)
     expect(result).not.toBeNull()
     expect(result!.stations).toHaveLength(2)
 
@@ -85,7 +85,7 @@ describe('generateShortListSchedule', () => {
 
     const minutesPerWarrior = 90
     // numberOfWarriors=2 per station with 2 stations = 4 total
-    const result = generateShortListSchedule(group.id, mockStations, 14, minutesPerWarrior, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', minutesPerWarrior, 2, mockStorage)
     expect(result).not.toBeNull()
 
     for (const station of result!.stations) {
@@ -99,12 +99,23 @@ describe('generateShortListSchedule', () => {
     const group = createMockGroup(10, 8)
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
-    const startHour = 14
-    const result = generateShortListSchedule(group.id, mockStations, startHour, 60, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, mockStorage)
     expect(result).not.toBeNull()
 
     const firstParticipant = result!.stations[0].participants[0]
     expect(firstParticipant.startTime).toBe('14:00')
+  })
+
+  it('starts at 14:30 when startTime is "14:30" — minutes are not discarded', () => {
+    const group = createMockGroup(10, 8)
+    vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
+
+    const result = generateShortListSchedule(group.id, mockStations, '14:30', 60, 2, mockStorage)
+    expect(result).not.toBeNull()
+
+    for (const station of result!.stations) {
+      expect(station.participants[0].startTime).toBe('14:30')
+    }
   })
 
   it('handles midnight crossover correctly', () => {
@@ -115,7 +126,7 @@ describe('generateShortListSchedule', () => {
     // Starting at 22:00: 22:00 + 4h = 02:00 (next day)
     const singleStation: StationConfig[] = [{ id: 'st1', name: 'עמדה', type: 'time-based' }]
     // numberOfWarriors=4 per station with 1 station = 4 total
-    const result = generateShortListSchedule(group.id, singleStation, 22, 60, 4, mockStorage)
+    const result = generateShortListSchedule(group.id, singleStation, '22:00', 60, 4, mockStorage)
     expect(result).not.toBeNull()
 
     // Should have 4 participants all on the same station
@@ -137,7 +148,7 @@ describe('generateShortListSchedule', () => {
 
     // numberOfWarriors=2.5 would give 5 total, but we can't use decimals. Let's use 3 per station = 6, but we only have 5 base.
     // Actually, let's use 1 per station = 2 total, well within our 5 base members
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 1, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 1, mockStorage)
     expect(result).not.toBeNull()
 
     const allParticipants = result!.stations.flatMap(s => s.participants)
@@ -156,7 +167,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=2 per station with 2 stations = 4 total (exactly matching base members)
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, mockStorage)
     expect(result).not.toBeNull()
 
     const allParticipants = result!.stations.flatMap(s => s.participants)
@@ -170,7 +181,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=3 per station with 2 stations = 6 total
-    const result1 = generateShortListSchedule(group.id, mockStations, 14, 60, 3, mockStorage)
+    const result1 = generateShortListSchedule(group.id, mockStations, '14:00', 60, 3, mockStorage)
     expect(result1).not.toBeNull()
     expect(result1!.stations).toHaveLength(2)
     expect(result1!.stations.flatMap(s => s.participants)).toHaveLength(6)
@@ -181,7 +192,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=2 per station with 2 stations = 4 total
-    const result = generateShortListSchedule(group.id, mockStations, 14, 60, 2, mockStorage)
+    const result = generateShortListSchedule(group.id, mockStations, '14:00', 60, 2, mockStorage)
     expect(result).not.toBeNull()
 
     expect(result!.id).toBeDefined()
@@ -200,7 +211,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=5 per station with 1 station = 5 total
-    const result = generateShortListSchedule(group.id, singleStation, 14, 60, 5, mockStorage)
+    const result = generateShortListSchedule(group.id, singleStation, '14:00', 60, 5, mockStorage)
     expect(result).not.toBeNull()
     expect(result!.stations).toHaveLength(1)
     expect(result!.stations[0].participants).toHaveLength(5)
@@ -216,7 +227,7 @@ describe('generateShortListSchedule', () => {
     vi.mocked(mockStorage.getItem).mockReturnValueOnce(JSON.stringify([group]))
 
     // numberOfWarriors=1 per station with 5 stations = 5 total
-    const result = generateShortListSchedule(group.id, manyStations, 14, 60, 1, mockStorage)
+    const result = generateShortListSchedule(group.id, manyStations, '14:00', 60, 1, mockStorage)
     expect(result).not.toBeNull()
 
     let totalWarriors = 0
