@@ -53,7 +53,7 @@ vi.mock('@/storage/cloudStorage', async (importOriginal) => {
     kvListGuestCitationsLatest: (...args: unknown[]) => mockKvListGuestCitationsLatest(...(args as [number | undefined])),
     kvDeleteGuestCitation: (...args: unknown[]) => mockKvDeleteGuestCitation(...(args as [string])),
     kvInvitationCancel: (...args: unknown[]) => mockKvInvitationCancel(...(args as [string])),
-    kvGroupLeave: vi.fn().mockResolvedValue(undefined),
+    kvGroupLeave: vi.fn().mockResolvedValue('ok'),
     kvCrossSet: vi.fn().mockResolvedValue('ok'),
     kvGroupCreate: vi.fn().mockResolvedValue({ groupId: 'new-group' }),
     kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
@@ -990,6 +990,46 @@ describe('SharingCenterScreen — guest citation createdByUsername attribution',
 })
 
 // ─── Regression: Hebrew+space username invitation ─────────────────────────────
+
+describe('sendGroupInvitation — group rollback on invite failure', () => {
+  it('rolls back freshly-created group when target_not_found', async () => {
+    const { kvCrossSet, kvGroupCreate, kvGroupLeave } = await import('@/storage/cloudStorage')
+    vi.mocked(kvGroupCreate).mockResolvedValue({ groupId: 'grp-new' })
+    vi.mocked(kvCrossSet).mockResolvedValue('target_not_found')
+    vi.mocked(kvGroupLeave).mockResolvedValue('ok')
+
+    const result = await sendGroupInvitation('ghost')
+
+    expect(result).toBe('target_not_found')
+    expect(vi.mocked(kvGroupLeave)).toHaveBeenCalledWith('grp-new')
+    expect(getLocalGroup()).toBeNull()
+  })
+
+  it('rolls back freshly-created group when target_in_group', async () => {
+    const { kvCrossSet, kvGroupCreate, kvGroupLeave } = await import('@/storage/cloudStorage')
+    vi.mocked(kvGroupCreate).mockResolvedValue({ groupId: 'grp-new' })
+    vi.mocked(kvCrossSet).mockResolvedValue('target_in_group')
+    vi.mocked(kvGroupLeave).mockResolvedValue('ok')
+
+    const result = await sendGroupInvitation('alreadygrouped')
+
+    expect(result).toBe('target_in_group')
+    expect(vi.mocked(kvGroupLeave)).toHaveBeenCalledWith('grp-new')
+    expect(getLocalGroup()).toBeNull()
+  })
+
+  it('does not roll back pre-existing group when invite fails', async () => {
+    const { kvCrossSet, kvGroupLeave } = await import('@/storage/cloudStorage')
+    setLocalGroup({ groupId: 'grp-existing', members: ['currentuser', 'bob'], joinedAt: Date.now() })
+    vi.mocked(kvCrossSet).mockResolvedValue('target_not_found')
+
+    const result = await sendGroupInvitation('ghost')
+
+    expect(result).toBe('target_not_found')
+    expect(vi.mocked(kvGroupLeave)).not.toHaveBeenCalled()
+    expect(getLocalGroup()?.groupId).toBe('grp-existing')
+  })
+})
 
 describe('sendGroupInvitation — Hebrew username with space', () => {
   it('calls kvCrossSet and returns "sent" for a username with a space', async () => {

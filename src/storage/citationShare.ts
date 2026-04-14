@@ -91,11 +91,13 @@ export async function sendGroupInvitation(
   const normalized = targetUsername.toLowerCase()
   if (normalized === currentUser.toLowerCase()) return 'own_namespace'
 
-  const { kvGroupCreate, kvCrossSet } = await import('./cloudStorage')
+  const { kvGroupCreate, kvGroupLeave, kvCrossSet } = await import('./cloudStorage')
 
-  // If no group yet, create one
+  // If no group yet, create one — track whether it was freshly created so we can
+  // roll it back if the invite fails (avoids leaving a dangling solo group in KV).
   let groupId: string
   const existing = getLocalGroup(storage)
+  const freshlyCreated = existing === null
   if (existing !== null) {
     groupId = existing.groupId
   } else {
@@ -112,10 +114,19 @@ export async function sendGroupInvitation(
     sentAt,
   })
 
-  if (result === 'target_not_found') return 'target_not_found'
-  if (result === 'target_in_group') return 'target_in_group'
-  if (result === 'already_pending') return 'target_has_pending'
-  if (result === 'error') return 'error'
+  if (result !== 'ok') {
+    // Invite failed — roll back the group creation so we don't leave a solo group
+    // dangling in KV. Only roll back if we created it in this call; if a group
+    // already existed before, leave it untouched.
+    if (freshlyCreated) {
+      clearLocalGroup(storage)
+      void kvGroupLeave(groupId)
+    }
+    if (result === 'target_not_found') return 'target_not_found'
+    if (result === 'target_in_group') return 'target_in_group'
+    if (result === 'already_pending') return 'target_has_pending'
+    return 'error'
+  }
 
   setOutgoingInvitation({ toUsername: normalized, groupId, sentAt }, storage)
   return 'sent'
