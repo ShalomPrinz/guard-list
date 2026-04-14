@@ -58,6 +58,15 @@ Always fix the underlying issue first. Only suppress a rule if fixing is genuine
 
 ---
 
+## Async Button Loading States
+
+- Use `src/components/Spinner.tsx` for all in-button loading animations. It renders an SVG with `animate-spin`, inherits `currentColor`, and accepts an optional `className` prop.
+- When a screen has multiple async buttons visible simultaneously, use a named union type instead of a boolean: `loadingAction: 'actionA' | 'actionB' | ... | null`. This lets each button show its own spinner independently without disabling unrelated buttons incorrectly.
+- Pattern: `{loadingAction === 'myAction' ? <div className="flex justify-center"><Spinner /></div> : 'Label'}` inside the button. All async buttons stay `disabled={loadingAction !== null}` to prevent double-clicks.
+- Never use a shared `actionLoading: boolean` when two or more async buttons are visible at the same time — the boolean disables all buttons when only one is in flight.
+
+---
+
 ## Toasts & User Notifications
 
 - All non-inline user notifications use `react-toastify`. Import `{ toast }` from `'react-toastify'` and call `toast.error(...)` or `toast.success(...)` directly — no state, no timer, no JSX.

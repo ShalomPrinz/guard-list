@@ -21,6 +21,7 @@ import { formatDate } from '../logic/formatting'
 import type { SharingGroup, GroupInvitation, GuestCitationSubmission, Member, Citation } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
+import Spinner from '../components/Spinner'
 
 export default function SharingCenterScreen() {
   const navigate = useNavigate()
@@ -34,7 +35,7 @@ export default function SharingCenterScreen() {
   const [showInviteInput, setShowInviteInput] = useState(false)
   const [inviteTarget, setInviteTarget] = useState('')
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<'accept' | 'decline' | 'sendInvite' | 'cancelInvite' | 'leave' | null>(null)
   const [inviteCancelledBy, setInviteCancelledBy] = useState<string | null>(null)
   const [autoLeftMsg, setAutoLeftMsg] = useState(false)
 
@@ -143,37 +144,39 @@ export default function SharingCenterScreen() {
   async function handleAccept() {
     if (!invitation) return
     const fromUsername = invitation.fromUsername
-    setActionLoading(true)
+    setLoadingAction('accept')
     const result = await acceptGroupInvitation(invitation)
     if (result === 'cancelled') {
-      setActionLoading(false)
+      setLoadingAction(null)
       setInviteCancelledBy(fromUsername)
       return
     }
     if (result === 'error') {
-      setActionLoading(false)
+      setLoadingAction(null)
       toast.error('שגיאה בהצטרפות לקבוצה — נסה שוב')
       return
     }
     // localStorage is already up to date from acceptGroupInvitation — just re-read it
     refreshState()
-    setActionLoading(false)
+    setLoadingAction(null)
+    toast.success('הצטרפת לקבוצת השיתוף בהצלחה')
   }
 
   async function handleDecline() {
     if (!invitation) return
-    setActionLoading(true)
+    setLoadingAction('decline')
     await declineGroupInvitation(invitation)
     refreshState()
-    setActionLoading(false)
+    setLoadingAction(null)
+    toast.success('ההזמנה נדחתה')
   }
 
   async function handleSendInvite() {
     const target = inviteTarget.trim()
     if (!target) return
-    setActionLoading(true)
+    setLoadingAction('sendInvite')
     const result = await sendGroupInvitation(target)
-    setActionLoading(false)
+    setLoadingAction(null)
     if (result === 'sent') {
       setShowInviteInput(false)
       setInviteTarget('')
@@ -194,10 +197,20 @@ export default function SharingCenterScreen() {
     }
   }
 
+  async function handleCancelInvite() {
+    if (!outgoing) return
+    setLoadingAction('cancelInvite')
+    await kvInvitationCancel(outgoing.toUsername)
+    clearOutgoingInvitation()
+    refreshState()
+    setLoadingAction(null)
+    toast.success('ההזמנה בוטלה')
+  }
+
   async function handleLeave() {
-    setActionLoading(true)
+    setLoadingAction('leave')
     await leaveGroup()
-    setActionLoading(false)
+    setLoadingAction(null)
     navigate('/citations')
   }
 
@@ -305,17 +318,17 @@ export default function SharingCenterScreen() {
           <div className="flex gap-3">
             <button
               onClick={handleAccept}
-              disabled={actionLoading}
+              disabled={loadingAction !== null}
               className="min-h-[44px] flex-1 rounded-2xl bg-green-600 text-sm font-semibold text-white active:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:active:bg-green-800"
             >
-              אשר
+              {loadingAction === 'accept' ? <div className="flex justify-center"><Spinner /></div> : 'אשר'}
             </button>
             <button
               onClick={handleDecline}
-              disabled={actionLoading}
+              disabled={loadingAction !== null}
               className="min-h-[44px] flex-1 rounded-2xl bg-red-600 text-sm font-semibold text-white active:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:active:bg-red-800"
             >
-              דחה
+              {loadingAction === 'decline' ? <div className="flex justify-center"><Spinner /></div> : 'דחה'}
             </button>
           </div>
         </div>
@@ -353,14 +366,11 @@ export default function SharingCenterScreen() {
                   הזמנה נשלחה ל-<span className="font-semibold">{outgoing.toUsername}</span>
                 </p>
                 <button
-                  onClick={async () => {
-                    await kvInvitationCancel(outgoing.toUsername)
-                    clearOutgoingInvitation()
-                    refreshState()
-                  }}
-                  className="min-h-[44px] px-3 text-xs text-red-600 dark:text-red-400"
+                  onClick={handleCancelInvite}
+                  disabled={loadingAction !== null}
+                  className="min-h-[44px] px-3 text-xs text-red-600 disabled:opacity-50 dark:text-red-400"
                 >
-                  בטל
+                  {loadingAction === 'cancelInvite' ? <Spinner className="mx-auto" /> : 'בטל'}
                 </button>
               </div>
             )}
@@ -383,10 +393,10 @@ export default function SharingCenterScreen() {
                 />
                 <button
                   onClick={handleSendInvite}
-                  disabled={actionLoading || !inviteTarget.trim()}
+                  disabled={loadingAction !== null || !inviteTarget.trim()}
                   className="min-h-[44px] w-full rounded-2xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700 disabled:opacity-50"
                 >
-                  {actionLoading ? 'שולח...' : 'שלח הזמנה'}
+                  {loadingAction === 'sendInvite' ? <div className="flex justify-center"><Spinner /></div> : 'שלח הזמנה'}
                 </button>
               </div>
             )}
@@ -394,9 +404,10 @@ export default function SharingCenterScreen() {
 
           <button
             onClick={() => setShowLeaveConfirm(true)}
-            className="min-h-[44px] w-full rounded-2xl border border-red-300 text-sm font-medium text-red-600 active:bg-red-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
+            disabled={loadingAction !== null}
+            className="min-h-[44px] w-full rounded-2xl border border-red-300 text-sm font-medium text-red-600 active:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:active:bg-red-900/20"
           >
-            עזוב קבוצה
+            {loadingAction === 'leave' ? <div className="flex justify-center"><Spinner /></div> : 'עזוב קבוצה'}
           </button>
         </div>
       )}
@@ -424,10 +435,10 @@ export default function SharingCenterScreen() {
               />
               <button
                 onClick={handleSendInvite}
-                disabled={actionLoading || !inviteTarget.trim()}
+                disabled={loadingAction !== null || !inviteTarget.trim()}
                 className="min-h-[44px] w-full rounded-2xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700 disabled:opacity-50"
               >
-                {actionLoading ? 'שולח...' : 'שלח הזמנה'}
+                {loadingAction === 'sendInvite' ? <div className="flex justify-center"><Spinner /></div> : 'שלח הזמנה'}
               </button>
             </div>
           )}
