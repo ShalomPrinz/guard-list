@@ -700,7 +700,7 @@ describe('api/kv handler', () => {
     })
 
     it('returns 404 when target user has no device key', async () => {
-      kvMock.keys.mockResolvedValue([]) // no device key for bob
+      kvMock.get.mockResolvedValue(null) // no device key for bob
       const res = await handler(makeReq(crossSetBody()))
       expect(res.status).toBe(404)
       const body = await res.json() as { error: string }
@@ -708,8 +708,8 @@ describe('api/kv handler', () => {
     })
 
     it('returns 422 when target user is already in a group', async () => {
-      kvMock.keys.mockResolvedValue(['device:bob']) // user exists
       kvMock.get.mockImplementation((key: string) => {
+        if (key === 'device:bob') return Promise.resolve('device-token') // user exists
         if (key === 'bob:share:groupId') return Promise.resolve('grp_existing')
         return Promise.resolve(null)
       })
@@ -720,8 +720,8 @@ describe('api/kv handler', () => {
     })
 
     it('returns 409 when target already has a pending invitation', async () => {
-      kvMock.keys.mockResolvedValue(['device:bob'])
       kvMock.get.mockImplementation((key: string) => {
+        if (key === 'device:bob') return Promise.resolve('device-token')
         if (key === 'bob:share:groupId') return Promise.resolve(null)
         if (key === 'bob:share:groupInvitation') return Promise.resolve({ fromUsername: 'carol' })
         return Promise.resolve(null)
@@ -731,9 +731,40 @@ describe('api/kv handler', () => {
     })
 
     it('returns 200 when target exists, not in group, no pending invitation', async () => {
-      kvMock.keys.mockResolvedValue(['device:bob'])
-      kvMock.get.mockResolvedValue(null) // no groupId, no pending invitation
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'device:bob') return Promise.resolve('device-token')
+        return Promise.resolve(null)
+      })
       const res = await handler(makeReq(crossSetBody()))
+      expect(res.status).toBe(200)
+    })
+
+    it('returns 200 when target username contains a space (Hebrew name with space)', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'device:יהונתן כהן') return Promise.resolve('device-token')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq(crossSetBody({ targetUsername: 'יהונתן כהן' })))
+      expect(res.status).toBe(200)
+    })
+
+    it('returns 200 when target username is Hebrew without a space', async () => {
+      kvMock.get.mockImplementation((key: string) => {
+        if (key === 'device:יהונתן') return Promise.resolve('device-token')
+        return Promise.resolve(null)
+      })
+      const res = await handler(makeReq(crossSetBody({ targetUsername: 'יהונתן' })))
+      expect(res.status).toBe(200)
+    })
+
+    it('rawSet accepts Hebrew username with space for device registration', async () => {
+      const res = await handler(makeReq({ action: 'rawSet', key: 'device:יהונתן כהן', value: 'token' }))
+      expect(res.status).toBe(200)
+    })
+
+    it('rawGet accepts Hebrew username with space for device lookup', async () => {
+      kvMock.get.mockResolvedValue('device-token')
+      const res = await handler(makeReq({ action: 'rawGet', key: 'device:יהונתן כהן' }))
       expect(res.status).toBe(200)
     })
   })

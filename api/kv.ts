@@ -32,9 +32,11 @@ function isValidUsername(username: string): boolean {
 }
 
 // SECURITY: Raw-action keys (device registration only) must start with the literal prefix
-// "device:" followed by safe non-colon characters. This structurally prevents any rawGet/rawSet
-// key from overlapping with user-namespaced keys ({username}:{namespace}:{id}).
-const RAW_KEY_RE = /^device:[a-zA-Z0-9_\-.]{1,128}$/;
+// "device:" followed by 1–128 characters that are not ':' (the namespace separator) or Redis
+// glob chars. Unicode letters and spaces are allowed so Hebrew usernames can register.
+// This structurally prevents any rawGet/rawSet key from overlapping with user-namespaced
+// keys ({username}:{namespace}:{id}).
+const RAW_KEY_RE = /^device:[^:*?[\]^]{1,128}$/;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -193,8 +195,10 @@ async function handleCrossSet(
   // Enforce one-open-invitation-at-a-time rule for groupInvitation key.
   if (key === "share:groupInvitation") {
     // Check if target user exists (has a registered device key).
-    const deviceKeys = await kv.keys(`device:${targetUsername}`);
-    if (deviceKeys.length === 0) {
+    // Use kv.get() for exact-key lookup — kv.keys() pattern matching over HTTP
+    // mishandles usernames that contain spaces or non-ASCII characters.
+    const deviceValue = await kv.get(`device:${targetUsername}`);
+    if (deviceValue === null) {
       return json({ error: "User not found" }, 404);
     }
     // Check if target is already a member of a sharing group.

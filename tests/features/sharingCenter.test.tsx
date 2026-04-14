@@ -17,6 +17,7 @@ import {
   getOutgoingInvitation,
   loadSharingCenterUpdates,
   acceptGroupInvitation,
+  sendGroupInvitation,
 } from '@/storage/citationShare'
 import { getCitations } from '@/storage/citations'
 import { getCitationAuthorLinks } from '@/storage/citationAuthorLinks'
@@ -985,5 +986,43 @@ describe('SharingCenterScreen — guest citation createdByUsername attribution',
       expect(saved).toHaveLength(2)
       expect(saved.every(c => c.createdByUsername === 'currentuser')).toBe(true)
     })
+  })
+})
+
+// ─── Regression: Hebrew+space username invitation ─────────────────────────────
+
+describe('sendGroupInvitation — Hebrew username with space', () => {
+  it('calls kvCrossSet and returns "sent" for a username with a space', async () => {
+    const { kvCrossSet, kvGroupCreate } = await import('@/storage/cloudStorage')
+    const mockCrossSet = vi.mocked(kvCrossSet)
+    const mockGroupCreate = vi.mocked(kvGroupCreate)
+    mockCrossSet.mockResolvedValue('ok')
+    mockGroupCreate.mockResolvedValue({ groupId: 'grp-1' })
+
+    const result = await sendGroupInvitation('יהונתן כהן')
+
+    expect(result).toBe('sent')
+    expect(mockCrossSet).toHaveBeenCalledWith(
+      'יהונתן כהן',
+      'share:groupInvitation',
+      expect.objectContaining({ fromUsername: 'currentuser' }),
+    )
+  })
+
+  it('calls kvCrossSet and returns "sent" for a Hebrew username without a space', async () => {
+    const { kvCrossSet, kvGroupCreate } = await import('@/storage/cloudStorage')
+    const mockCrossSet = vi.mocked(kvCrossSet)
+    const mockGroupCreate = vi.mocked(kvGroupCreate)
+    mockCrossSet.mockResolvedValue('ok')
+    mockGroupCreate.mockResolvedValue({ groupId: 'grp-1' })
+
+    const result = await sendGroupInvitation('יהונתן')
+
+    expect(result).toBe('sent')
+    expect(mockCrossSet).toHaveBeenCalledWith(
+      'יהונתן',
+      'share:groupInvitation',
+      expect.objectContaining({ fromUsername: 'currentuser' }),
+    )
   })
 })

@@ -246,7 +246,7 @@ This guarantees `setLoading(false)` fires even if a network call rejects or hang
 
 **Rule:** Never use `kv.scan` anywhere in `api/kv.ts`. Use `kv.keys(pattern)` instead — it returns all matching keys in a single Redis command regardless of database size. If you find yourself writing a `do { ... } while (cursor !== 0)` loop against Redis, stop. The fix is `const allKeys = await kv.keys(\`${prefix}*\`)` — one command, zero loops.
 
-**Testing implication:** Tests for `list` and `crossRead` actions must mock `kvMock.keys`, not `kvMock.scan`. `kvMock.keys.mockResolvedValue([])` is set in `beforeEach` in `api/kv.test.ts`.
+**Testing implication:** Tests for `list` and `crossRead` actions must mock `kvMock.keys`, not `kvMock.scan`. `kvMock.keys.mockResolvedValue([])` is set in `beforeEach` in `api/kv.test.ts`. The `crossSet` action uses `kv.get()` (not `kv.keys()`) for the device-key existence check — its tests mock `kvMock.get`, not `kvMock.keys`.
 
 ---
 
@@ -335,3 +335,16 @@ const values = (await pipeline.exec()) as (GuestCitationSubmission | null)[]
 ```
 
 **Rule:** Never use `kv.mget(...dynamicArray)` when the array comes from a runtime source (e.g. `kv.keys()`). Use `kv.pipeline()` instead — it sends one HTTP request, avoids spread, and is safe with any array length. Also: every `catch` block in `api/kv.ts` must log via `console.error` before returning 500, so failures appear in Vercel logs rather than masquerading as empty results at the client.
+
+---
+
+## E030 — Hebrew Usernames Silently Unregistered Due to ASCII-Only RAW_KEY_RE
+
+**What went wrong:** `RAW_KEY_RE` in `api/kv.ts` was `/^device:[a-zA-Z0-9_\-.]{1,128}$/` — ASCII-only. `kvSetRaw` and `kvGetRaw` are fire-and-forget (no throw on 400), so when a user registered with a Hebrew username (e.g. "פלוני אלמוני"), the `rawSet` call silently returned 400 and no `device:` key was ever created in KV. The user appeared registered to themselves (localStorage was written), but to everyone else they didn't exist. Sending a group invitation to any Hebrew username returned `target_not_found` because `handleCrossSet` checked for the device key and found nothing.
+
+**Root cause:** Two separate bugs compounded: (1) `RAW_KEY_RE` excluded all non-ASCII characters, silently dropping Hebrew device-key registrations; (2) `handleCrossSet` used `kv.keys(`device:${targetUsername}`)` for the existence check — pattern matching over HTTP that also fails for usernames containing spaces, even if the key existed.
+
+**Rule:**
+- `RAW_KEY_RE` is now `/^device:[^:*?[\]^]{1,128}$/` — allows any character except the KV namespace separator (`:`) and Redis glob chars. Hebrew, spaces, and other Unicode are all valid.
+- `handleCrossSet` uses `kv.get(`device:${targetUsername}`)` for the existence check — exact-key lookup, not pattern matching. Never revert to `kv.keys()` here.
+- `syncFromCloud()` in `src/storage/syncFromCloud.ts` includes a startup heal: if the current user's device key is missing in KV (can happen for any user registered before this fix), it silently re-registers it via `kvGetRaw`/`kvSetRaw`. This heals all affected existing users on their next app open.

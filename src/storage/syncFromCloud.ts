@@ -1,6 +1,6 @@
 import type { Group, StationConfig, Schedule, Citation, ParticipantStats } from '../types'
-import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers, kvGetNoBackup } from './cloudStorage'
-import { getUsername } from './userStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers, kvGetNoBackup, kvGetRaw, kvSetRaw } from './cloudStorage'
+import { getUsername, getOrCreateDeviceId } from './userStorage'
 import { getGroups, upsertGroup } from './groups'
 import { getStationsConfig, saveStationsConfig } from './stationsConfig'
 import { getSchedules, upsertSchedule } from './schedules'
@@ -25,6 +25,18 @@ export async function syncFromCloud(): Promise<void> {
     return
   }
   if (localStorage.getItem('synced')) return
+
+  // Heal: ensure this device has a registered device key in KV.
+  // Older registrations with Hebrew/Unicode usernames may have silently failed because
+  // RAW_KEY_RE used to allow ASCII only. Re-register now if the key is missing.
+  try {
+    const username = getUsername()!
+    const deviceKey = `device:${username}`
+    const existing = await kvGetRaw<string>(deviceKey)
+    if (existing === null) {
+      await kvSetRaw(deviceKey, getOrCreateDeviceId())
+    }
+  } catch { /* silent — device registration is best-effort */ }
 
   // Groups
   try {
