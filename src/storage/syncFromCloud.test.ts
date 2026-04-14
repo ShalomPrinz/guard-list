@@ -12,10 +12,12 @@ vi.mock('./cloudStorage', () => ({
   kvCrossReadGroupMember: vi.fn().mockResolvedValue(null),
   kvGroupGetMembers: vi.fn().mockResolvedValue(null),
   kvGetNoBackup: vi.fn().mockResolvedValue(false),
+  kvGetRaw: vi.fn().mockResolvedValue('existing-token'),
+  kvSetRaw: vi.fn().mockResolvedValue(undefined),
   isKvAvailable: true,
 }))
 
-import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers } from './cloudStorage'
+import { kvGet, kvList, kvMGet, kvSet, kvCrossReadGroupMember, kvGroupGetMembers, kvGetRaw, kvSetRaw } from './cloudStorage'
 import { syncFromCloud, pushLocalToCloud } from './syncFromCloud'
 
 const mockedKvList = vi.mocked(kvList)
@@ -24,6 +26,8 @@ const mockedKvMGet = vi.mocked(kvMGet)
 const mockedKvSet = vi.mocked(kvSet)
 const mockedKvCrossReadGroupMember = vi.mocked(kvCrossReadGroupMember)
 const mockedKvGroupGetMembers = vi.mocked(kvGroupGetMembers)
+const mockedKvGetRaw = vi.mocked(kvGetRaw)
+const mockedKvSetRaw = vi.mocked(kvSetRaw)
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
   return {
@@ -42,6 +46,8 @@ describe('syncFromCloud', () => {
     storage = createLocalStorageMock()
     // Set a username so syncFromCloud doesn't return early
     storage.setItem('username', 'testuser')
+    // Suppress heal by default so tests focus on sync behaviour
+    storage.setItem('deviceKeyHealed', '1')
     vi.stubGlobal('localStorage', storage)
     vi.clearAllMocks()
     mockedKvList.mockResolvedValue([])
@@ -49,9 +55,11 @@ describe('syncFromCloud', () => {
     mockedKvMGet.mockResolvedValue([])
     mockedKvCrossReadGroupMember.mockResolvedValue(null)
     mockedKvGroupGetMembers.mockResolvedValue(null)
+    mockedKvGetRaw.mockResolvedValue('existing-token')
+    mockedKvSetRaw.mockResolvedValue(undefined)
   })
 
-  it('skips entire sync body when synced flag is present in localStorage', async () => {
+  it('skips entire sync body when both synced and deviceKeyHealed flags are present', async () => {
     storage.setItem('synced', '1')
 
     await syncFromCloud()
@@ -59,6 +67,7 @@ describe('syncFromCloud', () => {
     expect(mockedKvList).not.toHaveBeenCalled()
     expect(mockedKvGet).not.toHaveBeenCalled()
     expect(mockedKvMGet).not.toHaveBeenCalled()
+    expect(mockedKvGetRaw).not.toHaveBeenCalled()
   })
 
   it('sets synced flag after successful sync', async () => {
@@ -296,6 +305,43 @@ describe('syncFromCloud', () => {
     it('does not attempt cross-read when not in a group', async () => {
       await syncFromCloud()
       expect(mockedKvCrossReadGroupMember).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('deviceKeyHealed — startup device key heal', () => {
+    beforeEach(() => {
+      // Remove the flag suppressed in the outer beforeEach so heal can run
+      storage.removeItem('deviceKeyHealed')
+    })
+
+    it('sets deviceKeyHealed flag after heal completes', async () => {
+      await syncFromCloud()
+      expect(storage.getItem('deviceKeyHealed')).toBe('1')
+    })
+
+    it('does not call kvSetRaw when device key already exists in KV', async () => {
+      mockedKvGetRaw.mockResolvedValue('existing-device-id')
+      await syncFromCloud()
+      expect(mockedKvSetRaw).not.toHaveBeenCalled()
+    })
+
+    it('calls kvSetRaw when device key is missing in KV', async () => {
+      mockedKvGetRaw.mockResolvedValue(null)
+      await syncFromCloud()
+      expect(mockedKvSetRaw).toHaveBeenCalledWith('device:testuser', expect.any(String))
+    })
+
+    it('runs heal even when synced flag is already set', async () => {
+      storage.setItem('synced', '1')
+      mockedKvGetRaw.mockResolvedValue(null)
+      await syncFromCloud()
+      expect(mockedKvGetRaw).toHaveBeenCalledWith('device:testuser')
+    })
+
+    it('skips heal when deviceKeyHealed flag is already set', async () => {
+      storage.setItem('deviceKeyHealed', '1')
+      await syncFromCloud()
+      expect(mockedKvGetRaw).not.toHaveBeenCalled()
     })
   })
 

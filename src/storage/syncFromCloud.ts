@@ -24,19 +24,24 @@ export async function syncFromCloud(): Promise<void> {
     localStorage.setItem('noBackup', '1')
     return
   }
-  if (localStorage.getItem('synced')) return
-
   // Heal: ensure this device has a registered device key in KV.
   // Older registrations with Hebrew/Unicode usernames may have silently failed because
-  // RAW_KEY_RE used to allow ASCII only. Re-register now if the key is missing.
-  try {
-    const username = getUsername()!
-    const deviceKey = `device:${username}`
-    const existing = await kvGetRaw<string>(deviceKey)
-    if (existing === null) {
-      await kvSetRaw(deviceKey, getOrCreateDeviceId())
-    }
-  } catch { /* silent — device registration is best-effort */ }
+  // RAW_KEY_RE used to allow ASCII only. Guarded by its own flag so it runs once
+  // independently of the 'synced' flag — existing users with synced='1' are also healed.
+  // REMOVAL Note: Should be removed after some time, once most users have been healed
+  if (!localStorage.getItem('deviceKeyHealed')) {
+    try {
+      const username = getUsername()!
+      const deviceKey = `device:${username}`
+      const existing = await kvGetRaw<string>(deviceKey)
+      if (existing === null) {
+        await kvSetRaw(deviceKey, getOrCreateDeviceId())
+      }
+      localStorage.setItem('deviceKeyHealed', '1')
+    } catch { /* silent — device registration is best-effort */ }
+  }
+
+  if (localStorage.getItem('synced')) return
 
   // Groups
   try {
