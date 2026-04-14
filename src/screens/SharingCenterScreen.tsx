@@ -324,8 +324,9 @@ export default function SharingCenterScreen() {
       {/* Auto-left lone group message */}
       {autoLeftMsg && group === null && (
         <div className="mb-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            מצטערים, נשארת לבד בקבוצת השיתוף ולכן סגרנו אותה עבורך
+          <p className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <span className="mt-0.5 shrink-0">💡</span>
+            <span>מצטערים, נשארת לבד בקבוצת השיתוף ולכן סגרנו אותה עבורך</span>
           </p>
         </div>
       )}
