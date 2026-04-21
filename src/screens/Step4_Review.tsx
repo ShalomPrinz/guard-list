@@ -98,22 +98,30 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
 
   return session.stations.map((ws, si) => {
     const stationRounding = ws.roundingAlgorithm ?? session.timeConfig.roundingAlgorithm
+    const durationMode = session.stationDurationModes?.[ws.config.id] ?? 'endingHour'
+    const constantDurationMinutes = session.stationConstantDurations?.[ws.config.id]
 
-    // If station has a per-station rounding override and end time is set, recalculate independently
+    // Determine duration based on per-station mode
     let durationMinutes: number
-    if (ws.roundingAlgorithm && (session.timeConfig.endTime || session.timeConfig.fixedDurationMinutes)) {
-      const count = participantCounts[si] ?? 0
-      const stationDurations = calcStationDurations({
-        startTime: ws.startTime,
-        endTime: session.timeConfig.endTime,
-        fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
-        roundingAlgorithm: stationRounding,
-        unevenMode: session.timeConfig.unevenMode,
-        stationParticipantCounts: [count],
-      })
-      durationMinutes = stationDurations[0]?.roundedDurationMinutes ?? 60
+    if (durationMode === 'constantDuration' && constantDurationMinutes) {
+      // Constant duration mode: use the saved duration directly
+      durationMinutes = constantDurationMinutes
     } else {
-      durationMinutes = globalDurations[si]?.roundedDurationMinutes ?? 60
+      // Ending hour mode: calculate from time config
+      if (ws.roundingAlgorithm && (session.timeConfig.endTime || session.timeConfig.fixedDurationMinutes)) {
+        const count = participantCounts[si] ?? 0
+        const stationDurations = calcStationDurations({
+          startTime: ws.startTime,
+          endTime: session.timeConfig.endTime,
+          fixedDurationMinutes: session.timeConfig.fixedDurationMinutes,
+          roundingAlgorithm: stationRounding,
+          unevenMode: session.timeConfig.unevenMode,
+          stationParticipantCounts: [count],
+        })
+        durationMinutes = stationDurations[0]?.roundedDurationMinutes ?? 60
+      } else {
+        durationMinutes = globalDurations[si]?.roundedDurationMinutes ?? 60
+      }
     }
 
     const partsWithDuration = ws.participants
@@ -123,9 +131,6 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
     const stStartDate = ws.startDate
 
     const scheduled = buildStationSchedule(partsWithDuration, stStartTime, stStartDate)
-
-    const durationMode = session.stationDurationModes?.[ws.config.id] ?? 'endingHour'
-    const constantDurationMinutes = session.stationConstantDurations?.[ws.config.id]
 
     return {
       stationConfigId: ws.config.id,
@@ -624,7 +629,7 @@ export default function Step4_Review() {
       return { ...st, items: recomputeTimes(st.items, newStartTime, st.startDate), startTime: newStartTime, roundingAlgorithm: resolvedRounding, durationMode: newDurationMode, constantDurationMinutes: newConstantDuration }
     }))
 
-    // Save mode and duration to wizard context
+    // Save mode, duration, and start time to wizard context
     if (session) {
       const updatedModes = { ...session.stationDurationModes, [stationId]: config.durationMode ?? 'endingHour' }
       const updatedDurations = { ...session.stationConstantDurations }
@@ -633,17 +638,25 @@ export default function Step4_Review() {
       } else {
         delete updatedDurations[stationId]
       }
+
       updateSession({
         stationDurationModes: updatedModes,
         stationConstantDurations: updatedDurations,
       })
-    }
 
-    if (config.roundingAlgorithm && session) {
-      const updated = session.stations.map(ws =>
-        ws.config.id === stationId ? { ...ws, roundingAlgorithm: config.roundingAlgorithm } : ws
-      )
-      updateStations(updated)
+      // Combine all station updates into a single updateStations call to avoid overwrites
+      const updatedStations: typeof session.stations = session.stations.map(ws => {
+        if (ws.config.id !== stationId) return ws
+        const updated = { ...ws }
+        if (config.startTime) {
+          updated.startTime = config.startTime
+        }
+        if (config.roundingAlgorithm) {
+          updated.roundingAlgorithm = config.roundingAlgorithm
+        }
+        return updated
+      })
+      updateStations(updatedStations)
     }
   }
 
@@ -807,12 +820,27 @@ export default function Step4_Review() {
     const updatedStations: typeof session.stations = session.stations.map(ws => {
       const rs = stations.find(s => s.stationConfigId === ws.config.id)
       if (!rs) return ws
-      return {
+      const updated: typeof ws = {
         ...ws,
         participants: rs.items.map(item => ({
           name: item.name,
         })),
+        startTime: rs.startTime,
       }
+      return updated
+    })
+    // Also persist the per-station duration modes and durations
+    const updatedModes: Record<string, 'endingHour' | 'constantDuration'> = {}
+    const updatedDurations: Record<string, number> = {}
+    stations.forEach(rs => {
+      updatedModes[rs.stationConfigId] = rs.durationMode
+      if (rs.constantDurationMinutes) {
+        updatedDurations[rs.stationConfigId] = rs.constantDurationMinutes
+      }
+    })
+    updateSession({
+      stationDurationModes: updatedModes,
+      stationConstantDurations: updatedDurations,
     })
     updateStations(updatedStations)
     navigate('/schedule/new/step3')
@@ -912,11 +940,23 @@ export default function Step4_Review() {
     const updatedStations: typeof session.stations = session.stations.map(ws => {
       const rs = stations.find(s => s.stationConfigId === ws.config.id)
       if (!rs) return ws
-      return {
+      const updated: typeof ws = {
         ...ws,
         participants: rs.items.map(item => ({
           name: item.name,
         })),
+        startTime: rs.startTime,
+      }
+      return updated
+    })
+
+    // Persist per-station duration modes, durations, and start times
+    const updatedModes: Record<string, 'endingHour' | 'constantDuration'> = {}
+    const updatedDurations: Record<string, number> = {}
+    stations.forEach(rs => {
+      updatedModes[rs.stationConfigId] = rs.durationMode
+      if (rs.constantDurationMinutes) {
+        updatedDurations[rs.stationConfigId] = rs.constantDurationMinutes
       }
     })
 
@@ -928,6 +968,8 @@ export default function Step4_Review() {
       quoteAuthor: finalQuoteAuthor,
       citationMode,
       citationId: usedCitationId,
+      stationDurationModes: updatedModes,
+      stationConstantDurations: updatedDurations,
     })
 
     navigate(`/schedule/${scheduleId}/result`)

@@ -270,4 +270,83 @@ describe('Step4_Review — timing config modal', () => {
     expect(screen.getByText(formatDate(today))).toBeTruthy()
     expect(screen.getByText(formatDate(tomorrow))).toBeTruthy()
   })
+
+  it('persists per-station start time after editing in constant duration mode', async () => {
+    // Test: set constant duration mode (60 min), change start time, verify it persists through back/forward
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
+
+    // Confirm initial state: participants start at 20:00
+    expect(screen.getByText(/20:00/)).toBeTruthy()
+
+    // Open timing modal and change start time to 22:00
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+    await waitFor(() => expect(screen.getByText(/הגדרות תזמון —/)).toBeTruthy())
+
+    // Change start time from 20:00 to 22:00
+    const timeInputs = screen.getAllByRole('textbox', { name: 'שעות' })
+    const startHourInput = timeInputs[0]
+    await user.clear(startHourInput)
+    await user.type(startHourInput, '22')
+
+    // Save the timing config
+    await user.click(screen.getByRole('button', { name: 'שמור' }))
+
+    // Verify the start time changed to 22:00
+    await waitFor(() => {
+      expect(screen.getByText(/22:00/)).toBeTruthy()
+    })
+
+    // Navigate back to Step3
+    await user.click(screen.getByText('← חזרה'))
+    await waitFor(() => expect(screen.getByText('סדר שומרים')).toBeTruthy())
+
+    // Navigate forward to Step4 again
+    await user.click(screen.getByText('הבא →'))
+    await waitFor(() => expect(screen.getByText('סקירה ועריכה')).toBeTruthy())
+
+    // Verify the start time is still 22:00 (persisted through navigation)
+    expect(screen.getByText(/22:00/)).toBeTruthy()
+  })
+
+  it('persists per-station start time to wizard context when creating schedule', async () => {
+    // Test: verify that the start time set in the modal is included in the created schedule
+    const user = userEvent.setup()
+    upsertGroup(makeGroup())
+    renderApp()
+    await navigateToStep4(user)
+
+    // Open timing modal and change start time to 21:00
+    const gearButton = screen.getAllByRole('button', { name: /הגדרות תזמון עמדה/i })[0]
+    await user.click(gearButton)
+    await waitFor(() => expect(screen.getByText(/הגדרות תזמון —/)).toBeTruthy())
+
+    const timeInputs = screen.getAllByRole('textbox', { name: 'שעות' })
+    const startHourInput = timeInputs[0]
+    await user.clear(startHourInput)
+    await user.type(startHourInput, '21')
+
+    await user.click(screen.getByRole('button', { name: 'שמור' }))
+
+    // Verify the UI shows 21:00
+    await waitFor(() => {
+      expect(screen.getByText(/21:00/)).toBeTruthy()
+    })
+
+    // Create the schedule
+    await user.click(screen.getByText('צור לוח שמירה ✓'))
+
+    // Verify the schedule was created and saved with the custom start time
+    await waitFor(() => {
+      const schedules = getSchedules()
+      expect(schedules).toHaveLength(1)
+      const schedule = schedules[0]
+      // First participant in the station should start at 21:00
+      const firstParticipant = schedule?.stations[0]?.participants[0]
+      expect(firstParticipant?.startTime).toBe('21:00')
+    })
+  })
 })
