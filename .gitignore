@@ -3,3 +3,4 @@ dist/
 coverage/
 .vercel
 .env*.local
+TODOS.md

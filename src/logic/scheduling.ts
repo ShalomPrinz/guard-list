@@ -154,6 +154,37 @@ export function recalculateStation(
   return buildStationSchedule(withDuration, startTime, startDate)
 }
 
+/**
+ * Recalculate station with support for both duration modes.
+ * Mode 'endingHour': calculates duration from endTime (like recalculateStation).
+ * Mode 'constantDuration': uses a fixed duration directly without rounding.
+ */
+export function recalculateStationWithMode(
+  participants: Array<{ name: string }>,
+  startTime: string,
+  startDate: string,
+  mode: 'endingHour' | 'constantDuration',
+  endTimeOrDuration: string | number, // endTime (string) for 'endingHour', duration (number) for 'constantDuration'
+  roundingAlgorithm: RoundingAlgorithm,
+): ScheduledParticipant[] {
+  if (participants.length === 0) return []
+
+  if (mode === 'endingHour') {
+    return recalculateStation(
+      participants,
+      startTime,
+      startDate,
+      endTimeOrDuration as string,
+      roundingAlgorithm,
+    )
+  }
+
+  // mode === 'constantDuration'
+  const durationMinutes = typeof endTimeOrDuration === 'number' ? endTimeOrDuration : Number(endTimeOrDuration)
+  const withDuration = participants.map(p => ({ ...p, durationMinutes }))
+  return buildStationSchedule(withDuration, startTime, startDate)
+}
+
 // ─── Participant distribution ─────────────────────────────────────────────────
 
 /**

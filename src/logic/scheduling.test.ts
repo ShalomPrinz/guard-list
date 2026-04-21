@@ -7,6 +7,7 @@ import {
   calcStationDurations,
   distributeParticipants,
   recalculateStation,
+  recalculateStationWithMode,
 } from './scheduling'
 
 // ─── parseTimeToMinutes ───────────────────────────────────────────────────────
@@ -263,5 +264,170 @@ describe('recalculateStation', () => {
     expect(result[0].durationMinutes).toBe(120)
     expect(result[0].startTime).toBe('08:00')
     expect(result[0].endTime).toBe('10:00')
+  })
+})
+
+// ─── recalculateStationWithMode ───────────────────────────────────────────────
+
+describe('recalculateStationWithMode', () => {
+  const participants = [
+    { name: 'Alice' },
+    { name: 'Bob' },
+    { name: 'Charlie' },
+  ]
+
+  it('endingHour mode produces same result as recalculateStation', () => {
+    const resultWithMode = recalculateStationWithMode(
+      participants,
+      '14:00',
+      '2026-04-22',
+      'endingHour',
+      '16:00',
+      'round-up-10'
+    )
+    const resultDirect = recalculateStation(
+      participants,
+      '14:00',
+      '2026-04-22',
+      '16:00',
+      'round-up-10'
+    )
+    expect(resultWithMode).toEqual(resultDirect)
+  })
+
+  it('applies constant duration correctly (no rounding applied)', () => {
+    const result = recalculateStationWithMode(
+      participants,
+      '14:00',
+      '2026-04-22',
+      'constantDuration',
+      45,
+      'round-up-10'
+    )
+    expect(result).toHaveLength(3)
+    // All participants should have exactly 45 minutes (no rounding)
+    expect(result[0].durationMinutes).toBe(45)
+    expect(result[1].durationMinutes).toBe(45)
+    expect(result[2].durationMinutes).toBe(45)
+    // Times should be incremented by 45 minutes each
+    expect(result[0].startTime).toBe('14:00')
+    expect(result[1].startTime).toBe('14:45')
+    expect(result[2].startTime).toBe('15:30')
+  })
+
+  it('constant duration with 2 participants', () => {
+    const twoParticipants = [{ name: 'Alice' }, { name: 'Bob' }]
+    const result = recalculateStationWithMode(
+      twoParticipants,
+      '09:00',
+      '2026-04-22',
+      'constantDuration',
+      30,
+      'round-up-10'
+    )
+    expect(result[0].durationMinutes).toBe(30)
+    expect(result[1].durationMinutes).toBe(30)
+    expect(result[0].startTime).toBe('09:00')
+    expect(result[1].startTime).toBe('09:30')
+    expect(result[0].endTime).toBe('09:30')
+    expect(result[1].endTime).toBe('10:00')
+  })
+
+  it('constant duration crossing midnight increments date correctly', () => {
+    const twoParticipants = [{ name: 'Alice' }, { name: 'Bob' }]
+    const result = recalculateStationWithMode(
+      twoParticipants,
+      '23:30',
+      '2026-04-22',
+      'constantDuration',
+      60,
+      'round-up-10'
+    )
+    expect(result[0].startTime).toBe('23:30')
+    expect(result[0].endTime).toBe('00:30')
+    expect(result[0].date).toBe('2026-04-22')
+    expect(result[1].startTime).toBe('00:30')
+    expect(result[1].endTime).toBe('01:30')
+    expect(result[1].date).toBe('2026-04-23') // crosses midnight
+  })
+
+  it('constant duration with single participant', () => {
+    const one = [{ name: 'Solo' }]
+    const result = recalculateStationWithMode(
+      one,
+      '10:00',
+      '2026-04-22',
+      'constantDuration',
+      120,
+      'round-up-10'
+    )
+    expect(result[0].durationMinutes).toBe(120)
+    expect(result[0].startTime).toBe('10:00')
+    expect(result[0].endTime).toBe('12:00')
+  })
+
+  it('constant duration ignores rounding algorithm', () => {
+    const result1 = recalculateStationWithMode(
+      [{ name: 'Alice' }],
+      '10:00',
+      '2026-04-22',
+      'constantDuration',
+      45,
+      'round-up-10'
+    )
+    const result2 = recalculateStationWithMode(
+      [{ name: 'Alice' }],
+      '10:00',
+      '2026-04-22',
+      'constantDuration',
+      45,
+      'round-nearest'
+    )
+    // Both should have exact same duration (45 min, not rounded)
+    expect(result1[0].durationMinutes).toBe(45)
+    expect(result2[0].durationMinutes).toBe(45)
+  })
+
+  it('returns empty array for no participants in any mode', () => {
+    const result = recalculateStationWithMode(
+      [],
+      '14:00',
+      '2026-04-22',
+      'constantDuration',
+      60,
+      'round-up-10'
+    )
+    expect(result).toEqual([])
+  })
+
+  it('preserves participant names in constant duration mode', () => {
+    const result = recalculateStationWithMode(
+      participants,
+      '14:00',
+      '2026-04-22',
+      'constantDuration',
+      60,
+      'round-up-10'
+    )
+    expect(result[0].name).toBe('Alice')
+    expect(result[1].name).toBe('Bob')
+    expect(result[2].name).toBe('Charlie')
+  })
+
+  it('constant duration with various minute values', () => {
+    const twoParticipants = [{ name: 'Alice' }, { name: 'Bob' }]
+    const testCases = [15, 30, 45, 60, 90, 120]
+    testCases.forEach(mins => {
+      const result = recalculateStationWithMode(
+        twoParticipants,
+        '10:00',
+        '2026-04-22',
+        'constantDuration',
+        mins,
+        'round-up-10'
+      )
+      expect(result[0].durationMinutes).toBe(mins)
+      expect(result[1].durationMinutes).toBe(mins)
+    })
   })
 })

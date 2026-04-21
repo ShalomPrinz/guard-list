@@ -8,6 +8,10 @@ Describes what the app does — algorithms, screen behavior, feature rules, and 
 
 ### Duration Calculation
 
+Two modes per station, selected in Step4_Review:
+
+**Mode 1: Ending Hour (default)**
+
 ```
 rawDuration = (endTime - startTime) / participantsInStation
 ```
@@ -25,6 +29,14 @@ Apply rounding based on user-selected algorithm:
 **Example:** 7 hours / 5 participants = 84 min → rounded up to 90 min (next 10-min mark).
 
 The rounded duration is applied uniformly per participant in that station. Rounding may cause the actual end time to exceed the stated end time — this is expected and acceptable.
+
+**Mode 2: Constant Warrior Duration**
+
+Fixed duration in minutes applies uniformly to each warrior in that station. No rounding applied—duration is used exactly as entered. Useful for rigid shift lengths or when ending time is not critical.
+
+```
+duration = userEnteredMinutes (no rounding)
+```
 
 ### Schedule Generation
 
@@ -56,6 +68,8 @@ When `totalParticipants % numberOfStations !== 0`:
 ### File Map
 
 - Duration calculation, rounding, schedule generation: `src/logic/scheduling.ts`
+  - `recalculateStation()` for end-time mode recalculation
+  - `recalculateStationWithMode()` for both modes (endingHour and constantDuration)
 - Continue round ordering and unite logic: `src/logic/continueRound.ts`
 - Author formatting (initials + family name): `src/logic/formatting.ts`
 - Short-list schedule generation: `src/logic/shortListGeneration.ts`
@@ -139,7 +153,7 @@ Quick schedule generation flow without the full wizard. Route: `/short-list/step
 - **CitationsScreen:** CRUD for citations DB. Author auto-formatted to initials + family name on blur ("יוסי ישראלי" → "י. ישראלי"). Live preview shown during typing. Single word (family name only) left unformatted. Renders citations in sections grouped by creator in **both search and non-search modes** — there is no flat-list mode. Current user's section is first (header "הציטוטים שלי"), then one section per other group member (header = username). Each section starts with `SECTION_INITIAL = 3` visible items; "טען עוד ציטוטים" loads `SECTION_LOAD_MORE = 10` more; after clicking, an `IntersectionObserver` on a per-section sentinel `<div>` drives further increments. Per-section state: `sectionVisible: Record<string, number>` (keyed by username or `ME_KEY`) and `sectionLoadMoreClicked: Record<string, boolean>`. `ME_KEY` is computed as `currentUsername ?? '__me__'` — never the literal string `'__me__'`. Sentinel refs stored in `sentinelRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())`. **When `search` is non-empty**, each section's `getSectionItems(key)` filters by `c.text.includes(search) || c.author.includes(search)`. Sections with 0 matches are hidden. When all sections have 0 matches, shows `"אין תוצאות לחיפוש זה."`. Changing `search` resets `sectionVisible` and `sectionLoadMoreClicked` to `{}` so each section starts at 3 items. There is no `visibleCount` state, no `PAGE_SIZE`, and no flat-list sentinel — do not reintroduce them. In non-selection mode, shows a single `🤝 מרכז השיתוף` button navigating to `/sharing-center`. Edit/delete gated by `canEditDelete = !citation.createdByUsername || citation.createdByUsername === currentUsername`. New citations saved with `createdByUsername: getUsername() ?? undefined`. On mount, if in a sharing group, `syncGroupCitations()` calls `kvCrossReadGroupMember` for each other member and merges via `upsertCitation`/`deleteCitationSilent`. A `loading` state shows `"מסנכרן ציטוטים..."` until sync completes. `setCitations(getCitations())` always called in `finally`. The "אין ציטוטים עדיין." empty state only shown when `citations.length === 0 && !loading`.
 - **SharingCenterScreen:** route `/sharing-center`. On mount, `useEffect` calls only `loadSharingCenterUpdates()`. Guest citations fetched on demand only when user opens inbox. Sections: notification banner, guest link card ("📋 העתק קישור" + "📤 שתף בוואטסאפ"), guest inbox button (badge count, opens modal), group management. "עזוב קבוצה" triggers `leaveGroup()` via `ConfirmDialog` then navigates to `/citations`. All sharing and guest citation management lives here — nothing in App.tsx or CitationsScreen. Loading state uses `loadingAction: 'accept' | 'decline' | 'sendInvite' | 'cancelInvite' | 'leave' | null` (not a boolean) so each button shows its own `<Spinner />` independently. Post-action toasts: `handleAccept` on success fires `toast.success('הצטרפת לקבוצת השיתוף בהצלחה')`; `handleDecline` fires `toast.success('ההזמנה נדחתה')`; `handleCancelInvite` fires `toast.success('ההזמנה בוטלה')`; `handleLeave` fires no toast (navigation to `/citations` is the feedback); `handleSendInvite` already has full toast coverage. The cancel outgoing invitation is a named `handleCancelInvite` function — not an inline async onClick.
 - **GuestCitationsScreen:** public, no auth. Route `/guest/:username`. Self-contained — no `Layout`, no `Header`. RTL Hebrew form: text textarea + author input + submit. Calls `fetch('/api/kv', { action: 'guestSubmit', targetUsername, text, author })` directly (no cloudStorage helper). Shows `"הציטוט נשלח בהצלחה!"` on success, `"יותר מדי שליחות — נסה שוב בעוד דקה"` on 429, `"שגיאה בשליחה — נסה שוב"` on other failures, `"נדרש טקסט וכותב"` on blank fields.
-- **Step4_Review:** default round name is "רשימת שמירה". Quote and author are wizard session state — restored on Back navigation. Per-warrior optional note field (collapsed by default, never in WhatsApp output). Editable end time per station header triggers immediate recalculation via `recalculateStation`. `autoFormatAuthor` toggle (default on) auto-formats author on blur; `saveToCollection` defaults to `true`. Both are wizard session fields.
+- **Step4_Review:** default round name is "רשימת שמירה". Quote and author are wizard session state — restored on Back navigation. Per-warrior optional note field (collapsed by default, never in WhatsApp output). Each station has a pencil (⚙️) button opening a timing modal where users select duration mode: (1) **Ending Hour** (calculates duration from start and end times with rounding) or (2) **Constant Warrior Duration** (fixed minutes per warrior, no rounding). Mode toggle UI matches Step2_Time pattern (two-button side-by-side). In Ending Hour mode, modal shows start time, end time, and rounding algorithm selector. In Constant Duration mode, shows start time and a minutes input (no rounding selector). Duration mode and constant duration value are stored per-station in wizard session: `stationDurationModes: Record<stationId, 'endingHour' | 'constantDuration'>` and `stationConstantDurations: Record<stationId, number>`. Recalculation via `recalculateStationWithMode()` in `src/logic/scheduling.ts`, which respects the mode for each station independently. `autoFormatAuthor` toggle (default on) auto-formats author on blur; `saveToCollection` defaults to `true`. Both are wizard session fields.
 - **ResultScreen:** "איחוד רשימות" always visible. For continued rounds: shortcut to direct parent or list picker. For others: list picker sorted newest-first with search. Back button: if `ShortListWizardContext` is active, clears session and navigates to `/short-list/step2`; otherwise returns to Step4_Review. When `schedule.customWhatsAppText` exists, clicking "← חזרה לעריכה" shows a guard modal — user must choose to keep or delete the edit. WhatsApp preview box has a pencil button (✏️, `aria-label="ערוך טקסט"`) opening an inline `<textarea>` with "אשר"/"בטל". `schedule` held in `useState` (not read inline) so `refresh()` can re-fetch after storage mutations. `updateScheduleCustomText` is in `src/storage/schedules.ts`.
 - **ShortListStep2:** collects `startHour` (0–23), `minutesPerWarrior` (min 1, default 60), `numberOfWarriors` (per station, min 1, max = available base members ÷ stations). UI shows "סך הכל: X חיילים" (numberOfWarriors × stationCount). Navigates to ResultScreen on creation.
 - **UniteScreen:** merges two schedules per station sorted by full datetime. Uses earlier schedule's name and citation. Never saved to localStorage. Same pencil-edit UX as ResultScreen but session-only.

@@ -1,5 +1,6 @@
 // Global test setup — runs before every test file
 // Runs before modules are imported, so IS_COARSE in TimePicker.tsx evaluates correctly.
+import { vi } from 'vitest'
 
 // Mock cloudStorage globally so no test ever makes a real network call.
 vi.mock('./storage/cloudStorage', () => ({

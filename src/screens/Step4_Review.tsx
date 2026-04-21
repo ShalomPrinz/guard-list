@@ -25,7 +25,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useWizard } from '../context/WizardContext'
 import { buildStationSchedule, addDaysToDate } from '../logic/generateSchedule'
-import { parseTimeToMinutes, minutesToTime, calcStationDurations, recalculateStation } from '../logic/scheduling'
+import { parseTimeToMinutes, minutesToTime, calcStationDurations, recalculateStation, recalculateStationWithMode } from '../logic/scheduling'
 import { upsertSchedule } from '../storage/schedules'
 import { recordShift } from '../storage/statistics'
 import { getCitations, markCitationUsed, upsertCitation } from '../storage/citations'
@@ -59,6 +59,10 @@ interface ReviewStation {
   roundingAlgorithm: RoundingAlgorithm
   /** Set when the user manually edits end time for this station in the timing modal. */
   endTimeOverride?: string
+  /** Mode for this station: 'endingHour' or 'constantDuration'. Defaults to 'endingHour'. */
+  durationMode: 'endingHour' | 'constantDuration'
+  /** Duration in minutes for 'constantDuration' mode. */
+  constantDurationMinutes?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -120,6 +124,9 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
 
     const scheduled = buildStationSchedule(partsWithDuration, stStartTime, stStartDate)
 
+    const durationMode = session.stationDurationModes?.[ws.config.id] ?? 'endingHour'
+    const constantDurationMinutes = session.stationConstantDurations?.[ws.config.id]
+
     return {
       stationConfigId: ws.config.id,
       stationName: ws.config.name,
@@ -134,6 +141,8 @@ function buildReviewStations(session: NonNullable<ReturnType<typeof useWizard>['
       startTime: stStartTime,
       startDate: stStartDate,
       roundingAlgorithm: stationRounding,
+      durationMode,
+      constantDurationMinutes,
     }
   })
 }
@@ -269,7 +278,7 @@ function ReviewStationCard({
   onRename: (id: string, name: string) => void
   onDurationChange: (id: string, stationId: string, minutes: number) => void
   onAdd: (stationId: string, name: string) => void
-  onTimingConfigChange: (stationId: string, config: { startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm }) => void
+  onTimingConfigChange: (stationId: string, config: { startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm; durationMode?: 'endingHour' | 'constantDuration'; constantDurationMinutes?: number }) => void
 }) {
   const [addName, setAddName] = useState('')
   const [timingModalOpen, setTimingModalOpen] = useState(false)
@@ -278,6 +287,8 @@ function ReviewStationCard({
 
   const [draftStartTime, setDraftStartTime] = useState(station.startTime)
   const [draftEndTime, setDraftEndTime] = useState(computedEndTime)
+  const [draftDurationMode, setDraftDurationMode] = useState<'endingHour' | 'constantDuration'>(station.durationMode)
+  const [draftConstantDuration, setDraftConstantDuration] = useState(String(station.constantDurationMinutes ?? 60))
 
   const startDate = station.startDate
   const endDate = draftEndTime < draftStartTime ? addDaysToDate(startDate, 1) : startDate
@@ -288,14 +299,18 @@ function ReviewStationCard({
     setDraftStartTime(station.startTime)
     setDraftEndTime(station.items[station.items.length - 1]?.endTime ?? computedEndTime)
     setDraftRounding(station.roundingAlgorithm)
+    setDraftDurationMode(station.durationMode)
+    setDraftConstantDuration(String(station.constantDurationMinutes ?? 60))
     setTimingModalOpen(true)
   }
 
   function handleSaveTiming() {
     onTimingConfigChange(station.stationConfigId, {
       startTime: draftStartTime,
-      endTime: draftEndTime,
+      endTime: draftDurationMode === 'endingHour' ? draftEndTime : undefined,
       roundingAlgorithm: draftRounding,
+      durationMode: draftDurationMode,
+      constantDurationMinutes: draftDurationMode === 'constantDuration' ? Number(draftConstantDuration) : undefined,
     })
     setTimingModalOpen(false)
   }
@@ -315,42 +330,89 @@ function ReviewStationCard({
 
       {timingModalOpen && (
         <Modal onClose={() => setTimingModalOpen(false)} title={`הגדרות תזמון — ${station.stationName}`}>
+            {/* Duration mode toggle */}
+            <div className="mb-4 flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+              <button
+                type="button"
+                onClick={() => setDraftDurationMode('endingHour')}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  draftDurationMode === 'endingHour'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}
+              >
+                זמן סיום
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftDurationMode('constantDuration')}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                  draftDurationMode === 'constantDuration'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}
+              >
+                זמן קבוע לכל לוחם
+              </button>
+            </div>
+
             {/* Start time */}
             <div className="mb-4 flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת התחלה:</label>
               <div className="flex items-center gap-2">
                 <TimePicker value={draftStartTime} onChange={setDraftStartTime} />
-                {crossesMidnight && (
+                {crossesMidnight && draftDurationMode === 'endingHour' && (
                   <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(startDate)}</span>
                 )}
               </div>
             </div>
 
-            {/* End time */}
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת סיום:</label>
-              <div className="flex items-center gap-2">
-                <TimePicker value={draftEndTime} onChange={setDraftEndTime} />
-                {crossesMidnight && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(endDate)}</span>
-                )}
+            {/* End time — shown when mode is 'endingHour' */}
+            {draftDurationMode === 'endingHour' && (
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">שעת סיום:</label>
+                <div className="flex items-center gap-2">
+                  <TimePicker value={draftEndTime} onChange={setDraftEndTime} />
+                  {crossesMidnight && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(endDate)}</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Rounding */}
-            <div className="mb-6">
-              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">עיגול משמרת:</label>
-              <select
-                value={draftRounding}
-                onChange={e => setDraftRounding(e.target.value as RoundingAlgorithm)}
-                className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
-                style={{ minHeight: 44 }}
-              >
-                {ROUNDING_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+            {/* Constant duration — shown when mode is 'constantDuration' */}
+            {draftDurationMode === 'constantDuration' && (
+              <div className="mb-4">
+                <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">
+                  משך קבוע לכל לוחם <span className="text-gray-400 dark:text-gray-500">(דקות)</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={draftConstantDuration}
+                  onChange={e => setDraftConstantDuration(e.target.value)}
+                  placeholder="למשל: 60"
+                  className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 placeholder-gray-400 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:ring-gray-600"
+                />
+              </div>
+            )}
+
+            {/* Rounding — shown only when mode is 'endingHour' */}
+            {draftDurationMode === 'endingHour' && (
+              <div className="mb-6">
+                <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">עיגול משמרת:</label>
+                <select
+                  value={draftRounding}
+                  onChange={e => setDraftRounding(e.target.value as RoundingAlgorithm)}
+                  className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-gray-900 outline-none ring-1 ring-gray-300 focus:ring-blue-500 dark:[color-scheme:dark] dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+                  style={{ minHeight: 44 }}
+                >
+                  {ROUNDING_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Buttons */}
             <div className="flex gap-3">
@@ -523,18 +585,21 @@ export default function Step4_Review() {
   }
 
   function handleTimingConfigChange(stationId: string, config: {
-    startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm
+    startTime?: string; endTime?: string; roundingAlgorithm?: RoundingAlgorithm; durationMode?: 'endingHour' | 'constantDuration'; constantDurationMinutes?: number
   }) {
     setStations(prev => prev.map(st => {
       if (st.stationConfigId !== stationId) return st
       const resolvedRounding = config.roundingAlgorithm ?? st.roundingAlgorithm
       const newStartTime = config.startTime ?? st.startTime
+      const newDurationMode = config.durationMode ?? st.durationMode
+      const newConstantDuration = config.constantDurationMinutes ?? st.constantDurationMinutes
       const parts = st.items.map(it => ({ name: it.name }))
-      if (parts.length === 0) return { ...st, roundingAlgorithm: resolvedRounding, startTime: newStartTime }
+      if (parts.length === 0) return { ...st, roundingAlgorithm: resolvedRounding, startTime: newStartTime, durationMode: newDurationMode, constantDurationMinutes: newConstantDuration }
 
-      if (config.endTime) {
-        const recalculated = recalculateStation(parts, newStartTime, st.startDate, config.endTime, resolvedRounding)
-        const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
+      let newItems: ReviewItem[] = []
+      if (newDurationMode === 'constantDuration' && newConstantDuration) {
+        const recalculated = recalculateStationWithMode(parts, newStartTime, st.startDate, 'constantDuration', newConstantDuration, resolvedRounding)
+        newItems = recalculated.map((sp, j) => ({
           id: st.items[j]?.id ?? `${stationId}-recalc-${j}`,
           name: sp.name,
           durationMinutes: sp.durationMinutes,
@@ -542,11 +607,37 @@ export default function Step4_Review() {
           endTime: sp.endTime,
           date: sp.date,
         }))
-        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding, endTimeOverride: config.endTime }
+        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding, durationMode: newDurationMode, constantDurationMinutes: newConstantDuration, endTimeOverride: undefined }
+      } else if (config.endTime) {
+        const recalculated = recalculateStation(parts, newStartTime, st.startDate, config.endTime, resolvedRounding)
+        newItems = recalculated.map((sp, j) => ({
+          id: st.items[j]?.id ?? `${stationId}-recalc-${j}`,
+          name: sp.name,
+          durationMinutes: sp.durationMinutes,
+          startTime: sp.startTime,
+          endTime: sp.endTime,
+          date: sp.date,
+        }))
+        return { ...st, items: newItems, startTime: newStartTime, roundingAlgorithm: resolvedRounding, durationMode: 'endingHour', constantDurationMinutes: undefined, endTimeOverride: config.endTime }
       }
 
-      return { ...st, items: recomputeTimes(st.items, newStartTime, st.startDate), startTime: newStartTime, roundingAlgorithm: resolvedRounding }
+      return { ...st, items: recomputeTimes(st.items, newStartTime, st.startDate), startTime: newStartTime, roundingAlgorithm: resolvedRounding, durationMode: newDurationMode, constantDurationMinutes: newConstantDuration }
     }))
+
+    // Save mode and duration to wizard context
+    if (session) {
+      const updatedModes = { ...session.stationDurationModes, [stationId]: config.durationMode ?? 'endingHour' }
+      const updatedDurations = { ...session.stationConstantDurations }
+      if (config.constantDurationMinutes !== undefined) {
+        updatedDurations[stationId] = config.constantDurationMinutes
+      } else {
+        delete updatedDurations[stationId]
+      }
+      updateSession({
+        stationDurationModes: updatedModes,
+        stationConstantDurations: updatedDurations,
+      })
+    }
 
     if (config.roundingAlgorithm && session) {
       const updated = session.stations.map(ws =>
@@ -671,7 +762,20 @@ export default function Step4_Review() {
     })
 
     setStations(reordered.map((st, idx) => {
-      if (st.endTimeOverride && st.items.length > 0) {
+      if (st.durationMode === 'constantDuration' && st.constantDurationMinutes && st.items.length > 0) {
+        // Station has constant duration mode — recalculate with that constant duration.
+        const parts = st.items.map(it => ({ name: it.name }))
+        const recalculated = recalculateStationWithMode(parts, st.startTime, st.startDate, 'constantDuration', st.constantDurationMinutes, st.roundingAlgorithm)
+        const newItems: ReviewItem[] = recalculated.map((sp, j) => ({
+          id: st.items[j]?.id ?? `${st.stationConfigId}-drag-${j}`,
+          name: sp.name,
+          durationMinutes: sp.durationMinutes,
+          startTime: sp.startTime,
+          endTime: sp.endTime,
+          date: sp.date,
+        }))
+        return { ...st, items: newItems }
+      } else if (st.endTimeOverride && st.items.length > 0) {
         // Station has a user-set end time — preserve it by recalculating from that end time.
         const parts = st.items.map(it => ({ name: it.name }))
         const recalculated = recalculateStation(parts, st.startTime, st.startDate, st.endTimeOverride, st.roundingAlgorithm)

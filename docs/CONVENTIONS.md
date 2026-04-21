@@ -54,6 +54,7 @@ Always fix the underlying issue first. Only suppress a rule if fixing is genuine
 - `Schedule` has `parentScheduleId?: string` when it is a continued round, `createdFromShortList?: boolean` when generated via short-list wizard, and `customWhatsAppText?: string` when the user has manually edited the WhatsApp preview text in ResultScreen. The `createdFromShortList` flag enables ResultScreen back button to reconstruct the short-list session from a schedule opened from history — allowing users to edit and regenerate short-list schedules seamlessly.
 - `ScheduledParticipant` has `note?: string` (optional per-warrior note, never shown in WhatsApp output).
 - `ShortListWizardSession` holds ephemeral state for quick schedule generation: `groupId`, `stations` (array of `StationConfig`), `startHour`, `minutesPerWarrior`, `numberOfWarriors` (interpreted as "warriors per station", not total), `name?: string` (default "רשימת שמירה"). Never persisted to KV or localStorage — session-only, cleared when returning home.
+- `WizardSession` in Step4_Review includes per-station duration mode configuration: `stationDurationModes?: Record<stationId, 'endingHour' | 'constantDuration'>` (defaults to 'endingHour' for all stations) and `stationConstantDurations?: Record<stationId, number>` (minutes per warrior for stations in 'constantDuration' mode). These fields persist across Step4 navigation and enable independent duration mode selection for each station.
 - All persisted types live in `src/types/index.ts`. Never define a persisted interface elsewhere.
 
 ---

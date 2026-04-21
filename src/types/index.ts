@@ -175,4 +175,6 @@ export interface WizardSession {
   citationId?: string; // ID of the DB citation selected (random or collection modes)
   autoFormatAuthor?: boolean; // default true — auto-format author name on blur in manual mode
   saveToCollection?: boolean; // default true — save manual citation to collection on create
+  stationDurationModes?: Record<string, 'endingHour' | 'constantDuration'>; // per-station mode; defaults to 'endingHour'
+  stationConstantDurations?: Record<string, number>; // minutes per warrior for stations in 'constantDuration' mode
 }
